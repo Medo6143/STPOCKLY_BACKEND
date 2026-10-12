@@ -210,6 +210,7 @@ erDiagram
         uuid product_id FK
         uuid product_unit_id FK
         numeric quantity
+        numeric list_unit_price
         numeric unit_price
         numeric line_total
     }
@@ -358,6 +359,8 @@ Quantity is allowed to go negative (a sale recorded before the invoice was scann
 ### 3.4 Sales
 
 **sales / sale_items** — quick-sale screen. Same idempotency pattern as invoices.
+
+`sale_items.list_unit_price` (`numeric(18,2) NOT NULL`) is the unit's sell price at sale time; `unit_price` (`numeric(18,2) NOT NULL`) is the price charged; `line_total = quantity × unit_price`. A line is "price overridden" when they differ (contract v1.1, S1/D1). Constraint: `CHECK (quantity > 0 AND unit_price >= 0 AND list_unit_price >= 0)`.
 
 | Index / constraint | Serves |
 |---|---|
