@@ -17,7 +17,7 @@ public sealed class TenantFilterTests
             .Where(entityType => typeof(ITenantEntity).IsAssignableFrom(entityType.ClrType))
             .ToList();
         var unfiltered = tenantTypes
-            .Where(entityType => entityType.GetQueryFilter() is null)
+            .Where(entityType => entityType.GetDeclaredQueryFilters().Count == 0)
             .Select(entityType => entityType.ClrType.Name);
 
         tenantTypes.Should().NotBeEmpty("the model maps tenant entities, so this rule must not pass vacuously");
