@@ -11,7 +11,9 @@ stockly/
 ├── docker-compose.yml            # postgres, redis, minio, pgadmin (dev profile)
 ├── .env.example                  # placeholders only, .env is git-ignored
 ├── .gitignore
+├── .gitattributes                # LF everywhere, CRLF for *.sln and *.cmd
 ├── .editorconfig
+├── global.json                   # .NET SDK 8.0.x, rollForward latestFeature
 ├── .github/
 │   ├── workflows/
 │   │   ├── backend.yml           # build, test, coverage (paths: backend/**)
@@ -26,7 +28,7 @@ stockly/
 │   ├── design/redis.md
 │   ├── design/backend.md         # next planning step
 │   ├── design/frontend.md        # next planning step
-│   ├── adr/NNNN-*.md
+│   ├── adr/NNNN-*.md            # 0001–0009
 │   └── features/_TEMPLATE.md, <feature>.md
 ├── backend/
 └── mobile/
@@ -130,6 +132,8 @@ backend/
 ```
 
 > `Stockly.Contracts`, `Stockly.Admin`, `Stockly.ArchitectureTests` and `Stockly.Admin.Tests` are additions to the original prompt (ADR-0005).
+
+> Layer rules live in `backend/tests/Stockly.ArchitectureTests`: `ProjectReferenceTests` checks the references declared in every `src/*.csproj` against the exact table in `AGENTS.md` §4; `LayerDependencyTests` (NetArchTest) checks compiled type dependencies; `ControllerSignatureTests` keeps Domain types out of controller signatures. Domain's only allowed package is `UUIDNext` (ADR-0009).
 
 ## 3. Mobile (Flutter)
 
