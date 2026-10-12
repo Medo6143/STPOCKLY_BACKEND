@@ -45,7 +45,7 @@ dotnet run --project src/Stockly.Api
 
 The API runs on the host. In Development it reads the repo-root `.env` itself (real environment variables win over it); in other environments it reads environment variables only. A missing required setting stops startup with the variable to set, for example `ConnectionStrings__Postgres`.
 
-**Auth settings.** `Jwt__SigningKey` is required: at least 32 bytes of random data (for example `openssl rand -base64 48`), kept in `.env` or the environment only, never logged. `Jwt__Issuer` and `Jwt__Audience` are optional (defaults `stockly` / `stockly-app`). Apply the migrations before the first run (`dotnet ef database update -p src/Stockly.Infrastructure -s src/Stockly.Api`); the `Identity` migration creates the user and membership tables and seeds the default plan. Auth endpoints and rules: [`docs/features/auth.md`](docs/features/auth.md).
+**Auth settings.** `Jwt__SigningKey` is required: at least 32 bytes of random data (for example `openssl rand -base64 48`), kept in `.env` or the environment only, never logged. `Jwt__Issuer` and `Jwt__Audience` are optional (defaults `stockly` / `stockly-app`). `RateLimiting__Auth__PermitLimit` and `RateLimiting__Auth__WindowSeconds` are optional (defaults `10` / `60`: login and register each allow 10 requests per minute per client IP). Apply the migrations before the first run (`dotnet ef database update -p src/Stockly.Infrastructure -s src/Stockly.Api`); the `Identity` migration creates the user and membership tables and seeds the default plan. Auth endpoints and rules: [`docs/features/auth.md`](docs/features/auth.md).
 
 | Endpoint | What |
 |---|---|
