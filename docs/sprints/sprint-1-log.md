@@ -172,3 +172,64 @@ Stop conditions. The message defining "the four stop conditions" did not reach t
 - Final verification (twice): build 0 warnings; Domain 260, Application 232, Architecture 23, Infrastructure 127, Api 230 = 872 green; no pending model changes.
 - Worker decisions accepted: two-stage decimal parsing (shape → `Validation.Failed`, then `Precision.*`; places counted on the string; `[0-9]` not `\d`); global `JsonNumberHandling.Strict`; separate `IProductQueries` read port; Redis `BacklogPolicy.FailFast`; cache skipped when the version cannot be read; `IUnitOfWork.TrySaveChangesAsync` for the barcode conflict.
 - Open (backlog): no maximum length for product/unit names in the contract; `lowStock=true&includeArchived=true` is not served by the partial index (documented).
+
+## Step 1.7: Sprint 1 review
+
+**Setup (clean clone, no `.env`):** `git clone` of `feature/sprint-1-review` into `D:\FLUTTER\_wteview`; `.env` copied from `.env.example`, only host ports changed (5435/6381/9010/9011/5051, because this machine already uses 5432/6379); compose project `stockly-review` (separate volumes, the dev stack untouched): postgres, redis, minio healthy, minio-init exited 0. `dotnet build -warnaserror`: 0 warnings. `dotnet ef database update`: applied `InitialCatalog`, `Identity`, `ProductsCatalog`; default plan seeded. API: `dotnet run` (Development, reads the clone's `.env`) on `http://127.0.0.1:5080`; `/health/ready` Healthy.
+
+**Flow:** `docs/review/sprint-1-review.http` (dev placeholders only), executed top to bottom against a fresh database in 16 s:
+
+```
+ R1 POST /api/auth/register -> 201 {"shop.role": "Owner"}
+ R2 POST /api/auth/register -> 201 {"shop.role": "Owner"}
+ L1 POST /api/auth/login -> 200 {"shop.role": "Owner"}
+  3 GET /api/auth/me -> 200 {"shop.role": "Owner"}
+  4 POST /api/products -> 201 {"quantity": "24.000", "isLowStock": false}
+  5 POST /api/products/01a13200-cd23-7917-8121-de209bb18e02/units -> 201 {}
+  6 POST /api/products/01a13200-cd23-7917-8121-de209bb18e02/adjustments -> 201 {"balanceAfter": "18.000", "quantityChange": "-6.000"}
+  7 POST /api/products/01a13200-cd23-7917-8121-de209bb18e02/stock-counts -> 200 {"quantity": "17.000", "changed": true, "movement.reason": "StockCount"}
+  8 POST /api/products/01a13200-cd23-7917-8121-de209bb18e02/stock-counts -> 200 {"quantity": "17.000", "changed": false}
+  9 GET /api/products?lowStock=true&page=1&pageSize=20 -> 200 {"totalCount": 1, "items": [{"name": "بنادول اكسترا", "quantity": "17.000", "isLowStock": true}]}
+ 10 GET /api/products/01a13200-cd23-7917-8121-de209bb18e02/movements?page=1&pageSize=20 -> 200 {"totalCount": 3, "items": [{"reason": "StockCount", "quantityChange": "-1.000", "balanceAfter": "17.000", "note": null}, {"reason": "ManualAdjustment", "quantityChange": "-6.000", "balanceAfter": "18.000", "note": "Expired, thrown away"}, {"reason": "StockCount", "quantityChange": "24.000", "balanceAfter": "24.000", "note": "Opening stock"}]}
+ 11 POST /api/products/01a13200-cd23-7917-8121-de209bb18e02/adjustments -> 400 {"code": "Precision.TooManyDecimals", "detail": "The value has too many decimal places (money 2, quantity 3, factor 6).", "status": 400}
+ L2 POST /api/auth/login -> 401 {"code": "Auth.InvalidCredentials", "detail": "البريد الإلكتروني أو كلمة المرور غير صحيحة.", "status": 401}
+ L3 POST /api/auth/login -> 401 {"code": "Auth.InvalidCredentials", "detail": "البريد الإلكتروني أو كلمة المرور غير صحيحة.", "status": 401}
+ L4 POST /api/auth/login -> 401 {"code": "Auth.InvalidCredentials", "detail": "البريد الإلكتروني أو كلمة المرور غير صحيحة.", "status": 401}
+ L5 POST /api/auth/login -> 401 {"code": "Auth.InvalidCredentials", "detail": "البريد الإلكتروني أو كلمة المرور غير صحيحة.", "status": 401}
+ L6 POST /api/auth/login -> 401 {"code": "Auth.InvalidCredentials", "detail": "البريد الإلكتروني أو كلمة المرور غير صحيحة.", "status": 401}
+ L7 POST /api/auth/login -> 423 Retry-After=900 {"code": "Auth.LockedOut", "detail": "محاولات دخول فاشلة كثيرة. تم قفل حسابك لمدة 15 دقيقة. حاول مرة أخرى لاحقاً.", "status": 423}
+ L8 POST /api/auth/login -> 200 {"shop.role": "Owner"}
+ L9 POST /api/auth/login -> 200 {"shop.role": "Owner"}
+L10 POST /api/auth/login -> 200 {"shop.role": "Owner"}
+L11 POST /api/auth/login -> 429 Retry-After=60 {"code": "Auth.TooManyRequests", "detail": "Too many requests. Please wait a moment and try again.", "status": 429}
+  H GET /health/ready -> 200 {"status": "Healthy", "checks": [["postgres", "Healthy"], ["redis", "Healthy"]]}
+```
+
+All results match the expected values written in the file: opening stock as a `StockCount` movement with note "Opening stock"; unit conversion (2 boxes × 3 = 6 base units); no zero movement on an unchanged count; low-stock list; movement history newest first; precision rejected, not rounded; lockout with the correct password (423, `Retry-After` 900, Arabic message); account B unaffected; the 11th login request in the minute is rate limited (429, `Retry-After` 60).
+
+### Definition of Done: Sprint 1
+
+| Item | Code follows AGENTS.md (§11) | Tests | Docs | Migration reviewed | Clean `docker compose up -d` | Done |
+|---|---|---|---|---|---|---|
+| Solution, 5 + 5 projects, `Directory.Build.props`, central packages (.NET 10) | ✅ | ✅ architecture 23 | ✅ structure.md, ADR-0009/0010/0011 | n/a | ✅ | ✅ |
+| Architecture tests (layers, tenant filter, IgnoreQueryFilters, tenant scope, shop members) | ✅ | ✅ | ✅ | n/a | n/a | ✅ |
+| docker-compose (postgres, redis, minio, minio-init, pgadmin) + `.env.example`, health checks | ✅ | ✅ (1.2 verification) | ✅ README, structure.md, ADR-0008 | n/a | ✅ | ✅ |
+| Domain: Product, ProductUnit, StockMovement, Result/Error, ArabicTextNormalizer | ✅ | ✅ Domain 260 (99% lines) | ✅ products.md | n/a | n/a | ✅ |
+| DbContext, tenant filter + interceptors, first migration with all indexes | ✅ | ✅ Infrastructure 127 | ✅ erd.md §3.7 | ✅ | ✅ | ✅ |
+| Auth: register, login, refresh rotation (token families), logout, me; lockout; rate limit | ✅ | ✅ Application + Api | ✅ auth.md, ADR-0002 update | ✅ `Identity` | ✅ (review flow) | ✅ |
+| Products: create (opening stock), update, archive, list (paged, search, low stock), get, units CRUD, adjust, stock count, movements | ✅ | ✅ Api 230 | ✅ products.md, erd.md | ✅ `ProductsCatalog` | ✅ (review flow) | ✅ |
+| Redis `ICacheService` + version keys, Redis-down fallback | ✅ | ✅ Testcontainers Redis | ✅ redis.md | n/a | ✅ | ✅ |
+| ProblemDetails (+ `code`), Serilog, correlation id, `/health/live`, `/health/ready` | ✅ | ✅ | ✅ README | n/a | ✅ | ✅ |
+| OpenAPI spec generated in a test + contract conformance (contract v1.4) | ✅ | ✅ | ✅ contract.md | n/a | n/a | ✅ |
+| Docs: `features/auth.md`, `features/products.md` | ✅ | n/a | ✅ | n/a | n/a | ✅ |
+
+Totals on `main` after 1.6: Domain 260, Application 232, Architecture 23, Infrastructure 127, Api 230 = **872 tests**, 0 warnings. Coverage: Domain 99.0%, Application 97.5% (target ≥ 80%).
+
+### Known gaps after Sprint 1 (backend)
+- CI (GitHub Actions) not set up yet (roadmap: Sprint 6).
+- Rate limiting uses the connection IP; forwarded headers must be configured behind a reverse proxy at deployment (contract decision 19).
+- Lockout tells a caller who failed 5 times that the account exists (accepted trade-off, contract decision 18).
+- No maximum length for product and unit names in the contract; `lowStock=true&includeArchived=true` not served by the partial index.
+- No shop switching, no member management, no `PATCH /api/auth/me` (backlog).
+- `ProductUnit.InUse` (P8) arrives with invoice/sale lines (Sprint 2+).
+- Docker's disk image stays on C: (product-owner decision); C: free space is monitored.
