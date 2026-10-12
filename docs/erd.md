@@ -8,7 +8,7 @@ Related ADRs: 0001 (stock ledger), 0002 (multi-tenancy), 0003 (units), 0004 (exp
 | Concern | Decision |
 |---|---|
 | Naming | `snake_case` tables/columns via `EFCore.NamingConventions`. C# stays PascalCase. |
-| Primary keys | `uuid`, generated in the app as **UUIDv7** (time-ordered → index-friendly inserts). .NET 8 has no built-in v7, use `UUIDNext`. The Domain `Entity` base assigns the id at construction (ADR-0009). |
+| Primary keys | `uuid`, generated in the app as **UUIDv7** (time-ordered → index-friendly inserts). The Domain `Entity` base assigns the id at construction with `Guid.CreateVersion7()` (ADR-0010). Ids from different milliseconds sort by creation time; inside one millisecond they do not, so order by `created_at`, never by `id`. |
 | Time | `timestamptz`, always UTC, produced by `IClock`. Business dates (invoice date, expiry) are `date`. |
 | Money | `numeric(18,2)`, C# `decimal`, never negative. Currency is EGP (one currency, no currency column). |
 | Quantities | `numeric(14,3)`, always stored in the product's **base unit** (supports 1.5 kg for groceries). |

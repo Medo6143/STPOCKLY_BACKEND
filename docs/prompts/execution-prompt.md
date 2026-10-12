@@ -22,10 +22,10 @@ You are a senior full-stack engineer implementing "Stockly", an AI inventory app
 If two sources disagree, or a source is silent on something you need, STOP and ask me one clear question. Never invent a design decision silently. If you believe a documented decision is wrong, say so and propose an ADR change; do not just deviate.
 
 ## Fixed technical choices
-- .NET 8 (LTS), C# 12, EF Core 8 + Npgsql 8, PostgreSQL 16, Redis 7, MinIO.
+- .NET 10 (LTS), C# 14, EF Core 10 + Npgsql 10, PostgreSQL 16, Redis 7, MinIO.
 - MediatR: pin to 12.x (last Apache-licensed line). Do not upgrade to 13+.
 - FluentAssertions: pin to 7.x (last Apache-licensed line). Do not upgrade to 8+.
-- FluentValidation 11.x, Serilog.AspNetCore, Hangfire.PostgreSql, Microsoft.Extensions.Http.Resilience (Polly v8), UUIDNext for UUIDv7, EFCore.NamingConventions for snake_case.
+- FluentValidation 11.x, Serilog.AspNetCore, Hangfire.PostgreSql, Microsoft.Extensions.Http.Resilience (Polly v8), Guid.CreateVersion7 for UUIDv7 (ADR-0010), EFCore.NamingConventions for snake_case.
 - Tests: xUnit, NSubstitute, Testcontainers (PostgreSql, Redis, Minio modules), NetArchTest.Rules.
 - All package versions live in Directory.Packages.props at the repo root (central package management).
 
@@ -69,7 +69,7 @@ Start Sprint 1 (docs/roadmap.md). We do it in 7 steps. Do ONLY step 1.1 now, fol
   tests: Stockly.Domain.Tests, Stockly.Application.Tests, Stockly.Api.IntegrationTests, Stockly.ArchitectureTests
   (Stockly.Admin and Stockly.Admin.Tests are created in Sprint 5, not now.)
 - Project references must follow AGENTS.md §4 exactly. No extra references.
-- Directory.Build.props: net8.0, Nullable enable, ImplicitUsings enable, TreatWarningsAsErrors true, AnalysisLevel latest-recommended, EnforceCodeStyleInBuild true.
+- Directory.Build.props: net10.0, Nullable enable, ImplicitUsings enable, TreatWarningsAsErrors true, AnalysisLevel latest-recommended, EnforceCodeStyleInBuild true.
 - Directory.Packages.props with pinned versions (see Part A).
 - Root: .gitignore (dotnet + .env + IDE files), .editorconfig (C#), README.md (how to run, 5 minutes max).
 - Stockly.ArchitectureTests with tests that fail if:

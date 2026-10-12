@@ -74,3 +74,23 @@ Stop conditions. The message defining "the four stop conditions" did not reach t
 - `D:\FLUTTER\stockly-mobile-assets\` now holds `brand/` (byte-identical copy, checked with `diff -r`), `AGENTS.mobile.md` and `docs/structure.mobile.md`. It is not a git repository yet.
 - From the root: build 0 warnings / 0 errors; 240 tests green; `docker compose up -d` healthy with minio-init exited 0; `dotnet ef migrations list` and `database update` work.
 - ADR-0011 added. Paths updated in README, AGENTS.md, structure.md, roadmap, products.md and the execution prompt.
+
+## Step upgrade-net10: .NET 8 → .NET 10 LTS
+
+**Why:** .NET 8 support ends 2026-11-10; .NET 10 LTS is supported until November 2028. Done while the codebase is small.
+
+**Plan:**
+- `global.json` → SDK `10.0.100`, `rollForward: latestFeature` (installed: 10.0.401, runtime 10.0.12).
+- `Directory.Build.props` → `net10.0`; `LangVersion` removed (C# 14 is the default for net10.0).
+- `Directory.Packages.props` → Microsoft.* / EF Core / Npgsql / EFCore.NamingConventions / Mvc.Testing / Design to their latest 10.x; `dotnet-ef` local tool 10.0.12. MediatR 12.x and FluentAssertions 7.x stay pinned (license). Test SDK 18.x. Other packages checked for net10.0 support.
+- `Entity` uses `Guid.CreateVersion7()`; UUIDNext removed; Domain references no packages. ADR-0010 supersedes ADR-0009. Architecture allowlist for Domain becomes empty.
+- `Guid.CreateVersion7()` has no counter inside a millisecond (UUIDNext had one). The id test keeps "v7 and time-ordered" by asserting what v7 guarantees: embedded timestamps never decrease, and ids from different milliseconds sort in creation order. Recorded in ADR-0010.
+- Migration `InitialCatalog` verified under EF Core 10 (model diff and script diff).
+- Docs: AGENTS.md stack, README, structure.md, roadmap, execution prompt.
+- Acceptance: 0 warnings, all tests green with and without coverage, architecture failure demo still fails, compose + migration smoke check pass.
+
+**Result (upgrade-net10):**
+- SDK 10.0.401 / runtime 10.0.12. All packages on their latest 10.x (EF Core, ASP.NET, Mvc.Testing 10.0.12; Npgsql EF 10.0.3; EFCore.NamingConventions 10.0.1; Serilog.AspNetCore 10.0.0); HealthChecks 9.0.0 (latest, supports net10.0); Testcontainers 4.16.0 and UUIDNext-free Domain; test SDK 18.10.1; coverlet.collector 6.0.4 works on net10.0. MediatR 12.5.0 and FluentAssertions 7.2.2 unchanged.
+- Only code change forced by the upgrade: EF Core 10 named query filters (`GetQueryFilter()` → `GetDeclaredQueryFilters()` in `TenantFilterTests`).
+- Migration under EF Core 10: `has-pending-model-changes` → "No changes have been made to the model since the last migration". Script diff vs EF 8: one blank line and the product version written to the history row (`8.0.31` → `10.0.12`). Migration kept as is.
+- `Guid.CreateVersion7` replaces UUIDNext; ADR-0010 supersedes ADR-0009. The old strictly-ascending id assertion fails in 1000 of 1000 runs with `Guid.CreateVersion7`, so the test now asserts the v7 guarantees (version, variant, non-decreasing timestamps, order across milliseconds).

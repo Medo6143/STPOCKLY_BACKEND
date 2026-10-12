@@ -31,7 +31,7 @@ Key docs:
 | Layer | Technology |
 |---|---|
 | Admin | Blazor WebAssembly + MudBlazor (`Stockly.Admin`) |
-| Backend | .NET 8 Web API, EF Core + Npgsql, MediatR, FluentValidation, Serilog, ASP.NET Core Identity |
+| Backend | .NET 10 (LTS) Web API, EF Core 10 + Npgsql, MediatR, FluentValidation, Serilog, ASP.NET Core Identity |
 | Database | PostgreSQL 16 in Docker, extensions `pg_trgm` |
 | Cache | Redis 7 in Docker |
 | Storage | MinIO (S3-compatible) in Docker |
@@ -78,7 +78,7 @@ Api ──► Infrastructure ──► Application ──► Domain
 
 | Project | Owns | References (exactly) | Must never reference |
 |---|---|---|---|
-| `Stockly.Domain` | Entities, enums, value objects, domain rules, `Result`/`Error` | none; only package: `UUIDNext` (ADR-0009) | any project or any other package |
+| `Stockly.Domain` | Entities, enums, value objects, domain rules, `Result`/`Error` | none; no packages (ADR-0010) | any project or package |
 | `Stockly.Contracts` | Request/response DTOs shared by Api and Admin | none | anything but BCL |
 | `Stockly.Application` | MediatR commands/queries, handlers, validators, interfaces it needs | Domain, Contracts | EF Core, Npgsql, HttpClient, Redis, Hangfire, AWS SDK |
 | `Stockly.Infrastructure` | EF Core, Identity, OpenRouter client, Redis, MinIO, Hangfire | Application | Api |

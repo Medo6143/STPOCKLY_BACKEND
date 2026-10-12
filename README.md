@@ -8,7 +8,7 @@ Read [`AGENTS.md`](AGENTS.md) before your first change. Design docs live in [`do
 
 | Tool | Version |
 |---|---|
-| .NET SDK | 8.0.x (pinned in [`global.json`](global.json)) |
+| .NET SDK | 10.0.x (pinned in [`global.json`](global.json)) |
 | Docker Desktop | with Compose v2 |
 
 ## Run locally

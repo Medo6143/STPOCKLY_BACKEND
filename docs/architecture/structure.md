@@ -137,7 +137,7 @@ stockly-backend/
 
 > `Stockly.Contracts`, `Stockly.Admin`, `Stockly.ArchitectureTests` and `Stockly.Admin.Tests` are additions to the original prompt (ADR-0005).
 
-> Layer rules live in `tests/Stockly.ArchitectureTests`: `ProjectReferenceTests` checks the references declared in every `src/*.csproj` against the exact table in `AGENTS.md` §4; `LayerDependencyTests` (NetArchTest) checks compiled type dependencies; `ControllerSignatureTests` keeps Domain types out of controller signatures. Domain's only allowed package is `UUIDNext` (ADR-0009).
+> Layer rules live in `tests/Stockly.ArchitectureTests`: `ProjectReferenceTests` checks the references declared in every `src/*.csproj` against the exact table in `AGENTS.md` §4; `LayerDependencyTests` (NetArchTest) checks compiled type dependencies; `ControllerSignatureTests` keeps Domain types out of controller signatures. Domain references no packages; ids use `Guid.CreateVersion7()` (ADR-0010).
 
 ## 3. Mobile
 

@@ -11,7 +11,9 @@ public sealed class EntityTests
         var entity = new FirstEntity();
 
         entity.Id.Should().NotBe(Guid.Empty);
-        entity.Id.ToString()[14].Should().Be('7', "ADR-0009 requires UUIDv7 ids");
+        entity.Id.Version.Should().Be(7, "ids are UUIDv7 (ADR-0010)");
+        entity.Id.ToString()[14].Should().Be('7');
+        (entity.Id.Variant >> 2).Should().Be(0b10, "RFC 9562: the top two bits of the variant nibble are 10");
     }
 
     [Fact]
@@ -23,11 +25,28 @@ public sealed class EntityTests
     }
 
     [Fact]
-    public void Constructor_SequentialEntities_IdsAreTimeOrdered()
+    public void Constructor_SequentialEntities_EmbeddedTimestampsNeverDecrease()
     {
-        var ids = Enumerable.Range(0, 100).Select(_ => new FirstEntity().Id.ToString()).ToList();
+        var timestamps = Enumerable.Range(0, 1000).Select(_ => UnixMilliseconds(new FirstEntity().Id)).ToList();
 
-        ids.Should().BeInAscendingOrder(StringComparer.Ordinal, "UUIDv7 ids sort by creation time");
+        timestamps.Should().BeInAscendingOrder("a UUIDv7 starts with its creation time in Unix milliseconds");
+    }
+
+    [Fact]
+    public void Constructor_EntitiesInDifferentMilliseconds_IdsSortInCreationOrder()
+    {
+        // Guid.CreateVersion7 orders ids by millisecond; inside one millisecond the rest is random (ADR-0010).
+        var ids = new List<Guid> { new FirstEntity().Id };
+        while (ids.Count < 20)
+        {
+            var next = new FirstEntity().Id;
+            if (UnixMilliseconds(next) > UnixMilliseconds(ids[^1]))
+            {
+                ids.Add(next);
+            }
+        }
+
+        ids.Select(id => id.ToString()).Should().BeInAscendingOrder(StringComparer.Ordinal, "PostgreSQL sorts uuid by bytes");
     }
 
     [Fact]
@@ -91,6 +110,9 @@ public sealed class EntityTests
 
         entity.Equals((object)entity).Should().BeTrue();
     }
+
+    private static long UnixMilliseconds(Guid id) =>
+        Convert.ToInt64(id.ToString("N")[..12], 16);
 
     // Simulates EF materialization, which sets the Id through its backing field.
     private static T WithId<T>(T entity, Guid id)

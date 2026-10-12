@@ -23,7 +23,7 @@ Tables `products`, `product_units`, `stock_movements` (and `shops`) are created 
 | `MovementSource` | Value object | `None`, `FromInvoiceItem(invoiceId, itemId)`, `FromSaleItem(saleId, itemId)`; two sources cannot be built |
 
 Notes:
-- Ids are UUIDv7, assigned at construction (ADR-0009).
+- Ids are UUIDv7 from `Guid.CreateVersion7()`, assigned at construction (ADR-0010).
 - `products.updated_at` is set by the `AuditTimestampsInterceptor` in step 1.4; the Domain does not read the clock. Methods that record time take `now`.
 - **The base unit should be the smallest unit sold**, so most factors are >= 1 (Strip 1, Box 3, Carton 30). Fractional factors are allowed (Kg 1, Half kg 0.5).
 - Index change from this step: `stock_movements UNIQUE (invoice_item_id, reason) WHERE invoice_item_id IS NOT NULL` (was `UNIQUE (invoice_item_id)`), see the reversal rule below and ADR-0001.
