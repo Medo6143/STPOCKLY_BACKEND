@@ -1,6 +1,6 @@
 # ADR-0005: Platform admin dashboard (Blazor WASM) and the tenant-filter exception
 
-- Status: Proposed
+- Status: Accepted (2026-10-12)
 - Date: 2026-10-12
 
 ## Context

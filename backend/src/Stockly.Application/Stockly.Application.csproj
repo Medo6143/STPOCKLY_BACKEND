@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Stockly.Domain\Stockly.Domain.csproj" />
+    <ProjectReference Include="..\Stockly.Contracts\Stockly.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

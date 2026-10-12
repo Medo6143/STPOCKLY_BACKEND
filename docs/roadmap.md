@@ -11,15 +11,15 @@ Each sprint ends with a demo and a working build from a clean `docker compose up
 | Item | Status |
 |---|---|
 | Product decisions (units, sales, expiry, members, offline, admin) | Done |
-| ERD with indexes and constraints (`docs/erd.md`) | Draft, in review |
-| ADRs 0001–0008 | Draft, in review |
-| Redis design (`docs/design/redis.md`) | Draft, in review |
-| `AGENTS.md`, structure, roadmap | Draft, in review |
-| Brand: logo, splash animation, tokens (`brand/`) | Draft, in review |
-| Backend system design (`docs/design/backend.md`) | Next |
-| Frontend system design, mobile + admin (`docs/design/frontend.md`) | Next |
+| ERD with indexes and constraints (`docs/erd.md`) | Approved |
+| ADRs 0001–0009 | Approved |
+| Redis design (`docs/design/redis.md`) | Approved |
+| `AGENTS.md`, structure, roadmap | Approved |
+| Brand: logo, splash animation, tokens (`brand/`) | Approved |
+| Backend system design (`docs/design/backend.md`) | Before Sprint 2 |
+| Frontend system design, mobile + admin (`docs/design/frontend.md`) | Before Sprint 3 |
 
-**Exit:** all of the above approved. No code before that.
+**Exit:** all of the above approved, except the two system design docs. `docs/design/backend.md` is written and approved before Sprint 2 starts, `docs/design/frontend.md` before Sprint 3 (see `docs/prompts/execution-prompt.md`, Part D).
 
 ---
 

@@ -1,6 +1,6 @@
 # ADR-0008: Invoice images in S3-compatible object storage (MinIO locally)
 
-- Status: Proposed
+- Status: Accepted (2026-10-12)
 - Date: 2026-10-12
 
 ## Context

@@ -18,7 +18,7 @@ Key docs:
 | `docs/architecture/structure.md` | Full folder structure for backend, mobile, admin |
 | `docs/erd.md` | Data model, every index and constraint |
 | `docs/design/redis.md` | Redis jobs, key catalogue, TTLs, failure behaviour |
-| `docs/adr/` | Architecture decisions. Read before changing anything they cover. |
+| `docs/adr/` | Architecture decisions (0001–0009). Read before changing anything they cover. |
 | `docs/features/` | One doc per feature, from `_TEMPLATE.md` |
 | `brand/` | Logo, splash animation spec, color and type tokens |
 
@@ -78,18 +78,21 @@ A change is not finished until the relevant commands pass with **zero warnings**
 
 ```
 Api ──► Infrastructure ──► Application ──► Domain
- │                              ▲
- └──────────► Contracts ◄───────┘          Admin ──► Contracts
+ │                            ▲    │
+ ├────────────────────────────┘    ▼
+ └──────────────────────────► Contracts ◄── Admin
 ```
 
-| Project | Owns | Must never reference |
-|---|---|---|
-| `Stockly.Domain` | Entities, enums, value objects, domain rules, `Result`/`Error` | anything |
-| `Stockly.Contracts` | Request/response DTOs shared by Api and Admin | anything but BCL |
-| `Stockly.Application` | MediatR commands/queries, handlers, validators, interfaces it needs | EF Core, Npgsql, HttpClient, Redis, Hangfire, AWS SDK |
-| `Stockly.Infrastructure` | EF Core, Identity, OpenRouter client, Redis, MinIO, Hangfire | Api |
-| `Stockly.Api` | Controllers, middleware, auth wiring, DI composition | business logic |
-| `Stockly.Admin` | Blazor UI | Application, Infrastructure, Domain |
+| Project | Owns | References (exactly) | Must never reference |
+|---|---|---|---|
+| `Stockly.Domain` | Entities, enums, value objects, domain rules, `Result`/`Error` | none; only package: `UUIDNext` (ADR-0009) | any project or any other package |
+| `Stockly.Contracts` | Request/response DTOs shared by Api and Admin | none | anything but BCL |
+| `Stockly.Application` | MediatR commands/queries, handlers, validators, interfaces it needs | Domain, Contracts | EF Core, Npgsql, HttpClient, Redis, Hangfire, AWS SDK |
+| `Stockly.Infrastructure` | EF Core, Identity, OpenRouter client, Redis, MinIO, Hangfire | Application | Api |
+| `Stockly.Api` | Controllers, middleware, auth wiring, DI composition (composition root) | Application, Infrastructure, Contracts | business logic |
+| `Stockly.Admin` | Blazor UI | Contracts | Application, Infrastructure, Domain |
+
+Api references Application directly because, as the composition root, it uses Application command and query types explicitly; a transitive reference would hide a real dependency.
 
 These boundaries are enforced by `tests/Stockly.ArchitectureTests`. A failing architecture test is a design problem, not a test problem.
 
