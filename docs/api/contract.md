@@ -1,8 +1,8 @@
 # Stockly API contract
 
-**Version: v1.2** · Status: **Approved** (v1.1 at checkpoint 1, 2026-10-12; v1.2 clarifications by the orchestrator) · Owner: orchestrator
+**Version: v1.3** · Status: **Approved** (v1.1 at checkpoint 1, v1.3 at checkpoint 2, 2026-10-12; v1.2 clarifications by the orchestrator) · Owner: orchestrator
 
-Change log: v1 (2026-10-12) first draft · v1.1 (2026-10-12) opening stock on create (P3), list price and override flag on sales (S1, D1), `newProduct` without category (I4), `GET /api/auth/me` fields made explicit (A5) · v1.2 (2026-10-12) `Http.*` codes for framework errors (§1.8), `newProduct` on `InvoiceItemDto` (§6).
+Change log: v1 (2026-10-12) first draft · v1.1 (2026-10-12) opening stock on create (P3), list price and override flag on sales (S1, D1), `newProduct` without category (I4), `GET /api/auth/me` fields made explicit (A5) · v1.2 (2026-10-12) `Http.*` codes for framework errors (§1.8), `newProduct` on `InvoiceItemDto` (§6) · v1.3 (2026-10-12) `Retry-After` on `429 Scan.DailyQuotaExceeded` (I1).
 
 This is the binding contract between `stockly-backend` and `stockly-mobile` (and `Stockly.Admin` later) for Sprints 1–4. Field names, types, status codes and error codes here are exact. Only the orchestrator changes this file: every change bumps the version, updates the copy in `stockly-mobile/docs/api/contract.md`, and is announced to the running lanes.
 
@@ -343,7 +343,7 @@ InvoiceDetail {
 `multipart/form-data`: `image` (file, `image/jpeg` | `image/png` | `image/webp`, max 8 MB), `clientRequestId` (UUID).
 - New scan: `202` `InvoiceListItem` (status `Processing`), `Location: /api/invoices/{id}`. Processing runs in a background job.
 - Repeat `clientRequestId`: `200` `InvoiceListItem` with the current status. Quota and rate limit are not consumed again.
-Errors: `400 Invoice.ImageRequired`, `400 Invoice.UnsupportedImageType`, `400 Validation.Failed` (clientRequestId); `413 Invoice.ImageTooLarge`; `429 Scan.RateLimited` (header `Retry-After` seconds), `429 Scan.DailyQuotaExceeded` (resets at Africa/Cairo midnight).
+Errors: `400 Invoice.ImageRequired`, `400 Invoice.UnsupportedImageType`, `400 Validation.Failed` (clientRequestId); `413 Invoice.ImageTooLarge`; `429 Scan.RateLimited` (header `Retry-After` seconds), `429 Scan.DailyQuotaExceeded` (resets at Africa/Cairo midnight; v1.3: header `Retry-After` = whole seconds until the next Africa/Cairo midnight, at least 1).
 
 ### I2 `GET /api/invoices` (user)
 Query: `status` (optional InvoiceStatus), `page`, `pageSize`. Newest first. `200` paged `InvoiceListItem`.
@@ -499,7 +499,7 @@ ExpiringItem { productId: uuid, productName: string, expiryDate: date, batchNo: 
 | `Invoice.LineProductRequired` | 400 | I4, I5 | Line has neither product nor newProduct |
 | `Invoice.UnitNotOfProduct` | 400 | I4 | Unit belongs to another product |
 | `Scan.RateLimited` | 429 | I1 | Per-minute limit; `Retry-After` header |
-| `Scan.DailyQuotaExceeded` | 429 | I1 | Plan's daily scan quota used up |
+| `Scan.DailyQuotaExceeded` | 429 | I1 | Plan's daily scan quota used up; `Retry-After` = seconds until Cairo midnight (v1.3) |
 | `Sale.NotFound` | 404 | S3 | |
 | `Sale.ArchivedProduct` | 400 | S1 | Archived products cannot be sold |
 | `Sale.UnitNotOfProduct` | 400 | S1 | Unit belongs to another product |
