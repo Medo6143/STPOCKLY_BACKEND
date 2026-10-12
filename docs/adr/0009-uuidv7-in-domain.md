@@ -1,6 +1,6 @@
 # ADR-0009: UUIDv7 ids assigned in the Domain
 
-- Status: Accepted (2026-10-12)
+- Status: Superseded by ADR-0010 (2026-10-12)
 
 ## Context
 Primary keys are UUIDv7 generated in the app (`docs/erd.md` §1). .NET 8 has no built-in v7 generator, so we use the `UUIDNext` package. AGENTS.md §4 says `Stockly.Domain` references nothing.

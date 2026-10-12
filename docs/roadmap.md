@@ -12,7 +12,7 @@ Each sprint ends with a demo and a working build from a clean `docker compose up
 |---|---|
 | Product decisions (units, sales, expiry, members, offline, admin) | Done |
 | ERD with indexes and constraints (`docs/erd.md`) | Approved |
-| ADRs 0001–0009 | Approved |
+| ADRs 0001–0011 | Approved (0009 superseded by 0010) |
 | Redis design (`docs/design/redis.md`) | Approved |
 | `AGENTS.md`, structure, roadmap | Approved |
 | Brand: logo, splash animation, tokens (`brand/`, now in `stockly-mobile`, ADR-0011) | Approved |
@@ -24,6 +24,8 @@ Each sprint ends with a demo and a working build from a clean `docker compose up
 ---
 
 ## Sprint 1 — Foundation, Auth, Products
+
+_Stack: .NET 10 LTS (upgraded from .NET 8 during Sprint 1; .NET 8 support ends 2026-11-10)._
 
 **Goal:** a shop owner can register and manage products with units through the API.
 
