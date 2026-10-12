@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Stockly.Api.Authentication;
 
 namespace Stockly.Api.IntegrationTests.Support;
 
@@ -12,4 +14,9 @@ public sealed class TestOnlyController : ControllerBase
     [HttpGet("throw")]
     public IActionResult Throw() =>
         throw new InvalidOperationException(SecretDetail + Request.Path);
+
+    /// <summary>Stands in for the owner-only endpoints of step 1.6.</summary>
+    [HttpGet("owner-only")]
+    [Authorize(Policy = AuthPolicies.Owner)]
+    public IActionResult OwnerOnly() => NoContent();
 }

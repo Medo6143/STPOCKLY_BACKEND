@@ -9,7 +9,7 @@ namespace Stockly.Api.IntegrationTests.Support;
 /// Hosts the real Api in memory. Environment "Testing": the developer's .env is not loaded, so tests only see
 /// the settings given here.
 /// </summary>
-public sealed class StocklyApiFactory(string postgres, string redis, bool includeTestEndpoints)
+public sealed class StocklyApiFactory(string postgres, string redis, bool includeTestEndpoints, string jwtSigningKey = TestJwt.SigningKey)
     : WebApplicationFactory<Program>
 {
     public const string TestEnvironment = "Testing";
@@ -19,6 +19,7 @@ public sealed class StocklyApiFactory(string postgres, string redis, bool includ
         builder.UseEnvironment(TestEnvironment);
         builder.UseSetting("ConnectionStrings:Postgres", postgres);
         builder.UseSetting("ConnectionStrings:Redis", redis);
+        builder.UseSetting("Jwt:SigningKey", jwtSigningKey);
 
         if (includeTestEndpoints)
         {

@@ -42,12 +42,59 @@ public sealed class HttpContextCurrentTenantTests
     [Fact]
     public void ShopId_NoHttpContext_ReturnsNull()
     {
-        new HttpContextCurrentTenant(new HttpContextAccessor()).ShopId.Should().BeNull();
+        new HttpContextCurrentTenant(new HttpContextAccessor(), new RequestTenantScope()).ShopId.Should().BeNull();
     }
 
-    private static HttpContextCurrentTenant Tenant(params Claim[] claims)
+    [Fact]
+    public void ShopId_OpenTenantScope_WinsOverClaimUntilDisposed()
+    {
+        var claimShop = Guid.CreateVersion7();
+        var newShop = Guid.CreateVersion7();
+        var scope = new RequestTenantScope();
+        var tenant = Tenant(scope, new Claim(StocklyClaimTypes.ShopId, claimShop.ToString()));
+
+        using (scope.BeginForNewShop(newShop))
+        {
+            tenant.ShopId.Should().Be(newShop);
+        }
+
+        tenant.ShopId.Should().Be(claimShop);
+    }
+
+    [Fact]
+    public void ShopId_OpenTenantScopeWithoutHttpContext_ReturnsScopeShop()
+    {
+        var scope = new RequestTenantScope();
+        var shopId = Guid.CreateVersion7();
+        using var open = scope.BeginForNewShop(shopId);
+
+        new HttpContextCurrentTenant(new HttpContextAccessor(), scope).ShopId.Should().Be(shopId);
+    }
+
+    [Fact]
+    public void BeginForNewShop_AlreadyOpen_Throws()
+    {
+        var scope = new RequestTenantScope();
+        using var open = scope.BeginForNewShop(Guid.CreateVersion7());
+
+        var act = () => scope.BeginForNewShop(Guid.CreateVersion7());
+
+        act.Should().Throw<InvalidOperationException>("tenant scopes do not nest");
+    }
+
+    [Fact]
+    public void BeginForNewShop_EmptyShop_Throws()
+    {
+        var act = () => new RequestTenantScope().BeginForNewShop(Guid.Empty);
+
+        act.Should().Throw<ArgumentException>();
+    }
+
+    private static HttpContextCurrentTenant Tenant(params Claim[] claims) => Tenant(new RequestTenantScope(), claims);
+
+    private static HttpContextCurrentTenant Tenant(RequestTenantScope scope, params Claim[] claims)
     {
         var context = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(claims, "test")) };
-        return new HttpContextCurrentTenant(new HttpContextAccessor { HttpContext = context });
+        return new HttpContextCurrentTenant(new HttpContextAccessor { HttpContext = context }, scope);
     }
 }

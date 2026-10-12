@@ -1,5 +1,16 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <PropertyGroup>
+    <!-- Neutral resources (*.resx) are English; Arabic lives in *.ar.resx satellites. -->
+    <NeutralLanguage>en</NeutralLanguage>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MediatR" />
+    <PackageReference Include="FluentValidation" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Stockly.Domain\Stockly.Domain.csproj" />
     <ProjectReference Include="..\Stockly.Contracts\Stockly.Contracts.csproj" />

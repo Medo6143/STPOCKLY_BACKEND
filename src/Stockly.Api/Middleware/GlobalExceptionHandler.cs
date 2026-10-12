@@ -1,11 +1,13 @@
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using Stockly.Api.Errors;
 
 namespace Stockly.Api.Middleware;
 
 /// <summary>
 /// Unexpected exceptions become a 500 ProblemDetails with a <c>traceId</c> and no exception details
-/// (AGENTS.md rule 28). Expected failures never get here: they are <c>Result</c> errors.
+/// and code <c>Server.Unexpected</c> (AGENTS.md rule 28); title and detail are localized by
+/// <see cref="ProblemDetailsEnricher"/>. Expected failures never get here: they are <c>Result</c> errors.
 /// </summary>
 public sealed partial class GlobalExceptionHandler(
     IProblemDetailsService problemDetailsService, ILogger<GlobalExceptionHandler> logger) : IExceptionHandler
@@ -19,16 +21,14 @@ public sealed partial class GlobalExceptionHandler(
         LogUnhandled(logger, exception, httpContext.Request.Method, httpContext.Request.Path);
 
         httpContext.Response.StatusCode = StatusCodes.Status500InternalServerError;
-        return await problemDetailsService.TryWriteAsync(new ProblemDetailsContext
+        var problem = new ProblemDetails
         {
-            HttpContext = httpContext,
-            ProblemDetails = new ProblemDetails
-            {
-                Status = StatusCodes.Status500InternalServerError,
-                Title = Title,
-                Type = "https://tools.ietf.org/html/rfc9110#section-15.6.1",
-            },
-        });
+            Status = StatusCodes.Status500InternalServerError,
+            Title = Title,
+            Type = "https://tools.ietf.org/html/rfc9110#section-15.6.1",
+        };
+        problem.Extensions[StocklyProblems.CodeExtension] = StocklyProblems.ServerUnexpected;
+        return await problemDetailsService.TryWriteAsync(new ProblemDetailsContext { HttpContext = httpContext, ProblemDetails = problem });
     }
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Unhandled exception for {Method} {Path}")]

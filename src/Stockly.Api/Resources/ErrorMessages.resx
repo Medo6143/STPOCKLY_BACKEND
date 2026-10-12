@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Neutral (English) ProblemDetails title/detail per error code (contract §1.5, §1.8). Arabic: ErrorMessages.ar.resx.
+  Keys: {code}.Title and {code}.Detail. Every code the API can return must exist in both files (ErrorTextTests).
+-->
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="Validation.Failed.Title" xml:space="preserve">
+    <value>Validation failed</value>
+  </data>
+  <data name="Validation.Failed.Detail" xml:space="preserve">
+    <value>One or more fields are invalid. See 'errors'.</value>
+  </data>
+  <data name="Validation.InvalidValue" xml:space="preserve">
+    <value>The value is missing or has the wrong format.</value>
+  </data>
+  <data name="Server.Unexpected.Title" xml:space="preserve">
+    <value>An unexpected error occurred.</value>
+  </data>
+  <data name="Server.Unexpected.Detail" xml:space="preserve">
+    <value>Please try again later.</value>
+  </data>
+  <data name="Http.NotFound.Title" xml:space="preserve">
+    <value>Not found</value>
+  </data>
+  <data name="Http.NotFound.Detail" xml:space="preserve">
+    <value>The requested resource does not exist.</value>
+  </data>
+  <data name="Http.MethodNotAllowed.Title" xml:space="preserve">
+    <value>Method not allowed</value>
+  </data>
+  <data name="Http.MethodNotAllowed.Detail" xml:space="preserve">
+    <value>This HTTP method is not allowed for this resource.</value>
+  </data>
+  <data name="Http.UnsupportedMediaType.Title" xml:space="preserve">
+    <value>Unsupported media type</value>
+  </data>
+  <data name="Http.UnsupportedMediaType.Detail" xml:space="preserve">
+    <value>The request content type is not supported.</value>
+  </data>
+  <data name="Auth.Unauthenticated.Title" xml:space="preserve">
+    <value>Unauthenticated</value>
+  </data>
+  <data name="Auth.Unauthenticated.Detail" xml:space="preserve">
+    <value>The access token is missing, invalid or expired. Please sign in again.</value>
+  </data>
+  <data name="Auth.Forbidden.Title" xml:space="preserve">
+    <value>Forbidden</value>
+  </data>
+  <data name="Auth.Forbidden.Detail" xml:space="preserve">
+    <value>Your role does not allow this action.</value>
+  </data>
+  <data name="Auth.EmailTaken.Title" xml:space="preserve">
+    <value>Conflict</value>
+  </data>
+  <data name="Auth.EmailTaken.Detail" xml:space="preserve">
+    <value>This email is already registered.</value>
+  </data>
+  <data name="Auth.InvalidCredentials.Title" xml:space="preserve">
+    <value>Unauthorized</value>
+  </data>
+  <data name="Auth.InvalidCredentials.Detail" xml:space="preserve">
+    <value>The email or password is incorrect.</value>
+  </data>
+  <data name="Auth.NoActiveShop.Title" xml:space="preserve">
+    <value>Forbidden</value>
+  </data>
+  <data name="Auth.NoActiveShop.Detail" xml:space="preserve">
+    <value>Your account is not an active member of any shop.</value>
+  </data>
+  <data name="Auth.InvalidRefreshToken.Title" xml:space="preserve">
+    <value>Unauthorized</value>
+  </data>
+  <data name="Auth.InvalidRefreshToken.Detail" xml:space="preserve">
+    <value>Your session has expired. Please sign in again.</value>
+  </data>
+  <data name="Auth.RefreshTokenReused.Title" xml:space="preserve">
+    <value>Unauthorized</value>
+  </data>
+  <data name="Auth.RefreshTokenReused.Detail" xml:space="preserve">
+    <value>This session was ended for security reasons. Please sign in again.</value>
+  </data>
+  <data name="Shop.NameRequired.Title" xml:space="preserve">
+    <value>Validation failed</value>
+  </data>
+  <data name="Shop.NameRequired.Detail" xml:space="preserve">
+    <value>Shop name is required.</value>
+  </data>
+  <data name="Shop.UnknownType.Title" xml:space="preserve">
+    <value>Validation failed</value>
+  </data>
+  <data name="Shop.UnknownType.Detail" xml:space="preserve">
+    <value>The shop type is not supported.</value>
+  </data>
+  <data name="Shop.Suspended.Title" xml:space="preserve">
+    <value>Forbidden</value>
+  </data>
+  <data name="Shop.Suspended.Detail" xml:space="preserve">
+    <value>This shop is suspended. Please contact Stockly support.</value>
+  </data>
+</root>

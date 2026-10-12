@@ -91,11 +91,11 @@ Every error response is `application/problem+json`:
 
 | # | Method | Path | Auth | Statuses | Step | State |
 |---|---|---|---|---|---|---|
-| A1 | POST | /api/auth/register | anonymous | 201, 400, 409 | 1.5 | planned |
-| A2 | POST | /api/auth/login | anonymous | 200, 400, 401, 403 | 1.5 | planned |
-| A3 | POST | /api/auth/refresh | anonymous | 200, 400, 401, 403 | 1.5 | planned |
-| A4 | POST | /api/auth/logout | user | 204, 400, 401 | 1.5 | planned |
-| A5 | GET | /api/auth/me | user | 200, 401, 403 | 1.5 | planned |
+| A1 | POST | /api/auth/register | anonymous | 201, 400, 409 | 1.5 | implemented |
+| A2 | POST | /api/auth/login | anonymous | 200, 400, 401, 403 | 1.5 | implemented |
+| A3 | POST | /api/auth/refresh | anonymous | 200, 400, 401, 403 | 1.5 | implemented |
+| A4 | POST | /api/auth/logout | user | 204, 400, 401 | 1.5 | implemented |
+| A5 | GET | /api/auth/me | user | 200, 401, 403 | 1.5 | implemented |
 | P1 | GET | /api/products | user | 200, 400, 401, 403 | 1.6 | planned |
 | P2 | GET | /api/products/{id} | user | 200, 401, 403, 404 | 1.6 | planned |
 | P3 | POST | /api/products | user | 201, 400, 401, 403, 409 | 1.6 | planned |

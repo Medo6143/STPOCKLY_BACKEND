@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Arabic validation messages. Keys must match ValidationMessages.resx. -->
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="PasswordNeedsLetter" xml:space="preserve">
+    <value>يجب أن تحتوي كلمة المرور على حرف واحد على الأقل.</value>
+  </data>
+  <data name="PasswordNeedsDigit" xml:space="preserve">
+    <value>يجب أن تحتوي كلمة المرور على رقم واحد على الأقل (0-9).</value>
+  </data>
+  <data name="PasswordRejected" xml:space="preserve">
+    <value>كلمة المرور لا تستوفي قواعد كلمات المرور.</value>
+  </data>
+  <data name="LanguageNotSupported" xml:space="preserve">
+    <value>اللغة المفضلة يجب أن تكون 'ar' أو 'en'.</value>
+  </data>
+</root>

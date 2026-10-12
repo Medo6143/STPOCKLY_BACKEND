@@ -20,4 +20,29 @@ public sealed class StartupConfigurationTests(ApiFixture fixture)
             .WithMessage($"*ConnectionStrings__{name}*")
             .Which.Message.Should().NotContain(fixture.PostgresConnectionString).And.NotContain(fixture.RedisConnectionString);
     }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task Startup_MissingJwtSigningKey_FailsWithVariableName(string signingKey)
+    {
+        await using var factory = fixture.CreateFactory(jwtSigningKey: signingKey);
+
+        var act = () => factory.CreateClient();
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*Jwt__SigningKey*");
+    }
+
+    [Fact]
+    public async Task Startup_ShortJwtSigningKey_FailsWithoutShowingTheKey()
+    {
+        const string shortKey = "only-31-bytes-of-signing-key-xx";
+        await using var factory = fixture.CreateFactory(jwtSigningKey: shortKey);
+
+        var act = () => factory.CreateClient();
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*Jwt__SigningKey*32 bytes*")
+            .Which.Message.Should().NotContain(shortKey);
+    }
 }
