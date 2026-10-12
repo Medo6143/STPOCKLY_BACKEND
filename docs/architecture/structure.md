@@ -2,45 +2,48 @@
 
 Status: **Draft for review**
 
-## 1. Repository root
+## 1. Repository root (`stockly-backend`)
+
+This repository holds the API and the Blazor admin (ADR-0011). Everything below is at the repo root.
 
 ```
-stockly/
+stockly-backend/
 ├── AGENTS.md                     # rules for every contributor (human or AI)
 ├── README.md                     # how to run in 5 minutes
-├── docker-compose.yml            # postgres, redis, minio, pgadmin (dev profile)
+├── Stockly.sln
+├── Directory.Build.props         # target framework, nullable, TreatWarningsAsErrors, analyzers
+├── Directory.Packages.props      # central package versions
+├── global.json                   # .NET SDK pin, rollForward latestFeature
+├── .config/dotnet-tools.json     # dotnet-ef local tool
+├── docker-compose.yml            # postgres, redis, minio, minio-init, pgadmin (dev profile)
 ├── .env.example                  # placeholders only, .env is git-ignored
 ├── .gitignore
 ├── .gitattributes                # LF everywhere, CRLF for *.sln and *.cmd
 ├── .editorconfig
-├── global.json                   # .NET SDK 8.0.x, rollForward latestFeature
 ├── .github/
 │   ├── workflows/
-│   │   ├── backend.yml           # build, test, coverage (paths: backend/**)
-│   │   ├── mobile.yml            # analyze, test (paths: mobile/**)
+│   │   ├── backend.yml           # build, test, coverage
 │   │   └── admin.yml             # build, bUnit tests
 │   └── pull_request_template.md  # = checklist from AGENTS.md §11
-├── brand/                        # logo SVGs, splash spec, tokens
 ├── docs/
 │   ├── roadmap.md
 │   ├── erd.md
 │   ├── architecture/structure.md
+│   ├── api/openapi.json          # API contract for stockly-mobile (from step 1.4b)
 │   ├── design/redis.md
-│   ├── design/backend.md         # next planning step
-│   ├── design/frontend.md        # next planning step
-│   ├── adr/NNNN-*.md            # 0001–0009
-│   └── features/_TEMPLATE.md, <feature>.md
-├── backend/
-└── mobile/
+│   ├── design/backend.md         # before Sprint 2
+│   ├── design/frontend.md        # admin part here; mobile part in stockly-mobile
+│   ├── adr/NNNN-*.md
+│   ├── features/_TEMPLATE.md, <feature>.md
+│   ├── sprints/sprint-N-log.md
+│   └── prompts/execution-prompt.md
+├── src/
+└── tests/
 ```
 
-## 2. Backend
+## 2. Source and tests
 
 ```
-backend/
-├── Stockly.sln
-├── Directory.Build.props         # net8.0, nullable, TreatWarningsAsErrors, analyzers
-├── Directory.Packages.props      # central package versions
 ├── src/
 │   ├── Stockly.Domain/
 │   │   ├── Common/               # Entity, Result<T>, Error, ErrorType, Guard
@@ -134,42 +137,11 @@ backend/
 
 > `Stockly.Contracts`, `Stockly.Admin`, `Stockly.ArchitectureTests` and `Stockly.Admin.Tests` are additions to the original prompt (ADR-0005).
 
-> Layer rules live in `backend/tests/Stockly.ArchitectureTests`: `ProjectReferenceTests` checks the references declared in every `src/*.csproj` against the exact table in `AGENTS.md` §4; `LayerDependencyTests` (NetArchTest) checks compiled type dependencies; `ControllerSignatureTests` keeps Domain types out of controller signatures. Domain's only allowed package is `UUIDNext` (ADR-0009).
+> Layer rules live in `tests/Stockly.ArchitectureTests`: `ProjectReferenceTests` checks the references declared in every `src/*.csproj` against the exact table in `AGENTS.md` §4; `LayerDependencyTests` (NetArchTest) checks compiled type dependencies; `ControllerSignatureTests` keeps Domain types out of controller signatures. Domain's only allowed package is `UUIDNext` (ADR-0009).
 
-## 3. Mobile (Flutter)
+## 3. Mobile
 
-```
-mobile/
-├── pubspec.yaml
-├── analysis_options.yaml         # very_good_analysis
-├── l10n.yaml
-├── lib/
-│   ├── main.dart                 # ProviderScope + bootstrap
-│   ├── app.dart                  # MaterialApp.router, theme, locale
-│   ├── l10n/                     # app_ar.arb, app_en.arb (generated code ignored)
-│   ├── core/
-│   │   ├── config/               # env (API base URL via --dart-define)
-│   │   ├── network/              # dio_client, auth_interceptor, refresh_interceptor, error_mapper
-│   │   ├── error/                # Failure (sealed), Result
-│   │   ├── theme/                # tokens.dart (from brand/), app_theme.dart, stockly_colors.dart (ThemeExtension)
-│   │   ├── router/               # go_router, auth redirect, route names
-│   │   ├── storage/              # secure_token_storage, preferences (language, theme)
-│   │   ├── offline/              # drift database, pending_scans table, scan_sync_worker
-│   │   ├── media/                # image picker + compression (max 2000px, ~80% JPEG)
-│   │   └── widgets/              # AsyncStateView, EmptyState, ErrorState, MoneyText, QuantityText
-│   └── features/
-│       ├── splash/presentation/              # animated splash (brand spec)
-│       ├── auth/
-│       │   ├── data/        datasources/ models/ repositories/
-│       │   ├── domain/      entities/ repositories/ usecases/
-│       │   └── presentation/ providers/ screens/ widgets/
-│       ├── products/        (same 3 layers)  # list, detail, add/edit, units, adjust
-│       ├── invoices/        (same 3 layers)  # capture, queue, processing, review, confirm, history
-│       ├── sales/           (same 3 layers)  # quick sale, barcode lookup
-│       ├── dashboard/       (same 3 layers)  # summary, low stock, expiring soon
-│       └── settings/        (same 3 layers)  # language, theme, shop members, logout
-└── test/                     # mirrors lib/
-```
+The Flutter app lives in its own repository, `stockly-mobile` (ADR-0011). It consumes this API through the OpenAPI spec committed at `docs/api/openapi.json` (from step 1.4b). Its structure, brand assets and mobile-only rules moved with it.
 
 ## 4. Docker services
 

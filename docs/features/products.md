@@ -101,7 +101,7 @@ None.
 Sprint 3.
 
 ## 11. Tests
-`backend/tests/Stockly.Domain.Tests` (pure, no I/O):
+`tests/Stockly.Domain.Tests` (pure, no I/O):
 
 | Class | Covers |
 |---|---|

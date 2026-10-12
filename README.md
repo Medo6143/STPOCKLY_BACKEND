@@ -1,8 +1,8 @@
-# Stockly
+# stockly-backend
 
-AI inventory for small shops in Egypt. Photograph a supplier invoice, review what the AI extracted, confirm, and stock updates. Arabic first, English too.
+API and admin for Stockly, an AI inventory product for small shops in Egypt. Photograph a supplier invoice, review what the AI extracted, confirm, and stock updates. Arabic first, English too.
 
-Read [`AGENTS.md`](AGENTS.md) before your first change. Design docs live in [`docs/`](docs/), brand assets in [`brand/`](brand/).
+Read [`AGENTS.md`](AGENTS.md) before your first change. Design docs live in [`docs/`](docs/). The Flutter app and brand assets live in the `stockly-mobile` repository and use this API through [`docs/api/openapi.json`](docs/api/openapi.json) ([ADR-0011](docs/adr/0011-polyrepo-backend-and-mobile.md)).
 
 ## Prerequisites
 
@@ -10,7 +10,6 @@ Read [`AGENTS.md`](AGENTS.md) before your first change. Design docs live in [`do
 |---|---|
 | .NET SDK | 8.0.x (pinned in [`global.json`](global.json)) |
 | Docker Desktop | with Compose v2 |
-| Flutter | stable (from Sprint 3) |
 
 ## Run locally
 
@@ -35,24 +34,23 @@ docker compose ps -a          # postgres/redis/minio "healthy", minio-init "Exit
 - Missing variable? Compose stops with `required variable X is missing a value`. Compare your `.env` with `.env.example`.
 - Reset everything (deletes all local data): `docker compose --profile dev down -v`, then `docker compose up -d`.
 
-### 2. Backend
+### 2. Backend (from the repo root)
 
 ```bash
-cd backend
+dotnet tool restore
 dotnet build -warnaserror
 dotnet test
 dotnet run --project src/Stockly.Api
 ```
 
-The API runs on the host and reads the `ConnectionStrings__*`, `Storage__*`, `Jwt__*` and `OpenRouter__*` values (wired up in Sprint 1, step 1.4). The full command list (migrations, admin, mobile) is in [`AGENTS.md` §3](AGENTS.md#3-commands).
+The API runs on the host and reads the `ConnectionStrings__*`, `Storage__*`, `Jwt__*` and `OpenRouter__*` values (wired up in Sprint 1, step 1.4). The full command list (migrations, admin) is in [`AGENTS.md` §3](AGENTS.md#3-commands).
 
 ## Repository layout
 
 | Path | What |
 |---|---|
-| `backend/` | .NET 8 solution: Domain, Contracts, Application, Infrastructure, Api + tests |
-| `mobile/` | Flutter app (from Sprint 3) |
-| `docs/` | Roadmap, ERD, Redis design, ADRs, feature docs |
-| `brand/` | Logo, splash spec, color and type tokens |
+| `Stockly.sln`, `src/`, `tests/` | .NET solution: Domain, Contracts, Application, Infrastructure, Api + tests (Admin from Sprint 5) |
+| `docker-compose.yml`, `.env.example` | Local Postgres, Redis, MinIO, pgAdmin |
+| `docs/` | Roadmap, ERD, Redis design, ADRs, feature docs, sprint logs, API contract |
 
-Layer rules are enforced by `backend/tests/Stockly.ArchitectureTests`. See [`docs/architecture/structure.md`](docs/architecture/structure.md).
+Layer rules are enforced by `tests/Stockly.ArchitectureTests`. See [`docs/architecture/structure.md`](docs/architecture/structure.md).
