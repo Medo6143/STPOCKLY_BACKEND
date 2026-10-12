@@ -57,7 +57,8 @@ dotnet test
 dotnet tool restore                        # dotnet-ef pinned in .config/dotnet-tools.json
 dotnet ef migrations add <Name> -p src/Stockly.Infrastructure -s src/Stockly.Api
 dotnet ef database update      -p src/Stockly.Infrastructure -s src/Stockly.Api --connection "<ConnectionStrings__Postgres from .env>"
-dotnet run --project src/Stockly.Api
+dotnet run --project src/Stockly.Api           # Development: reads the repo-root .env
+dotnet build src/Stockly.Api --no-incremental  # rewrite docs/api/openapi.json (normal builds do it when the Api changes)
 
 # admin
 dotnet run --project src/Stockly.Admin

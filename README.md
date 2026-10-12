@@ -23,11 +23,11 @@ docker compose ps -a          # postgres/redis/minio "healthy", minio-init "Exit
 
 | Service | URL (127.0.0.1 only) | Credentials from `.env` |
 |---|---|---|
-| PostgreSQL 16 | `localhost:5432` | `POSTGRES_USER` / `POSTGRES_PASSWORD` |
-| Redis 7 (cache only) | `localhost:6379` | `REDIS_PASSWORD` |
-| MinIO S3 API | http://localhost:9000 | API: `STORAGE_ACCESS_KEY` / `STORAGE_SECRET_KEY` |
-| MinIO console | http://localhost:9001 | `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` |
-| pgAdmin (dev profile) | http://localhost:5050 | `PGADMIN_DEFAULT_EMAIL` / `PGADMIN_DEFAULT_PASSWORD` |
+| PostgreSQL 16 | `127.0.0.1:5432` | `POSTGRES_USER` / `POSTGRES_PASSWORD` |
+| Redis 7 (cache only) | `127.0.0.1:6379` | `REDIS_PASSWORD` |
+| MinIO S3 API | http://127.0.0.1:9000 | API: `STORAGE_ACCESS_KEY` / `STORAGE_SECRET_KEY` |
+| MinIO console | http://127.0.0.1:9001 | `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` |
+| pgAdmin (dev profile) | http://127.0.0.1:5050 | `PGADMIN_DEFAULT_EMAIL` / `PGADMIN_DEFAULT_PASSWORD` |
 
 - pgAdmin: `docker compose --profile dev up -d`.
 - Port already taken (for example a local PostgreSQL)? Set `POSTGRES_PORT`, `REDIS_PORT`, `MINIO_API_PORT`, `MINIO_CONSOLE_PORT` or `PGADMIN_PORT` in `.env`, and update the matching `ConnectionStrings__*` / `Storage__Endpoint` values.
@@ -43,7 +43,15 @@ dotnet test
 dotnet run --project src/Stockly.Api
 ```
 
-The API runs on the host and reads the `ConnectionStrings__*`, `Storage__*`, `Jwt__*` and `OpenRouter__*` values (wired up in Sprint 1, step 1.4). The full command list (migrations, admin) is in [`AGENTS.md` §3](AGENTS.md#3-commands).
+The API runs on the host. In Development it reads the repo-root `.env` itself (real environment variables win over it); in other environments it reads environment variables only. A missing required setting stops startup with the variable to set, for example `ConnectionStrings__Postgres`.
+
+| Endpoint | What |
+|---|---|
+| `GET /health/live` | Process is up (no dependencies) |
+| `GET /health/ready` | PostgreSQL and Redis: Postgres down → 503; Redis down → `Degraded`, still 200 |
+| `GET /openapi/v1.json` | OpenAPI document (not in Production) |
+
+**API contract.** Every local build of `src/Stockly.Api` writes [`docs/api/openapi.json`](docs/api/openapi.json); commit it with the change. CI does not regenerate it, and `OpenApiContractTests` fails when it is out of date. After a hand edit, `dotnet build src/Stockly.Api --no-incremental` rewrites it. The full command list (migrations, admin) is in [`AGENTS.md` §3](AGENTS.md#3-commands).
 
 ## Repository layout
 

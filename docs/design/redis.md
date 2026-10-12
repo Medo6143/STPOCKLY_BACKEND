@@ -54,7 +54,7 @@ Deleting `stockly:{shopId}:products:*` needs `SCAN`, which is slow and not atomi
 | Daily quota | Fall back to `COUNT(*)` on `invoices` created today, where "today" starts at Africa/Cairo midnight from `IClock` (index `invoices (shop_id, created_at DESC)`). Not `ai_usage_records`: it has one row per AI call, including retries and cache hits, so it would over-count scans. | Warning |
 | Invoice status | Read from `invoices` table | none |
 
-Redis connection uses `AbortOnConnectFail = false` and a 250 ms operation timeout, so a dead Redis costs at most 250 ms per request and never crashes startup. Health check `/health/ready` reports Redis as *Degraded*, not *Unhealthy*.
+Redis connection uses `AbortOnConnectFail = false` and a 250 ms operation timeout, so a dead Redis costs at most 250 ms per request and never crashes startup. Health check `/health/ready` reports Redis as *Degraded* (HTTP 200), not *Unhealthy*; the health check itself times out after 1 s, because it is not on a request path and a cold connection can take longer than 250 ms. Connection strings use `127.0.0.1`, not `localhost`: compose binds IPv4 only and `localhost` can resolve to `::1` first.
 
 ## 5. Polling budget
 
