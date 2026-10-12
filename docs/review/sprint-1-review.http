@@ -1,0 +1,175 @@
+# Sprint 1 review flow (step 1.7). Run top to bottom against a fresh database, in one go:
+# the login steps (L1–L11) must all happen within one minute, because login is limited to
+# 10 requests per minute per client IP (contract v1.4).
+# Works with VS Code REST Client and JetBrains HTTP Client. Expected results are written above each request.
+# The passwords below are development placeholders for a local, throw-away database. Never real secrets.
+
+@baseUrl = http://127.0.0.1:5080
+@ownerEmail = owner.review@example.com
+@staffEmail = second.review@example.com
+@password = Review2026pass
+@correlation = sprint1-review
+
+### R1. Register shop owner A: 201, AuthResponse, role Owner
+# @name register
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+Accept-Language: en
+X-Correlation-Id: {{correlation}}
+
+{
+  "fullName": "Review Owner",
+  "email": "{{ownerEmail}}",
+  "password": "{{password}}",
+  "preferredLanguage": "ar",
+  "shop": { "name": "صيدلية المراجعة", "shopType": "Pharmacy", "governorate": "القاهرة" }
+}
+
+### R2. Register a second account B (its own shop), used later so lockout of A cannot mask the rate limit: 201
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "fullName": "Second Account",
+  "email": "{{staffEmail}}",
+  "password": "{{password}}",
+  "shop": { "name": "بقالة المراجعة", "shopType": "Grocery" }
+}
+
+### L1. Login A (login request 1 of this minute): 200, new token pair
+# @name login
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{ "email": "{{ownerEmail}}", "password": "{{password}}" }
+
+### 3. Who am I: 200, user + shop + role Owner
+GET {{baseUrl}}/api/auth/me
+Authorization: Bearer {{login.response.body.accessToken}}
+
+### 4. Create a product with opening stock (Owner): 201, quantity "24.000"
+# @name product
+POST {{baseUrl}}/api/products
+Authorization: Bearer {{login.response.body.accessToken}}
+Content-Type: application/json
+
+{
+  "name": "بنادول اكسترا",
+  "barcode": "6221234567890",
+  "category": "مسكنات",
+  "baseUnitName": "شريط",
+  "costPrice": "12.50",
+  "baseUnitSellPrice": "15.00",
+  "lowStockThreshold": "20.000",
+  "openingQuantity": "24.000"
+}
+
+### 5. Add a unit "Box" = 3 strips: 201
+# @name box
+POST {{baseUrl}}/api/products/{{product.response.body.id}}/units
+Authorization: Bearer {{login.response.body.accessToken}}
+Content-Type: application/json
+
+{ "name": "علبة", "factor": "3.000000", "sellPrice": "40.00", "barcode": null }
+
+### 6. Adjust: -2 boxes (= -6 strips), note required: 201, balanceAfter "18.000"
+POST {{baseUrl}}/api/products/{{product.response.body.id}}/adjustments
+Authorization: Bearer {{login.response.body.accessToken}}
+Content-Type: application/json
+
+{ "quantityChange": "-2.000", "unitId": "{{box.response.body.id}}", "note": "Expired, thrown away" }
+
+### 7. Stock count finds 17 strips: 200, changed true, quantity "17.000"
+POST {{baseUrl}}/api/products/{{product.response.body.id}}/stock-counts
+Authorization: Bearer {{login.response.body.accessToken}}
+Content-Type: application/json
+
+{ "countedQuantity": "17.000", "unitId": null }
+
+### 8. Same count again: 200, changed false, movement null (no zero movements)
+POST {{baseUrl}}/api/products/{{product.response.body.id}}/stock-counts
+Authorization: Bearer {{login.response.body.accessToken}}
+Content-Type: application/json
+
+{ "countedQuantity": "17.000", "unitId": null }
+
+### 9. Low-stock list (17 <= 20): 200, contains the product, isLowStock true
+GET {{baseUrl}}/api/products?lowStock=true&page=1&pageSize=20
+Authorization: Bearer {{login.response.body.accessToken}}
+
+### 10. Movement history: 200, 3 movements newest first (StockCount, ManualAdjustment, StockCount "Opening stock")
+GET {{baseUrl}}/api/products/{{product.response.body.id}}/movements?page=1&pageSize=20
+Authorization: Bearer {{login.response.body.accessToken}}
+
+### 11. Precision is rejected, never rounded: 400 Precision.TooManyDecimals
+POST {{baseUrl}}/api/products/{{product.response.body.id}}/adjustments
+Authorization: Bearer {{login.response.body.accessToken}}
+Content-Type: application/json
+Accept-Language: en
+
+{ "quantityChange": "1.0005", "note": "rounding check" }
+
+### L2. Wrong password for A, failure 1 of 5: 401 Auth.InvalidCredentials
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{ "email": "{{ownerEmail}}", "password": "wrong-placeholder-1" }
+
+### L3. Wrong password for A, failure 2 of 5: 401 Auth.InvalidCredentials
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{ "email": "{{ownerEmail}}", "password": "wrong-placeholder-2" }
+
+### L4. Wrong password for A, failure 3 of 5: 401 Auth.InvalidCredentials
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{ "email": "{{ownerEmail}}", "password": "wrong-placeholder-3" }
+
+### L5. Wrong password for A, failure 4 of 5: 401 Auth.InvalidCredentials
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{ "email": "{{ownerEmail}}", "password": "wrong-placeholder-4" }
+
+### L6. Wrong password for A, failure 5 of 5 (this one locks A for 15 minutes): 401 Auth.InvalidCredentials
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{ "email": "{{ownerEmail}}", "password": "wrong-placeholder-5" }
+
+### L7. CORRECT password for A while locked: 423 Auth.LockedOut, Retry-After about 900 s
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+Accept-Language: ar
+
+{ "email": "{{ownerEmail}}", "password": "{{password}}" }
+
+### L8. Login B (not locked; login request 8 of this minute): 200
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{ "email": "{{staffEmail}}", "password": "{{password}}" }
+
+### L9. Login B (request 9): 200
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{ "email": "{{staffEmail}}", "password": "{{password}}" }
+
+### L10. Login B (request 10, the last one the limit allows): 200
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{ "email": "{{staffEmail}}", "password": "{{password}}" }
+
+### L11. Login B (request 11 from this IP within the minute): 429 Auth.TooManyRequests, Retry-After (B is valid, so this is the limiter, not lockout)
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+Accept-Language: en
+
+{ "email": "{{staffEmail}}", "password": "{{password}}" }
+
+### H. Health: ready reports Postgres and Redis healthy: 200
+GET {{baseUrl}}/health/ready
