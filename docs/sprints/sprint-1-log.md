@@ -37,3 +37,21 @@ Stop conditions. The message defining "the four stop conditions" did not reach t
 **Decisions recorded for later steps:**
 - 1.5: scoped `ITenantScope` (Application) with `BeginForNewShop(Guid shopId)`, read by `ICurrentTenant` during the register request. Architecture test (source scan): only `Application/Features/Auth/Register` may use it.
 - Timestamps are UTC: Npgsql rejects `timestamptz` values with a non-zero offset. Documented, tested (`SystemClock.UtcNow.Offset == TimeSpan.Zero`), no converter.
+
+**Result (step 1.4a):**
+- Migration `InitialCatalog`: 4 tables, `pg_trgm`, all ERD indexes and checks for them, plus EF's FK support index `ix_stock_movements_product_id` (documented in erd.md §3.7).
+- Tests: Domain 185, Infrastructure 36 (Testcontainers), Architecture 18, Api 1. Coverage: Domain 99.1% line / 99.5% branch, Infrastructure 89.9%.
+- Deliberate mutations caught: tenant filter widened (2 failures), interceptor accepting another shop (2), ShopId change allowed (1).
+- Architecture failure demo: an `IgnoreQueryFilters` call in Infrastructure and an unfiltered `StockMovement` both fail.
+- Smoke check: `dotnet ef database update` against compose Postgres applies `InitialCatalog`; second run is a no-op.
+
+**Findings fixed during 1.4a:**
+- EF does not map get-only properties by convention: every get-only Domain property is mapped explicitly; `StockMovement` has a private parameterless constructor for EF.
+- EF history table name differed between design time (`__ef_migrations_history`) and runtime (`__EFMigrationsHistory`) with the snake_case plugin. Pinned explicitly; a test guards it.
+- Generated migration files are marked `generated_code = true` in `.editorconfig` instead of being hand-edited.
+
+## Interrupts received during 1.4a (order of work)
+1. Finish and merge 1.4a.
+2. Step `feature/repo-split`: this repo becomes `stockly-backend`, backend at the repo root, brand and mobile rules move out, ADR-0011 polyrepo.
+3. Step `feature/upgrade-net10`: .NET 10 LTS (.NET 8 support ends 2026-11-10), `Guid.CreateVersion7` replaces UUIDNext (ADR-0010 supersedes ADR-0009).
+4. Continue with 1.4b (now including OpenAPI spec at `docs/api/openapi.json` with an up-to-date test), 1.5, 1.6, 1.7.

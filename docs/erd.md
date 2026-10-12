@@ -412,6 +412,31 @@ Growth note: when this table passes ~10M rows, partition by month on `created_at
 | `(target_type, target_id, created_at DESC)` | "history of this shop" |
 | `(admin_user_id, created_at DESC)` | "what did this admin do" |
 
+### 3.7 Migration status (what exists in the database today)
+
+| Migration | Tables | Notes |
+|---|---|---|
+| `InitialCatalog` (step 1.4a) | `shops`, `products`, `product_units`, `stock_movements` | `pg_trgm`; every index and check listed above for these tables |
+
+Implementation notes for these tables:
+- `products.updated_at` is an EF **shadow property** set by `AuditTimestampsInterceptor` from `IClock`; the Domain type has no such property.
+- `products` uses PostgreSQL's system column `xmin` as the optimistic concurrency token (shadow property, `IsRowVersion`); no column is created.
+- `ix_stock_movements_product_id` is created by EF to support the `product_id` foreign key (no listed index starts with `product_id`). It is not used by a named query.
+- The EF history table is `__ef_migrations_history` (pinned explicitly so `dotnet ef` and the app agree).
+- All `timestamptz` values must be UTC (offset zero); Npgsql rejects other offsets. `IClock.UtcNow` guarantees it.
+
+**Deferred foreign keys.** These columns exist now as plain columns; the FK constraint is added by the migration that creates the target table.
+
+| Column | Null | Target | Added in |
+|---|---|---|---|
+| `stock_movements.created_by_user_id` | NOT NULL | `users` | 1.5 |
+| `stock_movements.invoice_id` | NULL | `invoices` | Sprint 2 |
+| `stock_movements.invoice_item_id` | NULL | `invoice_items` | Sprint 2 |
+| `stock_movements.sale_id` | NULL | `sales` | Sprint 4 |
+| `stock_movements.sale_item_id` | NULL | `sale_items` | Sprint 4 |
+
+**Deferred columns and index:** `products.barcode`, `products.category` and `UNIQUE (shop_id, barcode) WHERE barcode IS NOT NULL AND NOT is_archived` are added in step 1.6.
+
 ## 4. Confirm-invoice transaction (how the schema enforces rules 3 and 4)
 
 ```

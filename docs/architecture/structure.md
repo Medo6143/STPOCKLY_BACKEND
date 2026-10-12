@@ -128,6 +128,7 @@ backend/
     ├── Stockly.Application.Tests/        # handlers with NSubstitute fakes
     ├── Stockly.Api.IntegrationTests/     # WebApplicationFactory + Testcontainers (pg, redis, minio)
     ├── Stockly.ArchitectureTests/        # NetArchTest: layer rules, tenant filter, IgnoreQueryFilters
+    ├── Stockly.Infrastructure.Tests/     # Testcontainers Postgres: migration, tenant isolation, constraints, concurrency
     └── Stockly.Admin.Tests/              # bUnit
 ```
 
