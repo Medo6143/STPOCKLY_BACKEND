@@ -316,13 +316,16 @@ Implementation notes for the identity and tenancy tables (migration `Identity`, 
 
 `low_stock_threshold` is `numeric(14,3) NOT NULL DEFAULT 0`, in base units. With the default 0, a product is low when `quantity <= 0`, so out-of-stock products always appear in the low-stock list. This is intended.
 
+`barcode` (`text NULL`, max 64) and `category` (`text NULL`, max 100) are trimmed; blank is stored as NULL (step 1.6).
+
 | Index / constraint | Serves |
 |---|---|
 | `CHECK (low_stock_threshold >= 0)` | data integrity |
-| `UNIQUE (shop_id, barcode) WHERE barcode IS NOT NULL AND NOT is_archived` | barcode scan in sale screen |
-| `(shop_id, normalized_name) WHERE NOT is_archived` | product list sorted by name, paging |
-| `GIN (normalized_name gin_trgm_ops)` | search box, fuzzy match (Sprint 6) |
-| `(shop_id) WHERE quantity <= low_stock_threshold AND NOT is_archived` | `GetLowStockQuery` (`GET /api/products?lowStock=true`) — tiny partial index, only low items live in it |
+| `UNIQUE (shop_id, barcode) WHERE barcode IS NOT NULL AND NOT is_archived` (`ux_products_shop_id_barcode`) | P3/P4 duplicate check `ProductRepository.IsBarcodeUsedAsync`: `WHERE shop_id = @shop AND barcode = @b AND NOT is_archived AND id <> @self`; barcode scan in the sale screen (Sprint 4) |
+| `(shop_id, normalized_name) WHERE NOT is_archived` (`ix_products_shop_id_normalized_name`) | P1 `GetProductsQuery`: `WHERE shop_id = @shop AND NOT is_archived ORDER BY normalized_name, id OFFSET … LIMIT …` (product list sorted by name, paging) |
+| `GIN (normalized_name gin_trgm_ops)` (`ix_products_normalized_name_trgm`) | P1 `search`: `normalized_name ILIKE '%' \|\| @term \|\| '%' ESCAPE '\'` (wildcards in the term escaped), the term Arabic-normalized first; fuzzy match (Sprint 6) |
+| `(shop_id) WHERE quantity <= low_stock_threshold AND NOT is_archived` (`ix_products_low_stock`) | P1 `lowStock=true` → `GetLowStockQuery`: `WHERE shop_id = @shop AND quantity <= low_stock_threshold AND NOT is_archived ORDER BY normalized_name, id` — tiny partial index, only low items live in it |
+| primary key | P2/P4–P10 load by id; `StockService` row lock `SELECT 1 FROM products WHERE id = @id AND shop_id = @shop FOR UPDATE` |
 
 Quantity is allowed to go negative (a sale recorded before the invoice was scanned is real life). Negative stock raises a warning on the dashboard, it does not block the cashier.
 
@@ -333,8 +336,8 @@ Quantity is allowed to go negative (a sale recorded before the invoice was scann
 | `CHECK (factor > 0)` | integrity |
 | `UNIQUE (product_id, name)` | no duplicate unit names |
 | `UNIQUE (product_id) WHERE is_base` | exactly one base unit |
-| `(product_id)` covered by the unique above | load units with product |
-| `UNIQUE (shop_id, barcode) WHERE barcode IS NOT NULL` | a box and a strip can have different barcodes |
+| `(product_id)` covered by the unique above | load units with product (P2 detail, every product edit) |
+| `UNIQUE (shop_id, barcode) WHERE barcode IS NOT NULL` | a box and a strip can have different barcodes; P6/P7 duplicate check `ProductRepository.IsUnitBarcodeUsedAsync`: `WHERE shop_id = @shop AND barcode = @b AND id <> @self` (archived products' units included) |
 
 **product_aliases** — learned on every invoice confirmation: "the supplier wrote X, the user mapped it to product P in unit U". Next scan from the same supplier auto-matches with confidence 1.0.
 
@@ -421,7 +424,7 @@ Rules per reason (enforced in `Domain/Stock/StockMovement`; created only through
 |---|---|
 | `UNIQUE (invoice_item_id, reason) WHERE invoice_item_id IS NOT NULL` | **idempotent confirm** — the DB refuses a second receipt for the same line; also allows exactly one (terminal) reversal per line |
 | `UNIQUE (sale_item_id) WHERE sale_item_id IS NOT NULL` | idempotent sale |
-| `(shop_id, product_id, created_at DESC)` | product movement history |
+| `(shop_id, product_id, created_at DESC)` | product movement history: P11 `WHERE shop_id = @shop AND product_id = @p ORDER BY created_at DESC, id DESC OFFSET … LIMIT …` and its `COUNT` |
 | `(shop_id, created_at DESC)` | dashboard activity feed |
 | `CHECK (quantity_change <> 0)` | no empty movements |
 | `CHECK (num_nonnulls(invoice_item_id, sale_item_id) <= 1)` | a movement has one source |
@@ -453,6 +456,7 @@ Growth note: when this table passes ~10M rows, partition by month on `created_at
 |---|---|---|
 | `InitialCatalog` (step 1.4a) | `shops`, `products`, `product_units`, `stock_movements` | `pg_trgm`; every index and check listed above for these tables |
 | `Identity` (step 1.5) | `users`, `user_claims`, `user_logins`, `user_tokens`, `refresh_tokens`, `shop_members`, `plans`, `shop_subscriptions` | every index and constraint listed in §3.1 (including `refresh_tokens.family_id` and its index); default plan seeded; FK `stock_movements.created_by_user_id` → `users` added |
+| `ProductsCatalog` (step 1.6) | — | `products.barcode text NULL`, `products.category text NULL`, `UNIQUE (shop_id, barcode) WHERE barcode IS NOT NULL AND NOT is_archived` (`ux_products_shop_id_barcode`) |
 | `InvoiceScan` (Sprint 2, **planned**, not applied) | `suppliers`, `product_aliases`, `invoices`, `invoice_items`, `ai_usage_records`; schema `hangfire` | every index and check listed above for these tables; FKs `stock_movements.invoice_id` → `invoices`, `stock_movements.invoice_item_id` → `invoice_items`; Hangfire tables are created by `Hangfire.PostgreSql` at startup. Plan: `docs/design/backend.md` §12 |
 
 Implementation notes for the `InitialCatalog` tables:
@@ -472,7 +476,7 @@ Implementation notes for the `InitialCatalog` tables:
 | `stock_movements.sale_id` | NULL | `sales` | Sprint 4 |
 | `stock_movements.sale_item_id` | NULL | `sale_items` | Sprint 4 |
 
-**Deferred columns and index:** `products.barcode`, `products.category` and `UNIQUE (shop_id, barcode) WHERE barcode IS NOT NULL AND NOT is_archived` are added in step 1.6.
+**Deferred columns and index:** `products.barcode`, `products.category` and `UNIQUE (shop_id, barcode) WHERE barcode IS NOT NULL AND NOT is_archived` were added in step 1.6 (**done**, migration `ProductsCatalog`).
 
 ## 4. Confirm-invoice transaction (how the schema enforces rules 3 and 4)
 
