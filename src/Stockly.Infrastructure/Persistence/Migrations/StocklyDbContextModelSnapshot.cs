@@ -110,6 +110,14 @@ namespace Stockly.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("Barcode")
+                        .HasColumnType("text")
+                        .HasColumnName("barcode");
+
+                    b.Property<string>("Category")
+                        .HasColumnType("text")
+                        .HasColumnName("category");
+
                     b.Property<decimal>("CostPrice")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
@@ -171,6 +179,11 @@ namespace Stockly.Infrastructure.Persistence.Migrations
                     b.HasIndex("ShopId")
                         .HasDatabaseName("ix_products_low_stock")
                         .HasFilter("quantity <= low_stock_threshold AND NOT is_archived");
+
+                    b.HasIndex("ShopId", "Barcode")
+                        .IsUnique()
+                        .HasDatabaseName("ux_products_shop_id_barcode")
+                        .HasFilter("barcode IS NOT NULL AND NOT is_archived");
 
                     b.HasIndex("ShopId", "NormalizedName")
                         .HasDatabaseName("ix_products_shop_id_normalized_name")

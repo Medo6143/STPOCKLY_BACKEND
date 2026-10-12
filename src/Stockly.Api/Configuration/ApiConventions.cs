@@ -45,8 +45,13 @@ public static class ApiConventions
             options.RequestCultureProviders = [new AcceptLanguageHeaderRequestCultureProvider()];
         });
 
-    private static void Configure(JsonSerializerOptions options) =>
+    // Strict numbers: the web default also reads numbers from strings, which the spec would then show as
+    // "integer or string". Contract §1.2 keeps the two apart (decimals are strings, counts are numbers).
+    private static void Configure(JsonSerializerOptions options)
+    {
         options.Converters.Add(new JsonStringEnumConverter(namingPolicy: null, allowIntegerValues: false));
+        options.NumberHandling = JsonNumberHandling.Strict;
+    }
 
     private static ObjectResult InvalidModelState(ActionContext context)
     {

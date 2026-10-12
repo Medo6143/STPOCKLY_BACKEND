@@ -25,4 +25,7 @@
   <data name="LanguageNotSupported" xml:space="preserve">
     <value>Preferred language must be 'ar' or 'en'.</value>
   </data>
+  <data name="DecimalFormat" xml:space="preserve">
+    <value>Must be a decimal number written as a string, e.g. "12.50".</value>
+  </data>
 </root>

@@ -33,6 +33,9 @@ public sealed class MigrationTests(PostgresFixture fixture)
         "ux_plans_code",
         "ux_shop_subscriptions_shop_id_active",
         "ix_shop_subscriptions_ends_on_active",
+
+        // ProductsCatalog (erd.md §3.2, step 1.6)
+        "ux_products_shop_id_barcode",
     ];
 
     private static readonly string[] ExpectedChecks =
@@ -107,6 +110,7 @@ public sealed class MigrationTests(PostgresFixture fixture)
     [InlineData("ux_shop_members_shop_id_owner", "WHERE (role = 1)")]
     [InlineData("ux_shop_subscriptions_shop_id_active", "WHERE (status = 1)")]
     [InlineData("ix_shop_subscriptions_ends_on_active", "WHERE (status = 1)")]
+    [InlineData("ux_products_shop_id_barcode", "WHERE ((barcode IS NOT NULL) AND (NOT is_archived))")]
     public async Task Migrate_PartialIndexes_HaveTheErdPredicate(string index, string predicate)
     {
         var definition = await fixture.ScalarAsync<string>("SELECT indexdef FROM pg_indexes WHERE indexname = @p0", index);
@@ -149,6 +153,16 @@ public sealed class MigrationTests(PostgresFixture fixture)
             "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name ILIKE '%migrations%history%'");
 
         historyTables.Should().Equal("__ef_migrations_history");
+    }
+
+    [Fact]
+    public async Task Migrate_Products_HasNullableTextBarcodeAndCategory()
+    {
+        var columns = await fixture.ColumnAsync(
+            "SELECT concat_ws('|', column_name, data_type, is_nullable) FROM information_schema.columns " +
+            "WHERE table_name = 'products' AND column_name IN ('barcode', 'category') ORDER BY column_name");
+
+        columns.Should().Equal("barcode|text|YES", "category|text|YES");
     }
 
     [Fact]

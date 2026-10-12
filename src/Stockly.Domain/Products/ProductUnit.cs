@@ -51,7 +51,7 @@ public sealed class ProductUnit : Entity, ITenantEntity
             return error;
         }
 
-        return new ProductUnit(shopId, productId, name.Trim(), factor, sellPrice, CleanBarcode(barcode), isBase);
+        return new ProductUnit(shopId, productId, name.Trim(), factor, sellPrice, OptionalText.Clean(barcode), isBase);
     }
 
     internal static Error? Validate(string name, decimal factor, decimal sellPrice)
@@ -65,15 +65,12 @@ public sealed class ProductUnit : Entity, ITenantEntity
             ?? Precision.ValidateMoney(sellPrice, nameof(sellPrice));
     }
 
-    internal static string? CleanBarcode(string? barcode) =>
-        string.IsNullOrWhiteSpace(barcode) ? null : barcode.Trim();
-
     /// <summary>Applies already-validated values (see <see cref="Validate"/>).</summary>
     internal void Apply(string name, decimal factor, decimal sellPrice, string? barcode)
     {
         Name = name.Trim();
         Factor = factor;
         SellPrice = sellPrice;
-        Barcode = CleanBarcode(barcode);
+        Barcode = OptionalText.Clean(barcode);
     }
 }

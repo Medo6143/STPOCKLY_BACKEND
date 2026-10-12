@@ -7,6 +7,9 @@
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" />
     <!-- Token issuing (JsonWebTokenHandler) lives with the other identity adapters. -->
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <!-- Read cache (IDistributedCache) and the catalog version counter (INCR), docs/design/redis.md. -->
+    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" />
+    <PackageReference Include="StackExchange.Redis" />
   </ItemGroup>
 
   <ItemGroup>
