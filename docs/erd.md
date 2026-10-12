@@ -76,6 +76,7 @@ erDiagram
         timestamptz expires_at
         timestamptz revoked_at
         uuid replaced_by_id
+        uuid family_id
         timestamptz created_at
     }
     shops {
