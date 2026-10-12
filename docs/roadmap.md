@@ -104,7 +104,7 @@ _Built in the `stockly-mobile` repository (ADR-0011) against `docs/api/openapi.j
 
 ## Later (not scheduled)
 
-Lot tracking with FEFO (ADR-0004 follow-up), returns to supplier, reports export (Excel/PDF), multiple branches per shop, POS/barcode printer integration, WhatsApp low-stock alerts, iOS release.
+`PATCH /api/auth/me` to change `preferredLanguage` from the app (today the language setting is local only; checkpoint 2), lot tracking with FEFO (ADR-0004 follow-up), returns to supplier, reports export (Excel/PDF), multiple branches per shop, POS/barcode printer integration, WhatsApp low-stock alerts, iOS release.
 
 ---
 
