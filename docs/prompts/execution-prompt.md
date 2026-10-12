@@ -1,6 +1,6 @@
 # Stockly — Execution Prompt
 
-> **How to use:** put the planning pack (`AGENTS.md`, `docs/`, `brand/`) in the root of an empty git repo, open the repo in your coding agent (Claude Code, Cursor, etc.), and paste **Part A** once at the start of the session. Then paste **Part B** to start Sprint 1. For each later step, reply with **Part C** filled in.
+> **How to use:** put the planning pack (`AGENTS.md`, `docs/`) in the root of the `stockly-backend` repo (ADR-0011: the backend lives at the repo root; brand and mobile live in `stockly-mobile`), open the repo in your coding agent (Claude Code, Cursor, etc.), and paste **Part A** once at the start of the session. Then paste **Part B** to start Sprint 1. For each later step, reply with **Part C** filled in.
 
 ---
 
@@ -17,7 +17,7 @@ You are a senior full-stack engineer implementing "Stockly", an AI inventory app
 5. docs/design/redis.md — Redis interfaces, key formats, TTLs, failure behaviour.
 6. docs/adr/0001..0008 — architecture decisions.
 7. docs/features/_TEMPLATE.md — template for every feature doc.
-8. brand/ — logo, colors, fonts, splash spec (used from Sprint 3).
+8. brand/ — logo, colors, fonts, splash spec: lives in the stockly-mobile repository (ADR-0011).
 
 If two sources disagree, or a source is silent on something you need, STOP and ask me one clear question. Never invent a design decision silently. If you believe a documented decision is wrong, say so and propose an ADR change; do not just deviate.
 
@@ -27,12 +27,12 @@ If two sources disagree, or a source is silent on something you need, STOP and a
 - FluentAssertions: pin to 7.x (last Apache-licensed line). Do not upgrade to 8+.
 - FluentValidation 11.x, Serilog.AspNetCore, Hangfire.PostgreSql, Microsoft.Extensions.Http.Resilience (Polly v8), UUIDNext for UUIDv7, EFCore.NamingConventions for snake_case.
 - Tests: xUnit, NSubstitute, Testcontainers (PostgreSql, Redis, Minio modules), NetArchTest.Rules.
-- All package versions live in backend/Directory.Packages.props (central package management).
+- All package versions live in Directory.Packages.props at the repo root (central package management).
 
 ## How you work on every step
 1. PLAN: list files to create/change, tests to add, docs to update. Wait for my "OK" before coding.
 2. TEST FIRST: write failing tests, then the minimal code to pass.
-3. RUN: `dotnet build -warnaserror` and `dotnet test` (and docker/flutter commands when relevant). Paste the real tail of the output. Zero warnings, zero failures. Never skip, delete or weaken a test.
+3. RUN: `dotnet build -warnaserror` and `dotnet test` (and docker commands when relevant). Paste the real tail of the output. Zero warnings, zero failures. Never skip, delete or weaken a test.
 4. DOCS: create/update the feature doc, and docs/erd.md or docs/design/redis.md if indexes or cache keys change.
 5. SELF-REVIEW: go through the checklist in AGENTS.md §11 and mark each item ✅ / ❌ / N/A with one line of evidence.
 6. COMMIT: small Conventional Commits on a feature/<name> branch. Show me the commit list.
@@ -64,14 +64,14 @@ Reply now with: (a) a 10-line summary of what you understood about the product a
 Start Sprint 1 (docs/roadmap.md). We do it in 7 steps. Do ONLY step 1.1 now, following the step workflow (plan → wait for OK → test → code → run → docs → review → commit → summary → stop).
 
 ### Step 1.1 — Repository skeleton
-- Create backend/Stockly.sln with projects exactly as docs/architecture/structure.md:
+- Create Stockly.sln at the repo root with projects exactly as docs/architecture/structure.md:
   src: Stockly.Domain, Stockly.Contracts, Stockly.Application, Stockly.Infrastructure, Stockly.Api
   tests: Stockly.Domain.Tests, Stockly.Application.Tests, Stockly.Api.IntegrationTests, Stockly.ArchitectureTests
   (Stockly.Admin and Stockly.Admin.Tests are created in Sprint 5, not now.)
 - Project references must follow AGENTS.md §4 exactly. No extra references.
-- backend/Directory.Build.props: net8.0, Nullable enable, ImplicitUsings enable, TreatWarningsAsErrors true, AnalysisLevel latest-recommended, EnforceCodeStyleInBuild true.
-- backend/Directory.Packages.props with pinned versions (see Part A).
-- Root: .gitignore (dotnet + flutter + .env + IDE files), .editorconfig (C# + Dart), README.md (how to run, 5 minutes max).
+- Directory.Build.props: net8.0, Nullable enable, ImplicitUsings enable, TreatWarningsAsErrors true, AnalysisLevel latest-recommended, EnforceCodeStyleInBuild true.
+- Directory.Packages.props with pinned versions (see Part A).
+- Root: .gitignore (dotnet + .env + IDE files), .editorconfig (C#), README.md (how to run, 5 minutes max).
 - Stockly.ArchitectureTests with tests that fail if:
   - Domain references any other project or EF Core / ASP.NET
   - Application references Infrastructure, Api, EF Core, Npgsql, StackExchange.Redis, Hangfire, AWSSDK
@@ -118,5 +118,5 @@ Before coding Sprint 2, write docs/design/backend.md: request flows as Mermaid s
 
 **Before Sprint 3:**
 ```
-Before coding Sprint 3, write docs/design/frontend.md for the Flutter app: layers per feature, Riverpod provider graph, go_router routes and auth redirect, Dio interceptors (auth, refresh with request queue, error → Failure mapping), offline scan queue (Drift schema + sync worker), theme tokens mapped from brand/ (light + dark ThemeExtension), l10n setup (ar default, en), AsyncStateView for the 4 states, and the splash implementation from brand/stockly-brand.html. Wait for approval, then split Sprint 3 into steps and do step 3.1 only.
+Before coding Sprint 3 (in the stockly-mobile repository, ADR-0011), write its docs/design/frontend.md for the Flutter app, against the API contract in stockly-backend/docs/api/openapi.json: layers per feature, Riverpod provider graph, go_router routes and auth redirect, Dio interceptors (auth, refresh with request queue, error → Failure mapping), offline scan queue (Drift schema + sync worker), theme tokens mapped from brand/ (light + dark ThemeExtension), l10n setup (ar default, en), AsyncStateView for the 4 states, and the splash implementation from brand/stockly-brand.html. Wait for approval, then split Sprint 3 into steps and do step 3.1 only.
 ```

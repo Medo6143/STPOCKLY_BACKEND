@@ -6,7 +6,7 @@ This file is the contract for anyone writing code in this repo: humans and AI ag
 
 ## 1. What Stockly is
 
-A mobile app for small shops in Egypt (pharmacies, groceries, mobile shops). The owner photographs a supplier invoice, the backend extracts it with an AI vision model (OpenRouter), the user reviews and confirms, and stock updates through stock movements. Shops record sales on a quick-sale screen so stock goes down too. A Blazor admin dashboard lets the platform owner manage shops, plans, quotas and AI cost.
+Stockly is an inventory product for small shops in Egypt (pharmacies, groceries, mobile shops). The owner photographs a supplier invoice, the backend extracts it with an AI vision model (OpenRouter), the user reviews and confirms, and stock updates through stock movements. Shops record sales on a quick-sale screen so stock goes down too. A Blazor admin dashboard lets the platform owner manage shops, plans, quotas and AI cost.
 
 Users speak Arabic first. Arabic (RTL) and English, light and dark, from day one.
 
@@ -15,12 +15,14 @@ Key docs:
 | Doc | What it holds |
 |---|---|
 | `docs/roadmap.md` | Sprints, scope, definition of done |
-| `docs/architecture/structure.md` | Full folder structure for backend, mobile, admin |
+| `docs/architecture/structure.md` | Folder structure of this repository (API + admin) |
 | `docs/erd.md` | Data model, every index and constraint |
 | `docs/design/redis.md` | Redis jobs, key catalogue, TTLs, failure behaviour |
-| `docs/adr/` | Architecture decisions (0001–0009). Read before changing anything they cover. |
+| `docs/adr/` | Architecture decisions, numbered `NNNN-title.md`. Read before changing anything they cover. |
 | `docs/features/` | One doc per feature, from `_TEMPLATE.md` |
-| `brand/` | Logo, splash animation spec, color and type tokens |
+| `docs/api/openapi.json` | API contract consumed by the mobile app (from step 1.4b) |
+
+**Repositories (ADR-0011).** This repository, `stockly-backend`, holds the API and the Blazor admin. The Flutter app lives in `stockly-mobile` and consumes the API through the OpenAPI spec at `docs/api/openapi.json`; mobile-only rules live in that repository.
 
 ---
 
@@ -28,7 +30,6 @@ Key docs:
 
 | Layer | Technology |
 |---|---|
-| Mobile | Flutter stable, Riverpod, go_router, Dio, freezed + json_serializable, Drift (offline queue), flutter_animate |
 | Admin | Blazor WebAssembly + MudBlazor (`Stockly.Admin`) |
 | Backend | .NET 8 Web API, EF Core + Npgsql, MediatR, FluentValidation, Serilog, ASP.NET Core Identity |
 | Database | PostgreSQL 16 in Docker, extensions `pg_trgm` |
@@ -37,7 +38,7 @@ Key docs:
 | AI | OpenRouter `/api/v1/chat/completions`, **backend only** |
 | Jobs | Hangfire, PostgreSQL storage, schema `hangfire` |
 | Resilience | Polly via `Microsoft.Extensions.Http.Resilience` |
-| Tests | xUnit, FluentAssertions, NSubstitute, Testcontainers, NetArchTest · flutter_test, mocktail · bUnit |
+| Tests | xUnit, FluentAssertions, NSubstitute, Testcontainers, NetArchTest · bUnit |
 | CI | GitHub Actions |
 
 ---
@@ -50,8 +51,7 @@ cp .env.example .env
 docker compose up -d                       # postgres, redis, minio
 docker compose --profile dev up -d         # + pgadmin
 
-# backend
-cd backend
+# backend (from the repo root)
 dotnet build -warnaserror
 dotnet test
 dotnet tool restore                        # dotnet-ef pinned in .config/dotnet-tools.json
@@ -61,14 +61,6 @@ dotnet run --project src/Stockly.Api
 
 # admin
 dotnet run --project src/Stockly.Admin
-
-# mobile
-cd mobile
-flutter pub get
-dart run build_runner build --delete-conflicting-outputs
-flutter gen-l10n
-flutter analyze
-flutter test
 ```
 
 A change is not finished until the relevant commands pass with **zero warnings**.
@@ -97,7 +89,6 @@ Api references Application directly because, as the composition root, it uses Ap
 
 These boundaries are enforced by `tests/Stockly.ArchitectureTests`. A failing architecture test is a design problem, not a test problem.
 
-Mobile: `presentation (widgets + Riverpod notifiers) → domain (use cases, entities, repository interfaces) → data (repository impls, Dio data sources, DTOs)`. Widgets never import Dio or data-layer classes.
 
 ---
 
@@ -151,12 +142,7 @@ Mobile: `presentation (widgets + Riverpod notifiers) → domain (use cases, enti
 33. No N+1: use projections (`Select` to DTO) for reads. `AsNoTracking` for all queries.
 
 ### Mobile
-34. Every screen handles four states: loading, empty, error, data, using the shared `AsyncStateView`.
-35. No hardcoded strings, colors, sizes or durations. Strings from ARB files, colors and spacing from theme tokens (`brand/` is the source).
-36. Use `EdgeInsetsDirectional`, `AlignmentDirectional`, `start`/`end`. Never `left`/`right`.
-37. State is immutable (freezed). No business logic in widgets.
-38. Tokens in `flutter_secure_storage` only. No API keys in the app, ever.
-39. Respect "reduce motion": animations, including the splash, show their final frame.
+34–39. Reserved: the mobile rules moved to the `stockly-mobile` repository (`AGENTS.md` there). Numbers are kept so references such as "rule 42" stay valid.
 
 ### Code hygiene
 40. No magic strings, no dead code, no commented-out code, no `TODO` without an issue link.
@@ -169,7 +155,7 @@ Mobile: `presentation (widgets + Riverpod notifiers) → domain (use cases, enti
 
 | Principle | Here it means |
 |---|---|
-| S | One handler per use case. `OpenRouterInvoiceExtractor` only talks to OpenRouter. Widgets render, notifiers hold state, repositories fetch. |
+| S | One handler per use case. `OpenRouterInvoiceExtractor` only talks to OpenRouter. Repositories fetch, handlers decide, controllers map. |
 | O | New invoice check = new `IInvoiceValidationRule` class registered in DI. New AI provider = new `IAiInvoiceExtractor`. No growing `switch` on type or provider. |
 | L | Fakes behave like real implementations: same `Result` errors, same exceptions. |
 | I | Small interfaces per need (`IProductRepository`, `ICacheService`, `IScanQuotaCounter`...). No generic `IRepository<T>` god-interface. |
@@ -189,12 +175,6 @@ Name the principle in the PR when a design choice is not obvious. Do not add abs
 - EF configuration in `IEntityTypeConfiguration<T>` classes, one per entity.
 - Central package versions in `Directory.Packages.props`.
 
-**Dart**
-- `very_good_analysis` lints, no ignores without a comment explaining why.
-- One public widget per file. File names `snake_case`.
-- Providers live next to the feature, named `<thing>Provider`, notifiers `<Thing>Notifier`.
-- Repositories return `Result<T, Failure>` (sealed class), never throw to the UI.
-
 **Naming**
 - Tests: `Method_Scenario_ExpectedResult`.
 - Branches: `feature/<name>`, `fix/<name>`, `chore/<name>`, `docs/<name>`.
@@ -209,7 +189,6 @@ Name the principle in the PR when a design choice is not obvious. Do not add abs
 - `OpenRouterInvoiceExtractor` against a fake `HttpMessageHandler`: valid JSON, malformed JSON, empty items, too many items, 429, 500, timeout.
 - Repositories and the confirm transaction use Testcontainers (real Postgres), including a **concurrent double-confirm** test.
 - Redis adapters: Testcontainers Redis, plus a "Redis down" test proving fallback.
-- Flutter: unit tests for use cases and notifiers; widget tests for all 4 states of each screen, in both `ar` and `en`.
 - Coverage target ≥ 80% on Domain and Application.
 - Never delete, skip or weaken a test to make the build pass.
 
@@ -251,5 +230,4 @@ If unsure, ask **one** clear question instead of guessing.
 - [ ] Error paths tested, including wrong tenant
 - [ ] Migration added and SQL reviewed
 - [ ] Feature doc created or updated
-- [ ] Mobile: RTL checked, 4 states, light + dark, strings in ARB
 - [ ] Works from a clean `docker compose up -d` with `.env.example` values

@@ -15,9 +15,9 @@ Each sprint ends with a demo and a working build from a clean `docker compose up
 | ADRs 0001–0009 | Approved |
 | Redis design (`docs/design/redis.md`) | Approved |
 | `AGENTS.md`, structure, roadmap | Approved |
-| Brand: logo, splash animation, tokens (`brand/`) | Approved |
+| Brand: logo, splash animation, tokens (`brand/`, now in `stockly-mobile`, ADR-0011) | Approved |
 | Backend system design (`docs/design/backend.md`) | Before Sprint 2 |
-| Frontend system design, mobile + admin (`docs/design/frontend.md`) | Before Sprint 3 |
+| Frontend system design: admin here, mobile in `stockly-mobile` (`docs/design/frontend.md`) | Before Sprint 3 |
 
 **Exit:** all of the above approved, except the two system design docs. `docs/design/backend.md` is written and approved before Sprint 2 starts, `docs/design/frontend.md` before Sprint 3 (see `docs/prompts/execution-prompt.md`, Part D).
 
@@ -53,6 +53,8 @@ Each sprint ends with a demo and a working build from a clean `docker compose up
 - Docs: `features/invoice-scan.md` (full integration section for OpenRouter, Hangfire, MinIO, Redis)
 
 ## Sprint 3 — Mobile foundation and scan flow
+
+_Built in the `stockly-mobile` repository (ADR-0011) against `docs/api/openapi.json` from this repository._
 
 **Goal:** the owner uses the real app to log in, see products and scan an invoice.
 
@@ -91,7 +93,7 @@ Each sprint ends with a demo and a working build from a clean `docker compose up
 **Goal:** ready for first real shops.
 
 - Fuzzy matching with `pg_trgm` on aliases and names ("بنادول اكسترا" ↔ "Panadol Extra"), confidence shown on review
-- GitHub Actions: backend, mobile, admin workflows, coverage gate 80% on Domain/Application
+- GitHub Actions: backend and admin workflows here, mobile workflow in `stockly-mobile` (ADR-0011); coverage gate 80% on Domain/Application
 - Load test: polling and scan endpoint; security review (OWASP API Top 10 checklist)
 - Image lifecycle (90 days), backup plan for Postgres
 - Release builds (Android first), privacy policy text

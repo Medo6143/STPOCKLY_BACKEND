@@ -55,3 +55,22 @@ Stop conditions. The message defining "the four stop conditions" did not reach t
 2. Step `feature/repo-split`: this repo becomes `stockly-backend`, backend at the repo root, brand and mobile rules move out, ADR-0011 polyrepo.
 3. Step `feature/upgrade-net10`: .NET 10 LTS (.NET 8 support ends 2026-11-10), `Guid.CreateVersion7` replaces UUIDNext (ADR-0010 supersedes ADR-0009).
 4. Continue with 1.4b (now including OpenAPI spec at `docs/api/openapi.json` with an up-to-date test), 1.5, 1.6, 1.7.
+
+## Step repo-split: this repo becomes `stockly-backend`
+
+**Plan:**
+- `git mv` the contents of `backend/` to the repo root (`Stockly.sln`, `Directory.*.props`, `src/`, `tests/`); `backend/` disappears. History is kept (checked with `git log --follow`).
+- Copy `brand/` to `D:\FLUTTER\stockly-mobile-assets\brand` (outside the repo), then `git rm -r brand`.
+- Flutter/Dart sections leave `.gitignore` and `.editorconfig`; editorconfig globs lose the `backend/` prefix.
+- AGENTS.md: mobile-only rules (34–39), Dart conventions, mobile tests and mobile commands move to `D:\FLUTTER\stockly-mobile-assets\AGENTS.mobile.md`. Rule numbers 34–39 stay reserved with a pointer, so references such as "rule 42" in code comments stay valid. A short section says the mobile app lives in `stockly-mobile` and consumes the API through OpenAPI.
+- `structure.md` §3 (mobile tree) moves to `D:\FLUTTER\stockly-mobile-assets\docs\structure.mobile.md`; the backend tree is now the repo root.
+- `Stockly.Admin` (Sprint 5) stays here: it references `Stockly.Contracts`.
+- ADR-0011 "Polyrepo: stockly-backend (API + Admin) and stockly-mobile".
+- Paths updated in README, AGENTS.md, structure.md, roadmap, products.md, this log and the execution prompt.
+- Acceptance: build with 0 warnings and all tests green from the root; `docker compose up -d` healthy; `dotnet ef` from the root; `git log --follow` on a moved file shows its history.
+
+**Result (repo-split):**
+- Pure renames (`git mv`): 93 files, 0 content changes in moved files. `git log --follow src/Stockly.Domain/Products/Product.cs` shows its history from before the move.
+- `D:\FLUTTER\stockly-mobile-assets\` now holds `brand/` (byte-identical copy, checked with `diff -r`), `AGENTS.mobile.md` and `docs/structure.mobile.md`. It is not a git repository yet.
+- From the root: build 0 warnings / 0 errors; 240 tests green; `docker compose up -d` healthy with minio-init exited 0; `dotnet ef migrations list` and `database update` work.
+- ADR-0011 added. Paths updated in README, AGENTS.md, structure.md, roadmap, products.md and the execution prompt.
