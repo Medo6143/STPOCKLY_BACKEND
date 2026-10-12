@@ -172,11 +172,18 @@ mobile/
 
 ## 4. Docker services
 
-| Service | Image | Port | Volume | Profile |
-|---|---|---|---|---|
-| postgres | postgres:16 | 5432 | `pg_data` | default |
-| redis | redis:7-alpine | 6379 | none (cache only) | default |
-| minio | minio/minio | 9000 / 9001 | `minio_data` | default |
-| pgadmin | dpage/pgadmin4 | 5050 | none | dev |
+Defined in `docker-compose.yml` (project `stockly`, one network `stockly`). Images are pinned by tag **and** sha256 digest in the compose file; bump both together. Every port is bound to `127.0.0.1` only, and every credential comes from `.env` (`${VAR:?}`, compose refuses to start without it).
 
-All have health checks; the API waits on `service_healthy`.
+| Service | Image (tag; digest in compose) | Host port | Volume | Profile | Health check |
+|---|---|---|---|---|---|
+| postgres | `postgres:16.15-alpine` | 5432 | `pg_data` | default | `pg_isready` |
+| redis | `redis:7.4.11-alpine` | 6379 | none (cache only: `--save ""`, `--appendonly no`, 256 MB, `volatile-lru`, password) | default | `redis-cli ping` |
+| minio | `pgsty/minio:RELEASE.2026-08-04T00-00-00Z` (community build, dev/test only, ADR-0008) | 9000 API / 9001 console | `minio_data` | default | `mc ready local` |
+| minio-init | `pgsty/mc:RELEASE.2026-09-16T00-00-00Z` | none | none | default | none (one-shot, exits 0) |
+| pgadmin | `dpage/pgadmin4:9.18` | 5050 | none | dev | `wget /misc/ping` |
+
+`minio-init` waits for MinIO to be healthy, then creates the private bucket `MINIO_BUCKET` and the least-privilege API user (`STORAGE_ACCESS_KEY`, policy `stockly-api`: Get/Put/DeleteObject on the bucket's objects, ListBucket on the bucket). Re-running it is harmless.
+
+Host ports can be moved with `POSTGRES_PORT`, `REDIS_PORT`, `MINIO_API_PORT`, `MINIO_CONSOLE_PORT` and `PGADMIN_PORT` in `.env` when a port is already taken.
+
+In development the API runs on the host with `dotnet run` and connects to these services through the `127.0.0.1` ports. Containerizing the API is out of scope until the release sprint.
