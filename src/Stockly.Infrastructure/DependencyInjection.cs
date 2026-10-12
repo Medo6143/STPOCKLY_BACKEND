@@ -15,14 +15,16 @@ namespace Stockly.Infrastructure;
 public static class DependencyInjection
 {
     /// <summary>
-    /// Registers <see cref="StocklyDbContext"/> with its interceptors, <see cref="IClock"/>, the repositories and the
-    /// unit of work. The caller registers <c>ICurrentTenant</c> (from the JWT in the Api).
+    /// Registers <see cref="StocklyDbContext"/> with its interceptors, <see cref="IClock"/> and a <see cref="TimeProvider"/>
+    /// reading it (for framework code), the repositories and the unit of work. The caller registers
+    /// <c>ICurrentTenant</c> (from the JWT in the Api).
     /// </summary>
     public static IServiceCollection AddPersistence(this IServiceCollection services, string connectionString)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
 
         services.TryAddSingleton<IClock, SystemClock>();
+        services.AddSingleton<TimeProvider, ClockTimeProvider>();
         services.AddScoped<TenantStampInterceptor>();
         services.AddScoped<AuditTimestampsInterceptor>();
         services.AddDbContext<StocklyDbContext>((provider, options) =>
@@ -42,8 +44,8 @@ public static class DependencyInjection
     }
 
     /// <summary>
-    /// ASP.NET Core Identity on <see cref="StocklyDbContext"/> (users only, no roles), the password policy, and the
-    /// token issuer. Requires <see cref="AddPersistence"/> and logging.
+    /// ASP.NET Core Identity on <see cref="StocklyDbContext"/> (users only, no roles), the password and lockout
+    /// policies, and the token issuer. Requires <see cref="AddPersistence"/> and logging.
     /// </summary>
     public static IServiceCollection AddStocklyIdentity(this IServiceCollection services, JwtOptions jwtOptions)
     {
@@ -63,7 +65,12 @@ public static class DependencyInjection
 
                 // The user name is the email; any character an email may hold is allowed.
                 options.User.AllowedUserNameCharacters = string.Empty;
+
+                options.Lockout.MaxFailedAccessAttempts = AuthProtection.MaxFailedLoginAttempts;
+                options.Lockout.DefaultLockoutTimeSpan = AuthProtection.LockoutDuration;
+                options.Lockout.AllowedForNewUsers = true;
             })
+            .AddUserManager<StocklyUserManager>()
             .AddEntityFrameworkStores<StocklyDbContext>();
         services.AddScoped<IUserAccounts, IdentityUserAccounts>();
 

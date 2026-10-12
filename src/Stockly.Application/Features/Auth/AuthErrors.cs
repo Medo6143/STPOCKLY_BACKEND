@@ -25,4 +25,12 @@ public static class AuthErrors
 
     public static readonly Error Forbidden =
         Error.Forbidden("Auth.Forbidden", "The user's role does not allow this action.");
+
+    /// <summary>Too many failed logins. Returned with <c>RetryAfter</c> set (<c>with { RetryAfter = ... }</c>).</summary>
+    public static readonly Error LockedOut =
+        Error.Locked("Auth.LockedOut", "The account is locked after too many failed logins.");
+
+    /// <summary>Too many requests from this client. Returned with <c>RetryAfter</c> set (<c>with { RetryAfter = ... }</c>).</summary>
+    public static readonly Error TooManyRequests =
+        Error.TooManyRequests("Auth.TooManyRequests", "Too many requests from this client.");
 }

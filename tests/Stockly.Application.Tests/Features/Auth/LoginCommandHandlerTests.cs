@@ -1,4 +1,6 @@
 using NSubstitute;
+using Stockly.Application.Abstractions.Identity;
+using Stockly.Application.Abstractions.Messaging;
 using Stockly.Application.Abstractions.Persistence;
 using Stockly.Application.Features.Auth;
 using Stockly.Application.Features.Auth.Login;
@@ -15,7 +17,10 @@ public sealed class LoginCommandHandlerTests
 
     public LoginCommandHandlerTests()
     {
-        _context.Users.FindByCredentialsAsync("mona@example.com", "Str0ngPass", Arg.Any<CancellationToken>()).Returns(User);
+        _context.Users.CheckCredentialsAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(CredentialCheck.Invalid);
+        _context.Users.CheckCredentialsAsync("mona@example.com", "Str0ngPass", Arg.Any<CancellationToken>())
+            .Returns(CredentialCheck.Valid(User));
         _context.Memberships.FindFirstActiveAsync(UserId, Arg.Any<CancellationToken>()).Returns(Membership);
     }
 
@@ -42,6 +47,28 @@ public sealed class LoginCommandHandlerTests
 
         result.Error.Should().Be(AuthErrors.InvalidCredentials);
         _context.RefreshTokens.DidNotReceiveWithAnyArgs().Add(default!);
+    }
+
+    [Fact]
+    public async Task Handle_LockedOut_ReturnsLockedOutWithTimeUntilTheLockoutEndsAndIssuesNothing()
+    {
+        _context.Users.CheckCredentialsAsync("mona@example.com", "Str0ngPass", Arg.Any<CancellationToken>())
+            .Returns(CredentialCheck.LockedOut(Now.AddMinutes(14).AddSeconds(30)));
+
+        var result = await Handler().Handle(new LoginCommand("mona@example.com", "Str0ngPass", null), CancellationToken.None);
+
+        result.Error.Code.Should().Be(AuthErrors.LockedOut.Code);
+        result.Error.Type.Should().Be(AuthErrors.LockedOut.Type);
+        result.Error.RetryAfter.Should().Be(TimeSpan.FromMinutes(14.5));
+        _context.RefreshTokens.DidNotReceiveWithAnyArgs().Add(default!);
+        await _context.Memberships.DidNotReceiveWithAnyArgs().FindFirstActiveAsync(default, default);
+        await _context.Users.DidNotReceiveWithAnyArgs().RecordSignInAsync(default, default, default);
+    }
+
+    [Fact]
+    public void LoginCommand_CommitsOnFailure_SoFailedAttemptsAreCounted()
+    {
+        new LoginCommand("mona@example.com", "nope", null).Should().BeAssignableTo<ICommitOnFailure>();
     }
 
     [Fact]

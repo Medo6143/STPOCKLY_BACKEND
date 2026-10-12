@@ -1,8 +1,8 @@
 # Stockly API contract
 
-**Version: v1.3** · Status: **Approved** (v1.1 at checkpoint 1, v1.3 at checkpoint 2, 2026-10-12; v1.2 clarifications by the orchestrator) · Owner: orchestrator
+**Version: v1.4** · Status: **Approved** (v1.1 at checkpoint 1, v1.3 at checkpoint 2, v1.4 by the product owner, 2026-10-12; v1.2 clarifications by the orchestrator) · Owner: orchestrator
 
-Change log: v1 (2026-10-12) first draft · v1.1 (2026-10-12) opening stock on create (P3), list price and override flag on sales (S1, D1), `newProduct` without category (I4), `GET /api/auth/me` fields made explicit (A5) · v1.2 (2026-10-12) `Http.*` codes for framework errors (§1.8), `newProduct` on `InvoiceItemDto` (§6), logout allowed for suspended shops (A4) · v1.3 (2026-10-12) `Retry-After` on `429 Scan.DailyQuotaExceeded` (I1).
+Change log: v1 (2026-10-12) first draft · v1.1 (2026-10-12) opening stock on create (P3), list price and override flag on sales (S1, D1), `newProduct` without category (I4), `GET /api/auth/me` fields made explicit (A5) · v1.2 (2026-10-12) `Http.*` codes for framework errors (§1.8), `newProduct` on `InvoiceItemDto` (§6), logout allowed for suspended shops (A4) · v1.3 (2026-10-12) `Retry-After` on `429 Scan.DailyQuotaExceeded` (I1) · v1.4 (2026-10-12) account lockout (`423 Auth.LockedOut`) and per-IP rate limiting (`429 Auth.TooManyRequests`) on A1/A2.
 
 This is the binding contract between `stockly-backend` and `stockly-mobile` (and `Stockly.Admin` later) for Sprints 1–4. Field names, types, status codes and error codes here are exact. Only the orchestrator changes this file: every change bumps the version, updates the copy in `stockly-mobile/docs/api/contract.md`, and is announced to the running lanes.
 
@@ -46,6 +46,8 @@ The machine-readable spec is `docs/api/openapi.json`. A backend test checks that
 - **Refresh token**: opaque random string, lifetime **30 days**, stored hashed. Every refresh **rotates** it (the old one is revoked). Presenting a revoked refresh token **revokes the whole chain** and returns `401 Auth.RefreshTokenReused` (AGENTS.md rule 13).
 - **Client rule:** on `401` from any authenticated endpoint, the client calls `POST /api/auth/refresh` **once**, then retries the original request **once**. Concurrent `401`s share one refresh (request queue). If the refresh fails, the client signs out.
 - Roles: `user` = Owner or Staff of the active shop. `owner` = Owner only. A Staff user calling an owner-only endpoint gets `403 Auth.Forbidden`.
+- **Account lockout (v1.4):** 5 failed logins in a row on an existing account lock it for **15 minutes**. While locked, login returns `423 Auth.LockedOut` with `Retry-After` (whole seconds until the lockout ends, at least 1), **even with the correct password**. A successful login resets the failure count.
+- **Rate limiting (v1.4):** `POST /api/auth/login` and `POST /api/auth/register` each allow **10 requests per minute per client IP** (fixed window). The 11th returns `429 Auth.TooManyRequests` with `Retry-After` (seconds until the window resets). The client shows the message and does not retry automatically before `Retry-After`.
 - A suspended shop (`ShopStatus.Suspended`) gets `403 Shop.Suspended` on login, refresh and every authenticated call except logout (A4), so the user can always sign out.
 
 ### 1.5 Localization
@@ -91,8 +93,8 @@ Every error response is `application/problem+json`:
 
 | # | Method | Path | Auth | Statuses | Step | State |
 |---|---|---|---|---|---|---|
-| A1 | POST | /api/auth/register | anonymous | 201, 400, 409 | 1.5 | implemented |
-| A2 | POST | /api/auth/login | anonymous | 200, 400, 401, 403 | 1.5 | implemented |
+| A1 | POST | /api/auth/register | anonymous | 201, 400, 409, 429 | 1.5 | implemented |
+| A2 | POST | /api/auth/login | anonymous | 200, 400, 401, 403, 423, 429 | 1.5 | implemented |
 | A3 | POST | /api/auth/refresh | anonymous | 200, 400, 401, 403 | 1.5 | implemented |
 | A4 | POST | /api/auth/logout | user | 204, 400, 401 | 1.5 | implemented |
 | A5 | GET | /api/auth/me | user | 200, 401, 403 | 1.5 | implemented |
@@ -203,12 +205,12 @@ Request:
 ```
 - `email`: required, valid, max 256, case-insensitive unique. `password`: required, 8–128 chars, at least one letter and one digit. `fullName`: required, max 200. `phone`: optional, max 30. `preferredLanguage`: optional, `ar` (default) or `en`. `deviceId`: optional, max 100. `shop.name`: required, max 200, non-empty after Arabic normalization. `shop.shopType`: required.
 
-Responses: `201` `AuthResponse` (role `Owner`). `400 Validation.Failed`, `400 Shop.NameRequired`. `409 Auth.EmailTaken`.
+Responses: `201` `AuthResponse` (role `Owner`). `400 Validation.Failed`, `400 Shop.NameRequired`. `409 Auth.EmailTaken`. `429 Auth.TooManyRequests` (v1.4, `Retry-After`).
 
 ### A2 `POST /api/auth/login` (anonymous)
 Request: `{ "email": string, "password": string, "deviceId": string|null }`
 
-Responses: `200` `AuthResponse`. `401 Auth.InvalidCredentials` (same code for unknown email and wrong password). `403 Shop.Suspended`. `403 Auth.NoActiveShop` (user has no active membership).
+Responses: `200` `AuthResponse`. `401 Auth.InvalidCredentials` (same code for unknown email and wrong password). `403 Shop.Suspended`. `403 Auth.NoActiveShop` (user has no active membership). `423 Auth.LockedOut` (v1.4, `Retry-After`; checked before the password). `429 Auth.TooManyRequests` (v1.4, `Retry-After`).
 If the user belongs to several shops, the token is for the active membership joined first; switching shops is not in v1.
 
 ### A3 `POST /api/auth/refresh` (anonymous)
@@ -469,6 +471,8 @@ ExpiringItem { productId: uuid, productName: string, expiryDate: date, batchNo: 
 | `Auth.NoActiveShop` | 403 | A2 | User has no active shop membership |
 | `Auth.InvalidRefreshToken` | 401 | A3 | Unknown or expired refresh token |
 | `Auth.RefreshTokenReused` | 401 | A3 | Revoked token reused; chain revoked |
+| `Auth.LockedOut` | 423 | A2 | Too many failed logins; locked for 15 minutes; `Retry-After` (v1.4) |
+| `Auth.TooManyRequests` | 429 | A1, A2 | More than 10 requests per minute from this IP; `Retry-After` (v1.4) |
 | `Shop.NameRequired` | 400 | A1 | Shop name blank after normalization |
 | `Shop.UnknownType` | 400 | A1 | Unsupported shop type |
 | `Shop.Suspended` | 403 | all authenticated, A2, A3 | Shop suspended by the platform admin |
@@ -528,3 +532,5 @@ Domain movement-rule codes (`Stock.InvoiceSourceRequired`, `Stock.SaleSourceRequ
 15. Negative stock is a warning in the sale response, never an error.
 16. `ProductUnit.InUse` (409) protects history: a unit referenced by invoice or sale lines cannot be deleted.
 17. Domain-only movement codes surface as 500 (server bug), never as client errors.
+18. (v1.4) Lockout uses ASP.NET Core Identity lockout: 5 consecutive failures → 15 minutes, for every account. It applies to existing accounts only; an unknown email keeps returning `401 Auth.InvalidCredentials`. This lets a caller who fails 5 times on one email learn that the account exists; the per-IP rate limit bounds how fast that can be probed. Accepted trade-off.
+19. (v1.4) Rate limits are per endpoint and per client IP (`HttpContext.Connection.RemoteIpAddress`), fixed 60-second window, built-in ASP.NET Core rate limiter. Behind a reverse proxy, forwarded headers must be configured at deployment so the client IP is used (release sprint).

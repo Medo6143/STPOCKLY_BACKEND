@@ -155,3 +155,11 @@ Stop conditions. The message defining "the four stop conditions" did not reach t
 - Worker decisions accepted: shop type as a string in the request (so an unknown type gives `Shop.UnknownType`); expiry timestamps as UTC `DateTime` serialized with `Z`; invariant formatting culture with ar/en UI culture; existing tests updated, none weakened (500 test now sends `Accept-Language: en`, a new test checks the Arabic title).
 - Open (known limitation, docs/features/auth.md): no login lockout or rate limiting yet.
 - Tool note: the `dotnet-ef` resolver cache pointed at the old C: NuGet path after the cache move; the stale cache entry was deleted and `dotnet tool restore` re-run.
+
+## Lane BACKEND: step 1.5b auth hardening
+
+- Brief: `docs/agents/briefs/backend-1.5b-auth-hardening.md`; contract v1.4 written first on the branch (A1 + 429, A2 + 423/429), conformance red until done.
+- Report: "AGENTS.md read: yes", contract deviations NONE. The worker once ran `git checkout -- <file>` to undo its own edit (file identical to HEAD); harmless, and the brief template now forbids any git command that changes the working tree or history.
+- Orchestrator verification: build 0 warnings; tests Domain 222, Application 73, Architecture 23, Infrastructure 87, Api 165 (570, green); no pending model changes; scope = src, tests, openapi.json, auth.md, README, .env.example.
+- Identity clock question (product owner): checked the Identity 10.0.12 assemblies, including the shared-framework copy: `Microsoft.Extensions.Identity.Core` (UserManager) has no `TimeProvider` reference and reads `DateTimeOffset.UtcNow` for lockout; only `Microsoft.AspNetCore.Identity` (SignInManager, security stamp) uses `TimeProvider`. So a DI `TimeProvider` cannot drive lockout; `StocklyUserManager` overrides `IsLockedOutAsync` and `AccessFailedAsync` (same logic as stock, time from `ClockTimeProvider` over `IClock`). Documented in `docs/features/auth.md`; covered by a Testcontainers test with a fake clock (stored `lockout_end`, boundary at 15 min ± 1 s) and the Api lockout tests.
+- Other decisions accepted: login is `ICommitOnFailure` so failed-attempt counts survive the failed result; `Retry-After` on 429 is the window length (upper bound) from the lease metadata; rate-limit settings validated at startup.

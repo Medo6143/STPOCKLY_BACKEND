@@ -12,6 +12,9 @@ public sealed record Error(string Code, string Message, ErrorType Type)
     /// <summary>Per-field messages for request-shape failures, keyed by camelCase field path (e.g. <c>shop.name</c>).</summary>
     public IReadOnlyDictionary<string, string[]>? FieldErrors { get; init; }
 
+    /// <summary>How long the caller should wait before trying again (<c>Retry-After</c>), for temporary failures.</summary>
+    public TimeSpan? RetryAfter { get; init; }
+
     public static Error Validation(string code, string message) => new(code, message, ErrorType.Validation);
 
     public static Error NotFound(string code, string message) => new(code, message, ErrorType.NotFound);
@@ -21,4 +24,8 @@ public sealed record Error(string Code, string Message, ErrorType Type)
     public static Error Forbidden(string code, string message) => new(code, message, ErrorType.Forbidden);
 
     public static Error Unauthorized(string code, string message) => new(code, message, ErrorType.Unauthorized);
+
+    public static Error Locked(string code, string message) => new(code, message, ErrorType.Locked);
+
+    public static Error TooManyRequests(string code, string message) => new(code, message, ErrorType.TooManyRequests);
 }

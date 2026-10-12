@@ -1,9 +1,11 @@
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Stockly.Api.Authentication;
 using Stockly.Api.Errors;
 using Stockly.Api.Extensions;
+using Stockly.Api.RateLimiting;
 using Stockly.Application.Features.Auth.GetMe;
 using Stockly.Application.Features.Auth.Login;
 using Stockly.Application.Features.Auth.Logout;
@@ -21,12 +23,14 @@ public sealed class AuthController(ISender sender) : ControllerBase
     private const string MeLocation = "/api/auth/me";
     private const string Json = "application/json";
 
-    /// <summary>A1: register a user with their shop. Returns the first session.</summary>
+    /// <summary>A1: register a user with their shop. Returns the first session. Rate-limited per client IP.</summary>
     [HttpPost("register")]
     [AllowAnonymous]
+    [EnableRateLimiting(AuthRateLimiting.RegisterPolicy)]
     [ProducesResponseType<AuthResponse>(StatusCodes.Status201Created, Json)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest, StocklyProblems.ContentType)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict, StocklyProblems.ContentType)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status429TooManyRequests, StocklyProblems.ContentType)]
     public async Task<IActionResult> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -36,13 +40,16 @@ public sealed class AuthController(ISender sender) : ControllerBase
         return result.ToActionResult(this, response => Created(MeLocation, response));
     }
 
-    /// <summary>A2: sign in to the active membership joined first.</summary>
+    /// <summary>A2: sign in to the active membership joined first. Rate-limited per client IP; locked accounts get 423.</summary>
     [HttpPost("login")]
     [AllowAnonymous]
+    [EnableRateLimiting(AuthRateLimiting.LoginPolicy)]
     [ProducesResponseType<AuthResponse>(StatusCodes.Status200OK, Json)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest, StocklyProblems.ContentType)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, StocklyProblems.ContentType)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, StocklyProblems.ContentType)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status423Locked, StocklyProblems.ContentType)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status429TooManyRequests, StocklyProblems.ContentType)]
     public async Task<IActionResult> LoginAsync(LoginRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);

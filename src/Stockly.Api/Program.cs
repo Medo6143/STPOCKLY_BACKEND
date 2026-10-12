@@ -4,6 +4,7 @@ using Stockly.Api.Configuration;
 using Stockly.Api.Health;
 using Stockly.Api.Identity;
 using Stockly.Api.Middleware;
+using Stockly.Api.RateLimiting;
 using Stockly.Application;
 using Stockly.Application.Abstractions.Identity;
 using Stockly.Infrastructure;
@@ -19,6 +20,7 @@ if (builder.Environment.IsDevelopment())
 var postgres = builder.Configuration.GetRequiredConnectionString(ConnectionStringNames.Postgres);
 var redis = builder.Configuration.GetRequiredConnectionString(ConnectionStringNames.Redis);
 var jwt = builder.Configuration.GetRequiredJwtOptions();
+var authRateLimit = builder.Configuration.GetAuthRateLimitOptions();
 
 builder.Services.AddSerilog((services, logger) => logger
     .ReadFrom.Configuration(builder.Configuration)
@@ -36,6 +38,7 @@ builder.Services.AddStocklyIdentity(jwt);
 builder.Services.AddApplication();
 builder.Services.AddStocklyAuthentication(jwt);
 builder.Services.AddStocklyLocalization();
+builder.Services.AddStocklyRateLimiting(authRateLimit);
 
 builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = ProblemDetailsEnricher.Enrich);
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
@@ -50,6 +53,7 @@ app.UseRequestLocalization();
 app.UseSerilogRequestLogging();
 app.UseExceptionHandler();
 app.UseStatusCodePages();
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 

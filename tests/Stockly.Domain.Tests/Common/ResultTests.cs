@@ -84,5 +84,7 @@ public sealed class ResultTests
         ((int)ErrorType.Forbidden).Should().Be(4);
         ((int)ErrorType.Unauthorized).Should().Be(5);
         ((int)ErrorType.Failure).Should().Be(6);
+        ((int)ErrorType.Locked).Should().Be(7);
+        ((int)ErrorType.TooManyRequests).Should().Be(8);
     }
 }
