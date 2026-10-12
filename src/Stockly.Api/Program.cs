@@ -14,8 +14,8 @@ if (builder.Environment.IsDevelopment())
     builder.Configuration.AddRepositoryDotEnv(builder.Environment.ContentRootPath);
 }
 
-var postgres = BuildTimeOpenApi.ConnectionString(builder.Configuration, ConnectionStringNames.Postgres);
-var redis = BuildTimeOpenApi.ConnectionString(builder.Configuration, ConnectionStringNames.Redis);
+var postgres = builder.Configuration.GetRequiredConnectionString(ConnectionStringNames.Postgres);
+var redis = builder.Configuration.GetRequiredConnectionString(ConnectionStringNames.Redis);
 
 builder.Services.AddSerilog((services, logger) => logger
     .ReadFrom.Configuration(builder.Configuration)
@@ -30,7 +30,7 @@ builder.Services.AddPersistence(postgres);
 builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = ProblemDetailsEnricher.Enrich);
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddControllers();
-builder.Services.AddOpenApi(BuildTimeOpenApi.DocumentName);
+builder.Services.AddOpenApi(OpenApiDocuments.V1);
 builder.Services.AddStocklyHealthChecks(postgres, redis);
 
 var app = builder.Build();

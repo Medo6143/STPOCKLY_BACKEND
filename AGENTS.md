@@ -20,7 +20,9 @@ Key docs:
 | `docs/design/redis.md` | Redis jobs, key catalogue, TTLs, failure behaviour |
 | `docs/adr/` | Architecture decisions, numbered `NNNN-title.md`. Read before changing anything they cover. |
 | `docs/features/` | One doc per feature, from `_TEMPLATE.md` |
-| `docs/api/openapi.json` | API contract consumed by the mobile app (from step 1.4b) |
+| `docs/api/contract.md` | API contract v1 for Sprints 1–4 (binding; changed only by the orchestrator) |
+| `docs/api/openapi.json` | Generated spec, checked against the contract by tests |
+| `docs/agents/` | Orchestration guide and agent briefs |
 
 **Repositories (ADR-0011).** This repository, `stockly-backend`, holds the API and the Blazor admin. The Flutter app lives in `stockly-mobile` and consumes the API through the OpenAPI spec at `docs/api/openapi.json`; mobile-only rules live in that repository.
 
@@ -58,7 +60,7 @@ dotnet tool restore                        # dotnet-ef pinned in .config/dotnet-
 dotnet ef migrations add <Name> -p src/Stockly.Infrastructure -s src/Stockly.Api
 dotnet ef database update      -p src/Stockly.Infrastructure -s src/Stockly.Api --connection "<ConnectionStrings__Postgres from .env>"
 dotnet run --project src/Stockly.Api           # Development: reads the repo-root .env
-dotnet build src/Stockly.Api --no-incremental  # rewrite docs/api/openapi.json (normal builds do it when the Api changes)
+dotnet test --filter FullyQualifiedName~OpenApiDocumentTests   # rewrites docs/api/openapi.json when an endpoint changed
 
 # admin
 dotnet run --project src/Stockly.Admin
