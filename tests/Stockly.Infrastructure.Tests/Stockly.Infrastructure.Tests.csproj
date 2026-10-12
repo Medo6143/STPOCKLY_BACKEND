@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="Testcontainers.Redis" />
   </ItemGroup>
 
   <ItemGroup>

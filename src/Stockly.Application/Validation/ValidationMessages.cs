@@ -20,6 +20,8 @@ public static class ValidationMessages
 
     public static string LanguageNotSupported => Get(nameof(LanguageNotSupported));
 
+    public static string DecimalFormat => Get(nameof(DecimalFormat));
+
     private static string Get(string key) =>
         Resources.GetString(key, CultureInfo.CurrentUICulture)
         ?? throw new InvalidOperationException($"Validation message '{key}' is missing.");

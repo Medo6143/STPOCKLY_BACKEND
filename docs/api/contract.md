@@ -98,17 +98,17 @@ Every error response is `application/problem+json`:
 | A3 | POST | /api/auth/refresh | anonymous | 200, 400, 401, 403 | 1.5 | implemented |
 | A4 | POST | /api/auth/logout | user | 204, 400, 401 | 1.5 | implemented |
 | A5 | GET | /api/auth/me | user | 200, 401, 403 | 1.5 | implemented |
-| P1 | GET | /api/products | user | 200, 400, 401, 403 | 1.6 | planned |
-| P2 | GET | /api/products/{id} | user | 200, 401, 403, 404 | 1.6 | planned |
-| P3 | POST | /api/products | user | 201, 400, 401, 403, 409 | 1.6 | planned |
-| P4 | PUT | /api/products/{id} | user | 200, 400, 401, 403, 404, 409 | 1.6 | planned |
-| P5 | POST | /api/products/{id}/archive | owner | 204, 401, 403, 404 | 1.6 | planned |
-| P6 | POST | /api/products/{id}/units | user | 201, 400, 401, 403, 404, 409 | 1.6 | planned |
-| P7 | PUT | /api/products/{id}/units/{unitId} | user | 200, 400, 401, 403, 404, 409 | 1.6 | planned |
-| P8 | DELETE | /api/products/{id}/units/{unitId} | user | 204, 400, 401, 403, 404, 409 | 1.6 | planned |
-| P9 | POST | /api/products/{id}/adjustments | owner | 201, 400, 401, 403, 404 | 1.6 | planned |
-| P10 | POST | /api/products/{id}/stock-counts | owner | 200, 400, 401, 403, 404 | 1.6 | planned |
-| P11 | GET | /api/products/{id}/movements | user | 200, 400, 401, 403, 404 | 1.6 | planned |
+| P1 | GET | /api/products | user | 200, 400, 401, 403 | 1.6 | implemented |
+| P2 | GET | /api/products/{id} | user | 200, 401, 403, 404 | 1.6 | implemented |
+| P3 | POST | /api/products | user | 201, 400, 401, 403, 409 | 1.6 | implemented |
+| P4 | PUT | /api/products/{id} | user | 200, 400, 401, 403, 404, 409 | 1.6 | implemented |
+| P5 | POST | /api/products/{id}/archive | owner | 204, 401, 403, 404 | 1.6 | implemented |
+| P6 | POST | /api/products/{id}/units | user | 201, 400, 401, 403, 404, 409 | 1.6 | implemented |
+| P7 | PUT | /api/products/{id}/units/{unitId} | user | 200, 400, 401, 403, 404, 409 | 1.6 | implemented |
+| P8 | DELETE | /api/products/{id}/units/{unitId} | user | 204, 400, 401, 403, 404, 409 | 1.6 | implemented |
+| P9 | POST | /api/products/{id}/adjustments | owner | 201, 400, 401, 403, 404 | 1.6 | implemented |
+| P10 | POST | /api/products/{id}/stock-counts | owner | 200, 400, 401, 403, 404 | 1.6 | implemented |
+| P11 | GET | /api/products/{id}/movements | user | 200, 400, 401, 403, 404 | 1.6 | implemented |
 | P12 | GET | /api/products/lookup | user | 200, 400, 401, 403, 404 | 4 | planned |
 | I1 | POST | /api/invoices/scan | user | 200, 202, 400, 401, 403, 413, 429 | 2 | planned |
 | I2 | GET | /api/invoices | user | 200, 400, 401, 403 | 2 | planned |

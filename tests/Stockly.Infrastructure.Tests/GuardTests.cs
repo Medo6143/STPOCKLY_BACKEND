@@ -17,6 +17,16 @@ public sealed partial class GuardTests
     }
 
     [Fact]
+    public void RedisImage_MatchesDockerCompose()
+    {
+        var compose = File.ReadAllText(FindRepoFile("docker-compose.yml"));
+
+        var composeImage = RedisImageLine().Match(compose).Groups["image"].Value;
+
+        composeImage.Should().Be(RedisFixture.RedisImage, "tests must run against the same pinned image as development");
+    }
+
+    [Fact]
     public void SystemClock_UtcNow_HasZeroOffset()
     {
         var clock = new SystemClock();
@@ -50,4 +60,7 @@ public sealed partial class GuardTests
 
     [GeneratedRegex(@"image:\s*(?<image>postgres:\S+)")]
     private static partial Regex PostgresImageLine();
+
+    [GeneratedRegex(@"image:\s*(?<image>redis:\S+)")]
+    private static partial Regex RedisImageLine();
 }

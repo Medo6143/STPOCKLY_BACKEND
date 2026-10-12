@@ -1,13 +1,19 @@
+using Microsoft.Extensions.Caching.StackExchangeRedis;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Stockly.Application.Abstractions.Caching;
 using Stockly.Application.Abstractions.Identity;
 using Stockly.Application.Abstractions.Persistence;
+using Stockly.Application.Abstractions.Stock;
 using Stockly.Application.Abstractions.Time;
 using Stockly.Application.Features.Auth;
+using Stockly.Infrastructure.Caching;
 using Stockly.Infrastructure.Identity;
 using Stockly.Infrastructure.Persistence;
 using Stockly.Infrastructure.Persistence.Interceptors;
+using Stockly.Infrastructure.Persistence.Queries;
 using Stockly.Infrastructure.Persistence.Repositories;
+using Stockly.Infrastructure.Persistence.Stock;
 using Stockly.Infrastructure.Time;
 
 namespace Stockly.Infrastructure;
@@ -16,7 +22,8 @@ public static class DependencyInjection
 {
     /// <summary>
     /// Registers <see cref="StocklyDbContext"/> with its interceptors, <see cref="IClock"/> and a <see cref="TimeProvider"/>
-    /// reading it (for framework code), the repositories and the unit of work. The caller registers
+    /// reading it (for framework code), the repositories, the catalog queries, the stock service and the unit of work.
+    /// The caller registers
     /// <c>ICurrentTenant</c> (from the JWT in the Api).
     /// </summary>
     public static IServiceCollection AddPersistence(this IServiceCollection services, string connectionString)
@@ -39,6 +46,26 @@ public static class DependencyInjection
         services.AddScoped<IPlanRepository, PlanRepository>();
         services.AddScoped<IShopSubscriptionRepository, ShopSubscriptionRepository>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+        services.AddScoped<IProductRepository, ProductRepository>();
+        services.AddScoped<IProductQueries, ProductQueries>();
+        services.AddScoped<IStockService, StockService>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// The Redis read cache (<see cref="ICacheService"/>, docs/design/redis.md): <c>IDistributedCache</c> and the version
+    /// counters share one lazily opened connection with a 250 ms operation timeout. Requires logging and <see cref="IClock"/>.
+    /// </summary>
+    public static IServiceCollection AddStocklyCaching(this IServiceCollection services, string redisConnectionString)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(redisConnectionString);
+
+        services.AddSingleton(_ => new RedisConnection(redisConnectionString));
+        services.AddStackExchangeRedisCache(_ => { });
+        services.AddOptions<RedisCacheOptions>()
+            .Configure<RedisConnection>((options, connection) => options.ConnectionMultiplexerFactory = connection.GetMultiplexerAsync);
+        services.AddSingleton<ICacheService, RedisCacheService>();
 
         return services;
     }

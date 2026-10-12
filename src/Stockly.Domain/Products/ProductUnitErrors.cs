@@ -11,7 +11,7 @@ public static class ProductUnitErrors
         Error.Conflict("ProductUnit.DuplicateName", "This product already has a unit with this name.");
 
     public static readonly Error DuplicateBarcode =
-        Error.Conflict("ProductUnit.DuplicateBarcode", "This product already has a unit with this barcode.");
+        Error.Conflict("ProductUnit.DuplicateBarcode", "A unit of this shop already has this barcode.");
 
     public static readonly Error NotFound =
         Error.NotFound("ProductUnit.NotFound", "The unit was not found on this product.");

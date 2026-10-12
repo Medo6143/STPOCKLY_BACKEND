@@ -34,6 +34,7 @@ builder.Services.AddScoped<ITenantScope>(services => services.GetRequiredService
 builder.Services.AddScoped<ICurrentTenant, HttpContextCurrentTenant>();
 builder.Services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
 builder.Services.AddPersistence(postgres);
+builder.Services.AddStocklyCaching(redis);
 builder.Services.AddStocklyIdentity(jwt);
 builder.Services.AddApplication();
 builder.Services.AddStocklyAuthentication(jwt);

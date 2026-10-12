@@ -7,6 +7,8 @@ namespace Stockly.Infrastructure.Persistence.Configurations;
 
 internal sealed class ProductUnitConfiguration : IEntityTypeConfiguration<ProductUnit>
 {
+    public const string BarcodeIndex = "ux_product_units_shop_id_barcode";
+
     public void Configure(EntityTypeBuilder<ProductUnit> builder)
     {
         builder.ToTable("product_units", table =>
@@ -40,6 +42,6 @@ internal sealed class ProductUnitConfiguration : IEntityTypeConfiguration<Produc
         builder.HasIndex(u => new { u.ShopId, u.Barcode })
             .IsUnique()
             .HasFilter("barcode IS NOT NULL")
-            .HasDatabaseName("ux_product_units_shop_id_barcode");
+            .HasDatabaseName(BarcodeIndex);
     }
 }

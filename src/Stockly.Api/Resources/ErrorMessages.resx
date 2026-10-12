@@ -121,4 +121,106 @@
   <data name="Shop.Suspended.Detail" xml:space="preserve">
     <value>This shop is suspended. Please contact Stockly support.</value>
   </data>
+  <data name="Product.NotFound.Title" xml:space="preserve">
+    <value>Not found</value>
+  </data>
+  <data name="Product.NotFound.Detail" xml:space="preserve">
+    <value>The product was not found in this shop.</value>
+  </data>
+  <data name="Product.NameRequired.Title" xml:space="preserve">
+    <value>Validation failed</value>
+  </data>
+  <data name="Product.NameRequired.Detail" xml:space="preserve">
+    <value>The product name is required.</value>
+  </data>
+  <data name="Product.Archived.Title" xml:space="preserve">
+    <value>Conflict</value>
+  </data>
+  <data name="Product.Archived.Detail" xml:space="preserve">
+    <value>This product is archived and cannot be edited.</value>
+  </data>
+  <data name="Product.DuplicateBarcode.Title" xml:space="preserve">
+    <value>Conflict</value>
+  </data>
+  <data name="Product.DuplicateBarcode.Detail" xml:space="preserve">
+    <value>Another active product in this shop already uses this barcode.</value>
+  </data>
+  <data name="Product.OpeningStockOwnerOnly.Title" xml:space="preserve">
+    <value>Forbidden</value>
+  </data>
+  <data name="Product.OpeningStockOwnerOnly.Detail" xml:space="preserve">
+    <value>Only the shop owner can set the opening stock.</value>
+  </data>
+  <data name="ProductUnit.NotFound.Title" xml:space="preserve">
+    <value>Not found</value>
+  </data>
+  <data name="ProductUnit.NotFound.Detail" xml:space="preserve">
+    <value>The unit was not found on this product.</value>
+  </data>
+  <data name="ProductUnit.NameRequired.Title" xml:space="preserve">
+    <value>Validation failed</value>
+  </data>
+  <data name="ProductUnit.NameRequired.Detail" xml:space="preserve">
+    <value>The unit name is required.</value>
+  </data>
+  <data name="ProductUnit.DuplicateName.Title" xml:space="preserve">
+    <value>Conflict</value>
+  </data>
+  <data name="ProductUnit.DuplicateName.Detail" xml:space="preserve">
+    <value>This product already has a unit with this name.</value>
+  </data>
+  <data name="ProductUnit.DuplicateBarcode.Title" xml:space="preserve">
+    <value>Conflict</value>
+  </data>
+  <data name="ProductUnit.DuplicateBarcode.Detail" xml:space="preserve">
+    <value>A unit in this shop already uses this barcode.</value>
+  </data>
+  <data name="ProductUnit.BaseUnitCannotBeRemoved.Title" xml:space="preserve">
+    <value>Validation failed</value>
+  </data>
+  <data name="ProductUnit.BaseUnitCannotBeRemoved.Detail" xml:space="preserve">
+    <value>The base unit cannot be removed.</value>
+  </data>
+  <data name="ProductUnit.BaseUnitFactorFixed.Title" xml:space="preserve">
+    <value>Validation failed</value>
+  </data>
+  <data name="ProductUnit.BaseUnitFactorFixed.Detail" xml:space="preserve">
+    <value>The base unit factor is always 1.</value>
+  </data>
+  <data name="Precision.TooManyDecimals.Title" xml:space="preserve">
+    <value>Validation failed</value>
+  </data>
+  <data name="Precision.TooManyDecimals.Detail" xml:space="preserve">
+    <value>The value has too many decimal places (money 2, quantity 3, factor 6).</value>
+  </data>
+  <data name="Precision.Negative.Title" xml:space="preserve">
+    <value>Validation failed</value>
+  </data>
+  <data name="Precision.Negative.Detail" xml:space="preserve">
+    <value>The value must not be negative.</value>
+  </data>
+  <data name="Precision.NotPositive.Title" xml:space="preserve">
+    <value>Validation failed</value>
+  </data>
+  <data name="Precision.NotPositive.Detail" xml:space="preserve">
+    <value>The value must be greater than zero.</value>
+  </data>
+  <data name="Precision.OutOfRange.Title" xml:space="preserve">
+    <value>Validation failed</value>
+  </data>
+  <data name="Precision.OutOfRange.Detail" xml:space="preserve">
+    <value>The value is too large.</value>
+  </data>
+  <data name="Stock.ZeroChange.Title" xml:space="preserve">
+    <value>Validation failed</value>
+  </data>
+  <data name="Stock.ZeroChange.Detail" xml:space="preserve">
+    <value>The quantity change must not be zero.</value>
+  </data>
+  <data name="Stock.NoteRequired.Title" xml:space="preserve">
+    <value>Validation failed</value>
+  </data>
+  <data name="Stock.NoteRequired.Detail" xml:space="preserve">
+    <value>A note explaining the adjustment is required.</value>
+  </data>
 </root>

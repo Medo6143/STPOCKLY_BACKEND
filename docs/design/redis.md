@@ -21,7 +21,7 @@ Prefix rule: tenant data is always `stockly:{shopId}:...`. Platform-wide data us
 |---|---|---|---|---|
 | `stockly:{shopId}:ver:catalog` | integer version | none (tiny) | — | `INCR` on any product/stock write |
 | `stockly:{shopId}:products:list:v{ver}:{queryHash}` | paged product DTOs | 10 min | `GetProductsQueryHandler` | version bump |
-| `stockly:{shopId}:products:lowstock:v{ver}` | low-stock DTOs | 5 min | `GetLowStockQueryHandler` | version bump |
+| `stockly:{shopId}:products:lowstock:v{ver}:{queryHash}` | low-stock page DTOs (paged, rule 30; `queryHash` covers search and paging) | 5 min | `GetLowStockQueryHandler` | version bump |
 | `stockly:{shopId}:dashboard:summary:v{ver}` | dashboard DTO | 2 min | `GetDashboardQueryHandler` | version bump |
 | `stockly:{shopId}:suppliers:list` | supplier DTOs | 30 min | `GetSuppliersQueryHandler` | `DEL` on supplier write |
 | `stockly:{shopId}:ai:invoice:{sha256}` | validated extraction JSON | 7 days | `ProcessInvoiceJob` | never (content-addressed) |

@@ -118,4 +118,106 @@
   <data name="Shop.Suspended.Detail" xml:space="preserve">
     <value>هذا المتجر موقوف. يرجى التواصل مع دعم Stockly.</value>
   </data>
+  <data name="Product.NotFound.Title" xml:space="preserve">
+    <value>غير موجود</value>
+  </data>
+  <data name="Product.NotFound.Detail" xml:space="preserve">
+    <value>المنتج غير موجود في هذا المتجر.</value>
+  </data>
+  <data name="Product.NameRequired.Title" xml:space="preserve">
+    <value>بيانات غير صالحة</value>
+  </data>
+  <data name="Product.NameRequired.Detail" xml:space="preserve">
+    <value>اسم المنتج مطلوب.</value>
+  </data>
+  <data name="Product.Archived.Title" xml:space="preserve">
+    <value>تعارض</value>
+  </data>
+  <data name="Product.Archived.Detail" xml:space="preserve">
+    <value>هذا المنتج مؤرشف ولا يمكن تعديله.</value>
+  </data>
+  <data name="Product.DuplicateBarcode.Title" xml:space="preserve">
+    <value>تعارض</value>
+  </data>
+  <data name="Product.DuplicateBarcode.Detail" xml:space="preserve">
+    <value>يوجد منتج نشط آخر في هذا المتجر يستخدم هذا الباركود.</value>
+  </data>
+  <data name="Product.OpeningStockOwnerOnly.Title" xml:space="preserve">
+    <value>غير مسموح</value>
+  </data>
+  <data name="Product.OpeningStockOwnerOnly.Detail" xml:space="preserve">
+    <value>صاحب المتجر فقط يمكنه تحديد رصيد أول المدة.</value>
+  </data>
+  <data name="ProductUnit.NotFound.Title" xml:space="preserve">
+    <value>غير موجود</value>
+  </data>
+  <data name="ProductUnit.NotFound.Detail" xml:space="preserve">
+    <value>الوحدة غير موجودة في هذا المنتج.</value>
+  </data>
+  <data name="ProductUnit.NameRequired.Title" xml:space="preserve">
+    <value>بيانات غير صالحة</value>
+  </data>
+  <data name="ProductUnit.NameRequired.Detail" xml:space="preserve">
+    <value>اسم الوحدة مطلوب.</value>
+  </data>
+  <data name="ProductUnit.DuplicateName.Title" xml:space="preserve">
+    <value>تعارض</value>
+  </data>
+  <data name="ProductUnit.DuplicateName.Detail" xml:space="preserve">
+    <value>هذا المنتج لديه وحدة بنفس الاسم بالفعل.</value>
+  </data>
+  <data name="ProductUnit.DuplicateBarcode.Title" xml:space="preserve">
+    <value>تعارض</value>
+  </data>
+  <data name="ProductUnit.DuplicateBarcode.Detail" xml:space="preserve">
+    <value>توجد وحدة في هذا المتجر تستخدم هذا الباركود بالفعل.</value>
+  </data>
+  <data name="ProductUnit.BaseUnitCannotBeRemoved.Title" xml:space="preserve">
+    <value>بيانات غير صالحة</value>
+  </data>
+  <data name="ProductUnit.BaseUnitCannotBeRemoved.Detail" xml:space="preserve">
+    <value>لا يمكن حذف الوحدة الأساسية.</value>
+  </data>
+  <data name="ProductUnit.BaseUnitFactorFixed.Title" xml:space="preserve">
+    <value>بيانات غير صالحة</value>
+  </data>
+  <data name="ProductUnit.BaseUnitFactorFixed.Detail" xml:space="preserve">
+    <value>معامل الوحدة الأساسية دائماً 1.</value>
+  </data>
+  <data name="Precision.TooManyDecimals.Title" xml:space="preserve">
+    <value>بيانات غير صالحة</value>
+  </data>
+  <data name="Precision.TooManyDecimals.Detail" xml:space="preserve">
+    <value>القيمة بها أرقام عشرية أكثر من المسموح (المبالغ 2، الكميات 3، المعامل 6).</value>
+  </data>
+  <data name="Precision.Negative.Title" xml:space="preserve">
+    <value>بيانات غير صالحة</value>
+  </data>
+  <data name="Precision.Negative.Detail" xml:space="preserve">
+    <value>يجب ألا تكون القيمة سالبة.</value>
+  </data>
+  <data name="Precision.NotPositive.Title" xml:space="preserve">
+    <value>بيانات غير صالحة</value>
+  </data>
+  <data name="Precision.NotPositive.Detail" xml:space="preserve">
+    <value>يجب أن تكون القيمة أكبر من صفر.</value>
+  </data>
+  <data name="Precision.OutOfRange.Title" xml:space="preserve">
+    <value>بيانات غير صالحة</value>
+  </data>
+  <data name="Precision.OutOfRange.Detail" xml:space="preserve">
+    <value>القيمة كبيرة جداً.</value>
+  </data>
+  <data name="Stock.ZeroChange.Title" xml:space="preserve">
+    <value>بيانات غير صالحة</value>
+  </data>
+  <data name="Stock.ZeroChange.Detail" xml:space="preserve">
+    <value>يجب ألا يكون التغيير في الكمية صفراً.</value>
+  </data>
+  <data name="Stock.NoteRequired.Title" xml:space="preserve">
+    <value>بيانات غير صالحة</value>
+  </data>
+  <data name="Stock.NoteRequired.Detail" xml:space="preserve">
+    <value>يجب كتابة ملاحظة توضح سبب التعديل.</value>
+  </data>
 </root>
