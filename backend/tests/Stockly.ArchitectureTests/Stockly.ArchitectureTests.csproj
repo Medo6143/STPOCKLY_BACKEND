@@ -1,5 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <PropertyGroup>
+    <!-- Keeps coverage instrumentation away from the IL these tests inspect. -->
+    <RunSettingsFilePath>$(MSBuildProjectDirectory)/architecture.runsettings</RunSettingsFilePath>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="NetArchTest.Rules" />
   </ItemGroup>

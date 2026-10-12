@@ -16,3 +16,8 @@ Shop owners need a stock number they can trust, and we need to explain every cha
 - Any quantity can be audited back to its invoice, sale or user.
 - Confirm is safe to retry by construction, not by careful coding.
 - Slight write amplification (two writes per line). Acceptable at shop scale.
+
+## 2026-10-12 update: reversals
+- The invoice-line idempotency index is `UNIQUE (invoice_item_id, reason) WHERE invoice_item_id IS NOT NULL` (was `UNIQUE (invoice_item_id)`), so an `InvoiceReversal` can reference the line it reverses.
+- A reversal is terminal: a reversed line is never received again. Corrections go through a new scan or a manual adjustment. Each line therefore has at most one receipt and one reversal, both idempotent.
+- `Product.RecordMovement` is the only way to change `Quantity`; it returns the movement with `BalanceAfter`, so quantity and ledger cannot diverge. `IStockService` calls it inside the transaction.

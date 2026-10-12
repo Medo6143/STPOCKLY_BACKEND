@@ -105,7 +105,7 @@ Mobile: `presentation (widgets + Riverpod notifiers) → domain (use cases, enti
 ### Data & stock
 1. Never write `Product.Quantity` directly. Only `IStockService` changes it, in the same transaction as a new `StockMovement` (ADR-0001).
 2. Stock movements are append-only. Corrections are new movements.
-3. Confirm invoice and create sale are **idempotent**: status check + row lock + unique index on `invoice_item_id` / `sale_item_id`.
+3. Confirm invoice and create sale are **idempotent**: status check + row lock + unique indexes on (invoice_item_id, reason) and (sale_item_id).
 4. Lock order is always: invoice (or sale) first, then products ordered by `Id`. Never lock in another order.
 5. Quantities are stored in the product's base unit, `decimal` / `numeric(14,3)`. Conversion only through `ProductUnit.ToBase()` (ADR-0003).
 6. Money is `decimal` / `numeric(18,2)`, never `double`. Currency is EGP.
@@ -219,6 +219,7 @@ Name the principle in the PR when a design choice is not obvious. Do not add abs
 - A feature is not done without `docs/features/<feature>.md` (from `_TEMPLATE.md`), updated in the same change as the code.
 - New index → update `docs/erd.md`. New cache key → update `docs/design/redis.md`.
 - A decision that is hard to reverse → new `docs/adr/NNNN-title.md`.
+- ADR changes: a clarification goes in a dated "Update" section of the same ADR. A changed decision gets a new ADR that supersedes the old one (mark the old one "Superseded by ADR-NNNN").
 
 ---
 
