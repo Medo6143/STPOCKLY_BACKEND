@@ -25,6 +25,21 @@ public sealed class ProblemDetailsTests(ApiFixture fixture)
         problem["traceId"]!.GetValue<string>().Should().NotBeNullOrWhiteSpace();
         problem["correlationId"]!.GetValue<string>().Should().NotBeNullOrWhiteSpace();
         problem["instance"]!.GetValue<string>().Should().Be("GET /nope");
+        problem["code"]!.GetValue<string>().Should().Be("Http.NotFound");
+    }
+
+    [Fact]
+    public async Task UnhandledException_DefaultLanguage_ReturnsArabicTitleSameCode()
+    {
+        await using var factory = fixture.CreateFactory(includeTestEndpoints: true);
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync(new Uri("/__tests/throw", UriKind.Relative));
+        var problem = JsonNode.Parse(await response.Content.ReadAsStringAsync())!;
+
+        response.StatusCode.Should().Be(HttpStatusCode.InternalServerError);
+        problem["title"]!.GetValue<string>().Should().Be("حدث خطأ غير متوقع.");
+        problem["code"]!.GetValue<string>().Should().Be("Server.Unexpected");
     }
 
     [Fact]
@@ -34,6 +49,7 @@ public sealed class ProblemDetailsTests(ApiFixture fixture)
         using var client = factory.CreateClient();
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri("/__tests/throw", UriKind.Relative));
         request.Headers.Add(CorrelationIdMiddleware.HeaderName, "abc-123");
+        request.Headers.AcceptLanguage.ParseAdd("en");
 
         using var response = await client.SendAsync(request);
         var raw = await response.Content.ReadAsStringAsync();
@@ -43,6 +59,7 @@ public sealed class ProblemDetailsTests(ApiFixture fixture)
         response.Content.Headers.ContentType!.MediaType.Should().Be(ProblemJson);
         problem["status"]!.GetValue<int>().Should().Be(500);
         problem["title"]!.GetValue<string>().Should().Be("An unexpected error occurred.");
+        problem["code"]!.GetValue<string>().Should().Be("Server.Unexpected");
         problem["traceId"]!.GetValue<string>().Should().NotBeNullOrWhiteSpace();
         problem["correlationId"]!.GetValue<string>().Should().Be("abc-123");
         raw.Should().NotContain("hunter2").And.NotContain("InvalidOperationException").And.NotContain("at Stockly");

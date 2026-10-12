@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Arabic ProblemDetails title/detail per error code. Keys must match ErrorMessages.resx. -->
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="Validation.Failed.Title" xml:space="preserve">
+    <value>بيانات غير صالحة</value>
+  </data>
+  <data name="Validation.Failed.Detail" xml:space="preserve">
+    <value>حقل واحد أو أكثر غير صالح. راجع 'errors'.</value>
+  </data>
+  <data name="Validation.InvalidValue" xml:space="preserve">
+    <value>القيمة مفقودة أو بصيغة غير صحيحة.</value>
+  </data>
+  <data name="Server.Unexpected.Title" xml:space="preserve">
+    <value>حدث خطأ غير متوقع.</value>
+  </data>
+  <data name="Server.Unexpected.Detail" xml:space="preserve">
+    <value>يرجى المحاولة مرة أخرى لاحقاً.</value>
+  </data>
+  <data name="Http.NotFound.Title" xml:space="preserve">
+    <value>غير موجود</value>
+  </data>
+  <data name="Http.NotFound.Detail" xml:space="preserve">
+    <value>المورد المطلوب غير موجود.</value>
+  </data>
+  <data name="Http.MethodNotAllowed.Title" xml:space="preserve">
+    <value>الطريقة غير مسموح بها</value>
+  </data>
+  <data name="Http.MethodNotAllowed.Detail" xml:space="preserve">
+    <value>طريقة HTTP هذه غير مسموح بها لهذا المورد.</value>
+  </data>
+  <data name="Http.UnsupportedMediaType.Title" xml:space="preserve">
+    <value>نوع المحتوى غير مدعوم</value>
+  </data>
+  <data name="Http.UnsupportedMediaType.Detail" xml:space="preserve">
+    <value>نوع محتوى الطلب غير مدعوم.</value>
+  </data>
+  <data name="Auth.Unauthenticated.Title" xml:space="preserve">
+    <value>غير مصرح بالدخول</value>
+  </data>
+  <data name="Auth.Unauthenticated.Detail" xml:space="preserve">
+    <value>رمز الدخول مفقود أو غير صالح أو منتهي الصلاحية. يرجى تسجيل الدخول مرة أخرى.</value>
+  </data>
+  <data name="Auth.Forbidden.Title" xml:space="preserve">
+    <value>غير مسموح</value>
+  </data>
+  <data name="Auth.Forbidden.Detail" xml:space="preserve">
+    <value>دورك في المتجر لا يسمح بهذا الإجراء.</value>
+  </data>
+  <data name="Auth.EmailTaken.Title" xml:space="preserve">
+    <value>تعارض</value>
+  </data>
+  <data name="Auth.EmailTaken.Detail" xml:space="preserve">
+    <value>هذا البريد الإلكتروني مسجل بالفعل.</value>
+  </data>
+  <data name="Auth.InvalidCredentials.Title" xml:space="preserve">
+    <value>غير مصرح بالدخول</value>
+  </data>
+  <data name="Auth.InvalidCredentials.Detail" xml:space="preserve">
+    <value>البريد الإلكتروني أو كلمة المرور غير صحيحة.</value>
+  </data>
+  <data name="Auth.NoActiveShop.Title" xml:space="preserve">
+    <value>غير مسموح</value>
+  </data>
+  <data name="Auth.NoActiveShop.Detail" xml:space="preserve">
+    <value>حسابك ليس عضواً نشطاً في أي متجر.</value>
+  </data>
+  <data name="Auth.InvalidRefreshToken.Title" xml:space="preserve">
+    <value>غير مصرح بالدخول</value>
+  </data>
+  <data name="Auth.InvalidRefreshToken.Detail" xml:space="preserve">
+    <value>انتهت جلستك. يرجى تسجيل الدخول مرة أخرى.</value>
+  </data>
+  <data name="Auth.RefreshTokenReused.Title" xml:space="preserve">
+    <value>غير مصرح بالدخول</value>
+  </data>
+  <data name="Auth.RefreshTokenReused.Detail" xml:space="preserve">
+    <value>تم إنهاء هذه الجلسة لأسباب أمنية. يرجى تسجيل الدخول مرة أخرى.</value>
+  </data>
+  <data name="Shop.NameRequired.Title" xml:space="preserve">
+    <value>بيانات غير صالحة</value>
+  </data>
+  <data name="Shop.NameRequired.Detail" xml:space="preserve">
+    <value>اسم المتجر مطلوب.</value>
+  </data>
+  <data name="Shop.UnknownType.Title" xml:space="preserve">
+    <value>بيانات غير صالحة</value>
+  </data>
+  <data name="Shop.UnknownType.Detail" xml:space="preserve">
+    <value>نوع المتجر غير مدعوم.</value>
+  </data>
+  <data name="Shop.Suspended.Title" xml:space="preserve">
+    <value>غير مسموح</value>
+  </data>
+  <data name="Shop.Suspended.Detail" xml:space="preserve">
+    <value>هذا المتجر موقوف. يرجى التواصل مع دعم Stockly.</value>
+  </data>
+</root>
