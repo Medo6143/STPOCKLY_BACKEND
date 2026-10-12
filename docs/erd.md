@@ -10,13 +10,15 @@ Related ADRs: 0001 (stock ledger), 0002 (multi-tenancy), 0003 (units), 0004 (exp
 | Naming | `snake_case` tables/columns via `EFCore.NamingConventions`. C# stays PascalCase. |
 | Primary keys | `uuid`, generated in the app as **UUIDv7** (time-ordered → index-friendly inserts). .NET 8 has no built-in v7, use `UUIDNext`. The Domain `Entity` base assigns the id at construction (ADR-0009). |
 | Time | `timestamptz`, always UTC, produced by `IClock`. Business dates (invoice date, expiry) are `date`. |
-| Money | `numeric(18,2)`, C# `decimal`. Currency is EGP (one currency, no currency column). |
+| Money | `numeric(18,2)`, C# `decimal`, never negative. Currency is EGP (one currency, no currency column). |
 | Quantities | `numeric(14,3)`, always stored in the product's **base unit** (supports 1.5 kg for groceries). |
+| Unit factors | `numeric(14,6)`, > 0. |
+| Precision rule | Values with more decimal places than the column allows are **rejected** with a validation error, never silently rounded (`Domain/Common/Precision`). The only rounding is unit conversion: `ProductUnit.ToBase` rounds to 3 decimals, `MidpointRounding.AwayFromZero`. |
 | Concurrency | Postgres `xmin` mapped as EF concurrency token on `products`, `invoices`. |
 | Tenancy | Every tenant table has `shop_id NOT NULL` + EF global query filter from `ICurrentTenant`. Child tables also carry `shop_id` (denormalized) so the filter and indexes never need a join. |
 | Soft delete | Only `products` and `suppliers` (`is_archived`). Ledger tables are append-only, never deleted. |
 | Enums | Stored as `smallint`, mapped to C# enums. Values never reordered, only appended. |
-| Text search | `pg_trgm` extension, `normalized_*` columns (lower-case, Arabic letters unified: أ/إ/آ→ا, ة→ه, ى→ي, diacritics stripped). Normalization lives in a Domain service so it is unit-testable. |
+| Text search | `pg_trgm` extension, `normalized_*` columns built by `Domain/Text/ArabicTextNormalizer` (pure, unit-tested): tashkeel (U+064B–U+0652, U+0670) and tatweel (U+0640) removed; أ إ آ ٱ → ا, ة → ه, ى → ي; Arabic-Indic ٠-٩ and Persian ۰-۹ digits → 0-9; Latin lower-case (invariant); trimmed, whitespace collapsed to one space. Mixed scripts stay mixed (`بنادول Extra 500` → `بنادول extra 500`). |
 | Schemas | `public` for app tables, `hangfire` for Hangfire. |
 
 ## 2. Diagram
@@ -306,7 +308,7 @@ Every index below exists because a named query needs it. The "Serves" column is 
 
 Quantity is allowed to go negative (a sale recorded before the invoice was scanned is real life). Negative stock raises a warning on the dashboard, it does not block the cashier.
 
-**product_units** — `factor` = how many base units are in one of this unit. Example Panadol: `Strip` factor 1 (base), `Box` factor 3. Groceries: `Kg` factor 1, `Sack 25kg` factor 25.
+**product_units** — `factor` (`numeric(14,6)`) = how many base units are in one of this unit. Example Panadol: `Strip` factor 1 (base), `Box` factor 3. Groceries: `Kg` factor 1, `Sack 25kg` factor 25. The base unit should be the **smallest** unit sold, so most factors are >= 1; fractional factors (e.g. `Half kg` = 0.5) are allowed. Conversion: `ToBase(q) = round(q × factor, 3, away from zero)`. Unit names are unique per product after normalization (the Domain checks this; the DB index below is on the raw name).
 
 | Index / constraint | Serves |
 |---|---|
@@ -366,11 +368,23 @@ Quantity is allowed to go negative (a sale recorded before the invoice was scann
 
 ### 3.5 Stock ledger
 
-**stock_movements** — append-only. `reason`: InvoiceReceipt, Sale, ManualAdjustment, StockCount, InvoiceReversal. `quantity_change` is in base units, `balance_after` is the product quantity right after this row (makes history screens and audits trivial).
+**stock_movements** — append-only. `reason`: InvoiceReceipt (1), Sale (2), ManualAdjustment (3), StockCount (4), InvoiceReversal (5). `quantity_change` is in base units, `balance_after` is the product quantity right after this row (makes history screens and audits trivial).
+
+Rules per reason (enforced in `Domain/Stock/StockMovement`; created only through `Product.RecordMovement`):
+
+| Reason | Source | Change |
+|---|---|---|
+| InvoiceReceipt | `invoice_id` + `invoice_item_id` | > 0 |
+| Sale | `sale_id` + `sale_item_id` | < 0 |
+| ManualAdjustment | none; `note` required | ≠ 0 |
+| StockCount | none (`change = counted − current`; no movement when equal) | ≠ 0 |
+| InvoiceReversal | `invoice_id` + `invoice_item_id` | < 0 |
+
+**A reversal is terminal.** A reversed invoice line can never be received again; corrections go through a new scan or a manual adjustment. This is why `UNIQUE (invoice_item_id, reason)` is sufficient: each line has at most one receipt and at most one reversal. Matching the reversal amount to the original receipt is an Application rule (the aggregate cannot see the receipt).
 
 | Index / constraint | Serves |
 |---|---|
-| `UNIQUE (invoice_item_id) WHERE invoice_item_id IS NOT NULL` | **idempotent confirm** — the DB refuses a second receipt for the same line |
+| `UNIQUE (invoice_item_id, reason) WHERE invoice_item_id IS NOT NULL` | **idempotent confirm** — the DB refuses a second receipt for the same line; also allows exactly one (terminal) reversal per line |
 | `UNIQUE (sale_item_id) WHERE sale_item_id IS NOT NULL` | idempotent sale |
 | `(shop_id, product_id, created_at DESC)` | product movement history |
 | `(shop_id, created_at DESC)` | dashboard activity feed |
