@@ -12,7 +12,7 @@ Step 1.6.
 Step 1.6.
 
 ## 4. Data model changes
-Domain model only in this step; tables, the migration and EF configuration come in step 1.4. See `docs/erd.md` §3.2 and §3.5.
+Tables `products`, `product_units`, `stock_movements` (and `shops`) are created by migration `InitialCatalog` (step 1.4a), with every index and check from `docs/erd.md` §3.2 and §3.5. Deferred FKs and columns: `docs/erd.md` §3.7. EF configuration: `Infrastructure/Persistence/Configurations`, one class per entity.
 
 | Type | Kind | Notes |
 |---|---|---|

@@ -8,6 +8,11 @@ namespace Stockly.Domain.Stock;
 /// </summary>
 public sealed class StockMovement : Entity, ITenantEntity
 {
+    // For EF materialization only; the real constructor takes a MovementSource, which is not a mapped property.
+    private StockMovement()
+    {
+    }
+
     private StockMovement(
         Guid shopId,
         Guid productId,

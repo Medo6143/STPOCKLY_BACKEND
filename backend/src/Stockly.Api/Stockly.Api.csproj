@@ -1,6 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <ItemGroup>
+    <!-- Design-time only: lets `dotnet ef` use the Api as startup project (AGENTS.md §3). Never flows to consumers. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Stockly.Application\Stockly.Application.csproj" />
     <ProjectReference Include="..\Stockly.Infrastructure\Stockly.Infrastructure.csproj" />
     <ProjectReference Include="..\Stockly.Contracts\Stockly.Contracts.csproj" />

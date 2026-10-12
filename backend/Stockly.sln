@@ -25,6 +25,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Stockly.ArchitectureTests",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Stockly.Domain.Tests", "tests\Stockly.Domain.Tests\Stockly.Domain.Tests.csproj", "{2ED0BDA9-9A4B-46D8-A8A6-1AE08E50422B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Stockly.Infrastructure.Tests", "tests\Stockly.Infrastructure.Tests\Stockly.Infrastructure.Tests.csproj", "{77749FAB-4F91-468E-AB2F-27F7185556DD}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -70,6 +72,10 @@ Global
 		{2ED0BDA9-9A4B-46D8-A8A6-1AE08E50422B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{2ED0BDA9-9A4B-46D8-A8A6-1AE08E50422B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{2ED0BDA9-9A4B-46D8-A8A6-1AE08E50422B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{77749FAB-4F91-468E-AB2F-27F7185556DD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{77749FAB-4F91-468E-AB2F-27F7185556DD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{77749FAB-4F91-468E-AB2F-27F7185556DD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{77749FAB-4F91-468E-AB2F-27F7185556DD}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{E6965CF4-5653-4465-8F83-DF8D60B1BA11} = {011DAD97-4C82-47D4-B56A-8C35C390803D}
@@ -81,5 +87,6 @@ Global
 		{B65F9B64-7A2F-40F3-BD45-3EEC5E6338F7} = {9341AE71-07EF-4B0B-8DDB-D5B99B274B96}
 		{2B5B7735-68B1-4092-93F2-72C8F3990C59} = {9341AE71-07EF-4B0B-8DDB-D5B99B274B96}
 		{2ED0BDA9-9A4B-46D8-A8A6-1AE08E50422B} = {9341AE71-07EF-4B0B-8DDB-D5B99B274B96}
+		{77749FAB-4F91-468E-AB2F-27F7185556DD} = {9341AE71-07EF-4B0B-8DDB-D5B99B274B96}
 	EndGlobalSection
 EndGlobal

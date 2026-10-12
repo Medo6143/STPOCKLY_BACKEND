@@ -54,8 +54,9 @@ docker compose --profile dev up -d         # + pgadmin
 cd backend
 dotnet build -warnaserror
 dotnet test
+dotnet tool restore                        # dotnet-ef pinned in .config/dotnet-tools.json
 dotnet ef migrations add <Name> -p src/Stockly.Infrastructure -s src/Stockly.Api
-dotnet ef database update      -p src/Stockly.Infrastructure -s src/Stockly.Api
+dotnet ef database update      -p src/Stockly.Infrastructure -s src/Stockly.Api --connection "<ConnectionStrings__Postgres from .env>"
 dotnet run --project src/Stockly.Api
 
 # admin
