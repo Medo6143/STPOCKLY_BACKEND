@@ -25,33 +25,6 @@ coverage*.info
 artifacts/
 BenchmarkDotNet.Artifacts/
 
-# ---------- Flutter / Dart ----------
-.dart_tool/
-.flutter-plugins
-.flutter-plugins-dependencies
-.packages
-.pub-cache/
-.pub/
-mobile/build/
-*.g.dart
-*.freezed.dart
-*.mocks.dart
-mobile/lib/l10n/generated/
-mobile/android/.gradle/
-mobile/android/local.properties
-mobile/android/app/debug/
-mobile/android/app/profile/
-mobile/android/app/release/
-mobile/android/key.properties
-*.jks
-*.keystore
-mobile/ios/Pods/
-mobile/ios/.symlinks/
-mobile/ios/Flutter/Generated.xcconfig
-mobile/ios/Flutter/flutter_export_environment.sh
-mobile/ios/Flutter/ephemeral/
-mobile/ios/Runner/GeneratedPluginRegistrant.*
-
 # ---------- IDE ----------
 .vs/
 .idea/
