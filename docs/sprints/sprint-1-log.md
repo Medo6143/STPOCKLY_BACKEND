@@ -94,3 +94,23 @@ Stop conditions. The message defining "the four stop conditions" did not reach t
 - Only code change forced by the upgrade: EF Core 10 named query filters (`GetQueryFilter()` → `GetDeclaredQueryFilters()` in `TenantFilterTests`).
 - Migration under EF Core 10: `has-pending-model-changes` → "No changes have been made to the model since the last migration". Script diff vs EF 8: one blank line and the product version written to the history row (`8.0.31` → `10.0.12`). Migration kept as is.
 - `Guid.CreateVersion7` replaces UUIDNext; ADR-0010 supersedes ADR-0009. The old strictly-ascending id assertion fails in 1000 of 1000 runs with `Guid.CreateVersion7`, so the test now asserts the v7 guarantees (version, variant, non-decreasing timestamps, order across milliseconds).
+
+## Step 1.4b: API cross-cutting
+
+**Plan:**
+- **Configuration loading (decision).** Production reads real environment variables (`ConnectionStrings__Postgres` → `ConnectionStrings:Postgres`). In Development only, the Api also loads the repo-root `.env` through a small parser in `Api/Configuration` (no package), inserted *below* environment variables: precedence is appsettings < `.env` < environment variables < command line. Required settings are checked at startup with a clear message naming the variable, never its value. `.env` stays the single source for local secrets (AGENTS.md rule 11); user-secrets are not used.
+- **ICurrentTenant** implemented in `Api/Identity` from the `shop_id` claim (ADR-0002); missing or malformed claim → `null` (fail closed). The claim name lives in `Application/Abstractions/Identity/StocklyClaimTypes` so the token service (1.5) uses the same constant.
+- **ProblemDetails** (RFC 7807): `AddProblemDetails` with `traceId`, `correlationId` and `instance` on every problem; `GlobalExceptionHandler` (`IExceptionHandler`) logs and returns 500 without exception details; `UseStatusCodePages` gives empty 4xx responses a problem body.
+- **Correlation id** middleware: `X-Correlation-Id` accepted if 1–64 chars of `[A-Za-z0-9._-]`, otherwise a new id; echoed on the response, pushed to Serilog `LogContext`.
+- **Serilog** from configuration (`appsettings*.json`): compact JSON to console outside Development, readable text in Development; request logging without query strings or headers; EF/ASP.NET noise at Warning.
+- **Health checks**: `/health/live` (no dependencies), `/health/ready` with PostgreSQL (Unhealthy → 503) and Redis (failure reported as **Degraded**, HTTP 200, docs/design/redis.md §4). JSON body lists status and duration per check, never exception messages.
+- **OpenAPI** (ADR-0011): `Microsoft.AspNetCore.OpenApi` document `v1`, generated at build time by `Microsoft.Extensions.ApiDescription.Server` into `docs/api/openapi.json`. Build-time generation is skipped when `CI=true`, so in CI the file on disk is the committed one, and `OpenApiContractTests` fails if the runtime document differs from it. Locally every build refreshes the file; commit it with the change. Runtime endpoint `/openapi/v1.json` is mapped outside Production.
+- **Tests** (`Stockly.Api.IntegrationTests`, Testcontainers Postgres + Redis using the images parsed from `docker-compose.yml`): health live/ready (healthy, Redis down → Degraded 200, Postgres down → 503); ProblemDetails for 404 and for an unhandled exception (no leak); correlation id echo/replace/generate; missing connection string fails startup with a clear message; `.env` parser and precedence; tenant from claims; OpenAPI contract.
+- `ResultExtensions` (Result → HTTP) waits for the first controller in 1.5 (no dead code).
+
+**Result (step 1.4b):**
+- Tests: Api 36 (Testcontainers Postgres + Redis from the compose images), Domain 186, Infrastructure 36, Architecture 18: 276 green, 0 warnings.
+- OpenAPI: build writes `docs/api/openapi.json` (OpenAPI 3.1.1, no paths yet). Demo: with `CI=true` a stale committed spec fails `OpenApiContractTests`; a local `--no-incremental` build rewrites it and the test passes. Generation is incremental on the Api assembly, so a hand-edited file is only rewritten by the next Api change or a `--no-incremental` build (documented).
+- Real run (`dotnet run`, Development, compose): `.env` loaded; `/health/ready` Healthy; 404 returns `application/problem+json` with `traceId`, `correlationId`, `instance`; `X-Correlation-Id` echoed; logs carry the correlation id and contain no secrets (scanned).
+
+**Finding fixed during 1.4b:** `.env.example` used `localhost` in connection strings. On Windows StackExchange.Redis tried `::1` first, compose binds `127.0.0.1` only, so Redis was permanently Degraded. All connection strings now use `127.0.0.1` (`.env.example`, README, redis.md).

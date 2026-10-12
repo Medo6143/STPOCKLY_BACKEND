@@ -112,7 +112,9 @@ stockly-backend/
 │   │
 │   ├── Stockly.Api/
 │   │   ├── Controllers/          # Auth, Products, Invoices, Sales, Dashboard, Admin/*
-│   │   ├── Middleware/           # ExceptionHandling (ProblemDetails), CorrelationId
+│   │   ├── Configuration/        # .env loading (Development), required settings, logging, build-time OpenAPI
+│   │   ├── Health/               # /health/live, /health/ready
+│   │   ├── Middleware/           # GlobalExceptionHandler (ProblemDetails), CorrelationId
 │   │   ├── Identity/             # CurrentUser/CurrentTenant from claims
 │   │   ├── RateLimiting/
 │   │   ├── Extensions/           # ResultExtensions: Result → IActionResult
