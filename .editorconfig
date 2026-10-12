@@ -91,6 +91,13 @@ dotnet_naming_symbols.constant_symbols.applicable_kinds = field
 dotnet_naming_symbols.constant_symbols.required_modifiers = const
 dotnet_naming_style.pascal.capitalization = pascal_case
 
+# Naming: static readonly fields are PascalCase, like constants
+dotnet_naming_rule.static_readonly_pascal.severity = warning
+dotnet_naming_rule.static_readonly_pascal.symbols = static_readonly_symbols
+dotnet_naming_rule.static_readonly_pascal.style = pascal
+dotnet_naming_symbols.static_readonly_symbols.applicable_kinds = field
+dotnet_naming_symbols.static_readonly_symbols.required_modifiers = static, readonly
+
 # Naming: async methods end with Async
 dotnet_naming_rule.async_methods_end_with_async.severity = warning
 dotnet_naming_rule.async_methods_end_with_async.symbols = async_method_symbols
@@ -99,6 +106,18 @@ dotnet_naming_symbols.async_method_symbols.applicable_kinds = method
 dotnet_naming_symbols.async_method_symbols.required_modifiers = async
 dotnet_naming_style.async_suffix.required_suffix = Async
 dotnet_naming_style.async_suffix.capitalization = pascal_case
+
+# Build-time severities. The ":severity" suffix on a style option is ignored by the compiler,
+# so each enforced style rule also needs an explicit diagnostic severity.
+dotnet_diagnostic.IDE0161.severity = warning # file-scoped namespace
+dotnet_diagnostic.IDE0065.severity = warning # using placement
+dotnet_diagnostic.IDE0011.severity = warning # braces
+dotnet_diagnostic.IDE0007.severity = warning # var
+dotnet_diagnostic.IDE0044.severity = warning # readonly fields
+dotnet_diagnostic.IDE0003.severity = warning # no this.
+dotnet_diagnostic.IDE0049.severity = warning # predefined types
+dotnet_diagnostic.IDE0040.severity = warning # accessibility modifiers
+dotnet_diagnostic.IDE1006.severity = warning # naming rules
 
 # Tests: method names use Method_Scenario_ExpectedResult (AGENTS.md §7)
 [backend/tests/**.cs]

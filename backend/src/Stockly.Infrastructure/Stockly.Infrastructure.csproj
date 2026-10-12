@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Stockly.Application\Stockly.Application.csproj" />
+  </ItemGroup>
+
+</Project>

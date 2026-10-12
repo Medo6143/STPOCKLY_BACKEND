@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Stockly.Application\Stockly.Application.csproj" />
+    <ProjectReference Include="..\Stockly.Infrastructure\Stockly.Infrastructure.csproj" />
+    <ProjectReference Include="..\Stockly.Contracts\Stockly.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>
