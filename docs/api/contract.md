@@ -1,6 +1,8 @@
 # Stockly API contract
 
-**Version: v1** · Status: Draft for approval (checkpoint 1) · Owner: orchestrator · Date: 2026-10-12
+**Version: v1.1** · Status: **Approved** (checkpoint 1, 2026-10-12) · Owner: orchestrator
+
+Change log: v1 (2026-10-12) first draft · v1.1 (2026-10-12) opening stock on create (P3), list price and override flag on sales (S1, D1), `newProduct` without category (I4), `GET /api/auth/me` fields made explicit (A5).
 
 This is the binding contract between `stockly-backend` and `stockly-mobile` (and `Stockly.Admin` later) for Sprints 1–4. Field names, types, status codes and error codes here are exact. Only the orchestrator changes this file: every change bumps the version, updates the copy in `stockly-mobile/docs/api/contract.md`, and is announced to the running lanes.
 
@@ -216,7 +218,8 @@ Errors: `401 Auth.InvalidRefreshToken` (unknown or expired), `401 Auth.RefreshTo
 Request: `{ "refreshToken": string }` → `204`. Revokes that refresh token and its chain. Unknown or already revoked token → still `204` (logout is idempotent). `400 Validation.Failed` when the field is missing.
 
 ### A5 `GET /api/auth/me` (user)
-`200` `{ "user": UserDto, "shop": ShopMembershipDto }`.
+Used at app start-up to restore the session.
+`200` `{ "user": UserDto, "shop": ShopMembershipDto }`: the user (including `preferredLanguage`), the active shop of the token and the user's `role` in it.
 
 ---
 
@@ -241,12 +244,14 @@ Sorted by normalized name. `200` paged `ProductListItem`.
   "baseUnitName": "شريط",
   "costPrice": "12.50",
   "baseUnitSellPrice": "15.00",
-  "lowStockThreshold": "5.000"
+  "lowStockThreshold": "5.000",
+  "openingQuantity": "24.000"
 }
 ```
-`barcode`, `category` optional (max 64 / 100); `lowStockThreshold` optional (default `"0.000"`). The product starts with quantity `"0.000"`; initial stock is recorded with P10.
+`barcode`, `category` optional (max 64 / 100); `lowStockThreshold` optional (default `"0.000"`).
+`openingQuantity` optional (quantity in the base unit, `>= 0`, **Owner only**): when present and greater than zero, the handler records a `StockCount` movement with note `"Opening stock"` in the **same transaction** as the product, so every quantity has a movement behind it. Absent or `"0.000"`: the product starts at `"0.000"` with no movement. A Staff request that includes `openingQuantity` → `403 Product.OpeningStockOwnerOnly` (nothing is created).
 `201` `ProductDetail`, header `Location: /api/products/{id}`.
-Errors: `400 Product.NameRequired`, `ProductUnit.NameRequired`, `Precision.TooManyDecimals`, `Precision.Negative`, `Precision.OutOfRange`; `409 Product.DuplicateBarcode` (barcode used by another non-archived product of the shop).
+Errors: `400 Product.NameRequired`, `ProductUnit.NameRequired`, `Precision.TooManyDecimals`, `Precision.Negative`, `Precision.OutOfRange`; `403 Product.OpeningStockOwnerOnly`; `409 Product.DuplicateBarcode` (barcode used by another non-archived product of the shop).
 
 ### P4 `PUT /api/products/{id}` (user)
 `{ "name", "barcode", "category", "costPrice", "lowStockThreshold" }` (all required except `barcode`, `category`). Base-unit name and price are changed through P7.
@@ -362,7 +367,7 @@ Replaces header fields and all lines while the invoice is `NeedsReview`.
 }
 ```
 - Each line has either `productId` + `productUnitId` (existing product and one of its units), or `newProduct` (created on confirm):
-  `newProduct { name: string, baseUnitName: string, sellPrice: money-string, category: string|null }`. The new product's cost price is the line's `unitPrice`; the line quantity is in its base unit.
+  `newProduct { name: string, baseUnitName: string, sellPrice: money-string }` (stored in `invoice_items.new_product_name`, `new_product_base_unit_name`, `new_product_sell_price`). The new product's cost price is the line's `unitPrice`; the line quantity is in its base unit. Category is set later with P4.
 - `lineNo` unique, 1..100 lines. `quantity > 0`, `unitPrice >= 0`. `lineTotal` is computed by the server.
 `200` `InvoiceDetail` (warnings recomputed, including `TotalMismatch`).
 Errors: `400 Validation.Failed`, `Precision.*`, `400 Invoice.LineProductRequired` (neither product nor newProduct), `400 Invoice.UnitNotOfProduct`; `404 Invoice.NotFound`, `404 Product.NotFound`, `404 ProductUnit.NotFound`; `409 Invoice.NotEditable` (status not NeedsReview).
@@ -380,11 +385,16 @@ Errors: `400 Invoice.LineProductRequired`; `404 Invoice.NotFound`; `409 Invoice.
 SaleItemDto {
   id: uuid, productId: uuid, productName: string,
   productUnitId: uuid, unitName: string,
-  quantity: quantity-string, unitPrice: money-string, lineTotal: money-string,
+  quantity: quantity-string,
+  listUnitPrice: money-string,         // the unit's sell price at sale time
+  unitPrice: money-string,             // price charged
+  priceOverridden: boolean,            // unitPrice != listUnitPrice
+  lineTotal: money-string,             // quantity × unitPrice
   balanceAfter: quantity-string        // product quantity in base units after this line
 }
 SaleDto {
   id: uuid, clientRequestId: uuid, totalAmount: money-string, note: string|null,
+  priceOverridden: boolean,            // any line overridden
   items: SaleItemDto[], createdAt: timestamp, createdByUserId: uuid,
   warnings: { code: "Stock.NegativeBalance", productId: uuid }[]
 }
@@ -399,7 +409,7 @@ SaleListItem { id: uuid, totalAmount: money-string, itemCount: int, createdAt: t
   "items": [ { "productId": "uuid", "productUnitId": "uuid", "quantity": "2.000", "unitPrice": null } ]
 }
 ```
-- 1..100 items. `quantity > 0`. `unitPrice` optional: default is the unit's `sellPrice`; a lower or higher price is allowed (cashier decision) and stored.
+- 1..100 items. `quantity > 0`. `unitPrice` optional: default is the unit's `sellPrice`. A different price is allowed (cashier decision); each line stores both `list_unit_price` (the unit's sell price at sale time) and `unit_price` (charged), and the response flags `priceOverridden`.
 - Negative stock never blocks the sale; it is reported in `warnings` (and on the dashboard).
 - New sale: `201` `SaleDto`, `Location: /api/sales/{id}`. Repeat `clientRequestId`: `200` existing `SaleDto`.
 Errors: `400 Validation.Failed`, `Precision.*`, `400 Sale.ArchivedProduct`, `400 Sale.UnitNotOfProduct`; `404 Product.NotFound`, `404 ProductUnit.NotFound`.
@@ -422,12 +432,12 @@ Cached 2 minutes per shop (version key, `docs/design/redis.md`).
   "lowStockCount": 9,
   "negativeStockCount": 2,
   "expiringSoonCount": 5,
-  "todaySales": { "count": 37, "total": "4815.50" },
+  "todaySales": { "count": 37, "total": "4815.50", "overriddenSalesCount": 3 },
   "invoicesAwaitingReview": 1,
   "generatedAt": "2026-10-12T07:00:00Z"
 }
 ```
-"Today" is the Africa/Cairo calendar day.
+"Today" is the Africa/Cairo calendar day. `overriddenSalesCount` = today's sales with at least one price-overridden line.
 
 ### D2 `GET /api/dashboard/expiring-soon` (user)
 Query: `days` (int, default `60`, `1..365`), `page`, `pageSize`. Lines from confirmed invoices whose `expiryDate` is within `days` and whose product still has stock (ADR-0004: a hint, not an exact count). Soonest first.
@@ -459,6 +469,7 @@ ExpiringItem { productId: uuid, productName: string, expiryDate: date, batchNo: 
 | `Product.NameRequired` | 400 | P3, P4 | Name blank after normalization |
 | `Product.Archived` | 409 | P4, P6–P8 | Archived products cannot be edited |
 | `Product.DuplicateBarcode` | 409 | P3, P4 | Barcode used by another active product |
+| `Product.OpeningStockOwnerOnly` | 403 | P3 | Only the Owner may set `openingQuantity` |
 | `ProductUnit.NotFound` | 404 | P7–P10, I4, S1 | No such unit on this product |
 | `ProductUnit.NameRequired` | 400 | P3, P6, P7 | Unit name blank |
 | `ProductUnit.DuplicateName` | 409 | P6, P7 | Unit name already used on the product |
@@ -501,12 +512,12 @@ Domain movement-rule codes (`Stock.InvoiceSourceRequired`, `Stock.SaleSourceRequ
 6. Login with several memberships picks the active membership joined first; no shop switching in v1.
 7. Logout is idempotent (204 even for an unknown token).
 8. `GET /api/auth/me` added for app start-up.
-9. Product creation never sets stock; initial stock is a stock count (P10), so every quantity has a movement.
+9. (v1.1) Optional `openingQuantity` on P3, Owner only: a `StockCount` movement with note "Opening stock" in the same transaction. Staff → `403 Product.OpeningStockOwnerOnly`.
 10. Adjustments and counts accept an optional `unitId` and convert with `ProductUnit.ToBase`.
 11. `GET /api/products/{id}/movements` added (served by `stock_movements (shop_id, product_id, created_at DESC)`).
 12. Barcode lookup (P12) searches product and unit barcodes of non-archived products.
-13. New products from invoices (I4 `newProduct`): base unit = the line's unit, cost = line `unitPrice`, sell price entered on review. The ERD has no column for these fields yet; Sprint 2 design (`docs/design/backend.md`) must add them to `invoice_items` (migration) before I4 is built.
-14. Sale `unitPrice` may differ from the unit's sell price (cashier discount); stored per line.
+13. (v1.1) New products from invoices (I4 `newProduct`): stored in `invoice_items.new_product_name`, `new_product_base_unit_name`, `new_product_sell_price`; cost = line `unitPrice`. A line references an existing product or describes a new one, never both; a confirmed line never has neither. Specified in `docs/design/backend.md` (Sprint 2).
+14. (v1.1) Sale `unitPrice` may differ from the unit's sell price. `sale_items` stores `list_unit_price` and `unit_price`; responses expose `priceOverridden` per line and per sale; D1 reports `overriddenSalesCount` for today.
 15. Negative stock is a warning in the sale response, never an error.
 16. `ProductUnit.InUse` (409) protects history: a unit referenced by invoice or sale lines cannot be deleted.
 17. Domain-only movement codes surface as 500 (server bug), never as client errors.
