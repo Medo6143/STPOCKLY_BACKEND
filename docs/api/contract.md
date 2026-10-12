@@ -1,8 +1,8 @@
 # Stockly API contract
 
-**Version: v1.1** · Status: **Approved** (checkpoint 1, 2026-10-12) · Owner: orchestrator
+**Version: v1.2** · Status: **Approved** (v1.1 at checkpoint 1, 2026-10-12; v1.2 clarifications by the orchestrator) · Owner: orchestrator
 
-Change log: v1 (2026-10-12) first draft · v1.1 (2026-10-12) opening stock on create (P3), list price and override flag on sales (S1, D1), `newProduct` without category (I4), `GET /api/auth/me` fields made explicit (A5).
+Change log: v1 (2026-10-12) first draft · v1.1 (2026-10-12) opening stock on create (P3), list price and override flag on sales (S1, D1), `newProduct` without category (I4), `GET /api/auth/me` fields made explicit (A5) · v1.2 (2026-10-12) `Http.*` codes for framework errors (§1.8), `newProduct` on `InvoiceItemDto` (§6).
 
 This is the binding contract between `stockly-backend` and `stockly-mobile` (and `Stockly.Admin` later) for Sprints 1–4. Field names, types, status codes and error codes here are exact. Only the orchestrator changes this file: every change bumps the version, updates the copy in `stockly-mobile/docs/api/contract.md`, and is announced to the running lanes.
 
@@ -80,6 +80,7 @@ Every error response is `application/problem+json`:
 - Mapping from `ErrorType`: Validation → 400, Unauthorized → 401, Forbidden → 403, NotFound → 404, Conflict → 409, Failure → 500.
 - **Wrong tenant is 404**, with the resource's `NotFound` code (AGENTS.md rule 10).
 - Unexpected server errors: `500`, `code: "Server.Unexpected"`, no exception details.
+- Errors raised by the framework before any handler runs carry an `Http.*` code: `404 Http.NotFound` (unknown route), `405 Http.MethodNotAllowed`, `415 Http.UnsupportedMediaType`. They are not repeated per endpoint.
 - Error codes that can occur on **every** authenticated endpoint are not repeated per endpoint: `401 Auth.Unauthenticated`, `403 Shop.Suspended`, `400 Validation.Failed`, `500 Server.Unexpected`.
 
 ---
@@ -321,7 +322,10 @@ InvoiceItemDto {
   quantity: quantity-string,                             // in the line's unit, > 0
   unitPrice: money-string, lineTotal: money-string,
   expiryDate: date|null, batchNo: string|null,           // informational (ADR-0004)
-  matchConfidence: confidence-string|null
+  matchConfidence: confidence-string|null,
+  newProduct: { name: string, baseUnitName: string, sellPrice: money-string } | null
+                                                         // v1.2: what I4 saved; after confirm, productId/productName
+                                                         // name the product created from it (newProduct is kept)
 }
 
 InvoiceDetail {
@@ -455,6 +459,9 @@ ExpiringItem { productId: uuid, productName: string, expiryDate: date, batchNo: 
 |---|---|---|---|
 | `Validation.Failed` | 400 | all | Request shape or format invalid; see `errors` |
 | `Server.Unexpected` | 500 | all | Unexpected error; no details |
+| `Http.NotFound` | 404 | framework | Unknown route |
+| `Http.MethodNotAllowed` | 405 | framework | Route exists, method does not |
+| `Http.UnsupportedMediaType` | 415 | framework | Wrong `Content-Type` |
 | `Auth.Unauthenticated` | 401 | all authenticated | Missing, invalid or expired access token |
 | `Auth.Forbidden` | 403 | owner-only | Role not allowed |
 | `Auth.EmailTaken` | 409 | A1 | Email already registered |
