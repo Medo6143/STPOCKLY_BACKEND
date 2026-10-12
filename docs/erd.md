@@ -271,12 +271,13 @@ Every index below exists because a named query needs it. The "Serves" column is 
 |---|---|
 | `UNIQUE (normalized_email)` (Identity column) | login |
 
-**refresh_tokens** — only the SHA-256 hash of the token is stored. Rotation: each refresh revokes the old row and sets `replaced_by_id`; reuse of a revoked token revokes the whole chain (theft detection).
+**refresh_tokens** — only the SHA-256 hash of the token is stored. Rotation: each refresh revokes the old row and sets `replaced_by_id`; reuse of a revoked token revokes the whole chain (theft detection). **Token families** (step 1.5): each login or register (one device session) starts a family; `family_id uuid NOT NULL` is the id of the family's first token. Reuse revokes the whole family, including its active token; other families (other devices) of the same user are untouched.
 
 | Index / constraint | Serves |
 |---|---|
 | `UNIQUE (token_hash)` | refresh |
 | `(user_id) WHERE revoked_at IS NULL` | logout-all, chain revoke |
+| `(family_id) WHERE revoked_at IS NULL` | family revoke on reuse detection and on logout (`RefreshTokenRepository.RevokeFamilyAsync`) |
 
 **shops** — `shop_type`: Pharmacy, Grocery, MobileShop, Other. `status`: Active, Suspended (set by platform admin).
 
@@ -284,7 +285,7 @@ Every index below exists because a named query needs it. The "Serves" column is 
 |---|---|
 | `(status, created_at DESC)` | admin shop list |
 
-**shop_members** — PK `(shop_id, user_id)`. `role`: Owner, Staff. A shop has exactly one Owner.
+**shop_members** — PK `(shop_id, user_id)`. `role`: Owner, Staff. A shop has exactly one Owner. Not a tenant table (no `shop_id` query filter): it maps users to tenants and is read at login before any tenant exists. Every query on it filters by a user id (ADR-0002, update 2026-10-12).
 
 | Index / constraint | Serves |
 |---|---|
@@ -298,6 +299,15 @@ Every index below exists because a named query needs it. The "Serves" column is 
 | `plans UNIQUE (code)` | seed / lookup |
 | `shop_subscriptions UNIQUE (shop_id) WHERE status = Active` | one active subscription per shop |
 | `shop_subscriptions (ends_on) WHERE status = Active` | expiry job |
+
+Implementation notes for the identity and tenancy tables (migration `Identity`, step 1.5):
+- Index names: `ux_users_normalized_email`, `ux_refresh_tokens_token_hash`, `ix_refresh_tokens_user_id_active`, `ix_refresh_tokens_family_id_active`, `ix_shop_members_user_id_active`, `ux_shop_members_shop_id_owner` (`WHERE role = 1`), `ux_plans_code`, `ux_shop_subscriptions_shop_id_active` and `ix_shop_subscriptions_ends_on_active` (`WHERE status = 1`). Enums are smallint: `shop_members.role` Owner 1 / Staff 2; `shop_subscriptions.status` Active 1 / Ended 2; `users.preferred_language` Ar 1 / En 2; `users.platform_role` None 0 / PlatformAdmin 1.
+- `users` also has Identity's own columns (`user_name`, `normalized_user_name`, `email`, `password_hash`, `security_stamp`, `concurrency_stamp`, lockout and two-factor flags) and its `UNIQUE (normalized_user_name)` index (`ux_users_normalized_user_name`), required by Identity; the user name is the email. Identity's `PhoneNumber` is mapped to the `phone` column. Identity's `user_claims`, `user_logins`, `user_tokens` tables exist (Identity's user store); there are no roles tables.
+- `refresh_tokens.token_hash` is the lower-case hex SHA-256 of the token. `refresh_tokens.user_id` → `users` is `ON DELETE CASCADE`; `replaced_by_id` is a plain column (no FK). The partial `(user_id)` and `(family_id)` indexes also back the FK and the family revoke.
+- `shop_members` FKs: `shop_id` → `shops` (covered by the PK), `user_id` → `users` (covered by the partial index); both restrict.
+- `shop_subscriptions.plan_id` → `plans` gets the EF-created `ix_shop_subscriptions_plan_id` (FK support; not used by a named query). `starts_on`/`ends_on` are `date` (Cairo business dates); `ends_on` NULL = open-ended.
+- `plans` is seeded with the default plan (`Domain/Shops/DefaultPlan.cs`): `standard`, 30 scans/day, 3 members, 0.00 EGP, active (product-owner assumption, `docs/features/auth.md`).
+- `ix_stock_movements_created_by_user_id` is created by EF to support the now-real FK `stock_movements.created_by_user_id` → `users` (restrict). It is not used by a named query.
 
 ### 3.2 Catalog
 
@@ -441,6 +451,7 @@ Growth note: when this table passes ~10M rows, partition by month on `created_at
 | Migration | Tables | Notes |
 |---|---|---|
 | `InitialCatalog` (step 1.4a) | `shops`, `products`, `product_units`, `stock_movements` | `pg_trgm`; every index and check listed above for these tables |
+| `Identity` (step 1.5) | `users`, `user_claims`, `user_logins`, `user_tokens`, `refresh_tokens`, `shop_members`, `plans`, `shop_subscriptions` | every index and constraint listed in §3.1 (including `refresh_tokens.family_id` and its index); default plan seeded; FK `stock_movements.created_by_user_id` → `users` added |
 | `InvoiceScan` (Sprint 2, **planned**, not applied) | `suppliers`, `product_aliases`, `invoices`, `invoice_items`, `ai_usage_records`; schema `hangfire` | every index and check listed above for these tables; FKs `stock_movements.invoice_id` → `invoices`, `stock_movements.invoice_item_id` → `invoice_items`; Hangfire tables are created by `Hangfire.PostgreSql` at startup. Plan: `docs/design/backend.md` §12 |
 
 Implementation notes for the `InitialCatalog` tables:
@@ -454,7 +465,7 @@ Implementation notes for the `InitialCatalog` tables:
 
 | Column | Null | Target | Added in |
 |---|---|---|---|
-| `stock_movements.created_by_user_id` | NOT NULL | `users` | 1.5 |
+| `stock_movements.created_by_user_id` | NOT NULL | `users` | 1.5 (**done**, migration `Identity`) |
 | `stock_movements.invoice_id` | NULL | `invoices` | Sprint 2 |
 | `stock_movements.invoice_item_id` | NULL | `invoice_items` | Sprint 2 |
 | `stock_movements.sale_id` | NULL | `sales` | Sprint 4 |
