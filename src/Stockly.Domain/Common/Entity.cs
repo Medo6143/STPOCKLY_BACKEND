@@ -1,16 +1,14 @@
-using UUIDNext;
-
 namespace Stockly.Domain.Common;
 
 /// <summary>
-/// Base for all entities. The id is a UUIDv7 assigned at construction (ADR-0009), so an aggregate can be
+/// Base for all entities. The id is a UUIDv7 assigned at construction (ADR-0010), so an aggregate can be
 /// linked to other new rows inside one transaction before it is saved. Equality is by type and id.
 /// </summary>
 public abstract class Entity : IEquatable<Entity>
 {
     protected Entity()
     {
-        Id = Uuid.NewDatabaseFriendly(Database.PostgreSql);
+        Id = Guid.CreateVersion7();
     }
 
     public Guid Id { get; }

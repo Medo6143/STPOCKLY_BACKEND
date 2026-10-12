@@ -1,6 +1,6 @@
 namespace Stockly.ArchitectureTests;
 
-/// <summary>Project and package references declared in each src .csproj (AGENTS.md §4, ADR-0009).</summary>
+/// <summary>Project and package references declared in each src .csproj (AGENTS.md §4, ADR-0010).</summary>
 public sealed class ProjectReferenceTests
 {
     private static readonly Dictionary<string, string[]> AllowedProjectReferences = new()
@@ -49,11 +49,11 @@ public sealed class ProjectReferenceTests
     }
 
     [Fact]
-    public void Domain_PackageReferences_OnlyUuidNext()
+    public void Domain_PackageReferences_None()
     {
         var domain = ProjectFile.Load(Layers.Domain);
 
-        domain.PackageReferences.Should().BeSubsetOf(["UUIDNext"], "ADR-0009 allows UUIDNext as Domain's only package");
+        domain.PackageReferences.Should().BeEmpty("Domain references no packages; ids use Guid.CreateVersion7 (ADR-0010)");
     }
 
     [Fact]

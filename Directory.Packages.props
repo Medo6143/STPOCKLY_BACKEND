@@ -10,11 +10,6 @@
     <CentralPackageTransitivePinningEnabled>false</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
 
-  <!-- Domain (ADR-0009: the only package Domain may reference) -->
-  <ItemGroup>
-    <PackageVersion Include="UUIDNext" Version="4.2.4" />
-  </ItemGroup>
-
   <!-- Application -->
   <ItemGroup>
     <!-- LICENSE PIN: 12.x is the last Apache-2.0 line. Never upgrade to 13+. -->

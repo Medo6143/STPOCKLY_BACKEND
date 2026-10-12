@@ -2,7 +2,7 @@ using NetArchTest.Rules;
 
 namespace Stockly.ArchitectureTests;
 
-/// <summary>Type-level dependencies of each compiled layer (AGENTS.md §4, ADR-0009).</summary>
+/// <summary>Type-level dependencies of each compiled layer (AGENTS.md §4, ADR-0010).</summary>
 public sealed class LayerDependencyTests
 {
     // Namespaces the compiler may emit into any assembly (nullable and embedded attributes).
@@ -24,14 +24,14 @@ public sealed class LayerDependencyTests
     ];
 
     [Fact]
-    public void Domain_DependsOnlyOnBclAndUuidNext()
+    public void Domain_DependsOnlyOnBcl()
     {
         var result = Types.InAssembly(Layers.Load(Layers.Domain))
             .Should()
-            .OnlyHaveDependenciesOn(Layers.Domain, Bcl, CompilerGenerated, "UUIDNext")
+            .OnlyHaveDependenciesOn(Layers.Domain, Bcl, CompilerGenerated)
             .GetResult();
 
-        result.ShouldBeSuccessful("Domain references nothing but the BCL and UUIDNext");
+        result.ShouldBeSuccessful("Domain references nothing but the BCL (ADR-0010)");
     }
 
     [Fact]

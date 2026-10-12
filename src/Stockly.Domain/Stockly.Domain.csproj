@@ -1,8 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- ADR-0009: UUIDNext is the only package Domain may reference. -->
-  <ItemGroup>
-    <PackageReference Include="UUIDNext" />
-  </ItemGroup>
+  <!-- Domain references no packages (AGENTS.md §4, ADR-0010). -->
 
 </Project>
