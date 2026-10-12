@@ -41,6 +41,7 @@ Deleting `stockly:{shopId}:products:*` needs `SCAN`, which is slow and not atomi
 1. Stock numbers used for a **write** are never read from Redis. Confirm and sale lock the product row with `SELECT ... FOR UPDATE`.
 2. Cache invalidation runs **after** the DB transaction commits. Bumping before commit lets a reader re-cache old data.
 3. Every key has a TTL except the tiny version counters.
+   Redis runs with `maxmemory 256mb` and `maxmemory-policy volatile-lru`, which evicts only keys that have a TTL, so the TTL-less version counters are never evicted (with `allkeys-lru` an evicted counter would restart at 0 and could make stale `v{ver}` entries reachable again).
 4. Values are DTOs serialized with System.Text.Json, never EF entities.
 
 ## 4. Failure behaviour (Redis down)
