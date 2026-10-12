@@ -67,6 +67,8 @@ public sealed class ErrorTextTests
     [InlineData(ErrorType.NotFound, 404)]
     [InlineData(ErrorType.Conflict, 409)]
     [InlineData(ErrorType.Failure, 500)]
+    [InlineData(ErrorType.Locked, 423)]
+    [InlineData(ErrorType.TooManyRequests, 429)]
     public void StatusFor_ErrorType_FollowsContract(ErrorType type, int status)
     {
         StocklyProblems.StatusFor(type).Should().Be(status);

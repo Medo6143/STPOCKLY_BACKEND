@@ -45,4 +45,17 @@ public sealed class StartupConfigurationTests(ApiFixture fixture)
             .WithMessage("*Jwt__SigningKey*32 bytes*")
             .Which.Message.Should().NotContain(shortKey);
     }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("-5")]
+    [InlineData("ten")]
+    public async Task Startup_InvalidAuthPermitLimit_FailsWithVariableName(string permitLimit)
+    {
+        await using var factory = fixture.CreateFactory(authPermitLimit: permitLimit);
+
+        var act = () => factory.CreateClient();
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*RateLimiting__Auth__PermitLimit*");
+    }
 }

@@ -68,16 +68,29 @@ internal sealed class IdentityUserAccounts(UserManager<ApplicationUser> userMana
         throw new InvalidOperationException($"Identity rejected a new user: {string.Join(", ", codes)}.");
     }
 
-    public async Task<UserAccount?> FindByCredentialsAsync(string email, string password, CancellationToken cancellationToken)
+    public async Task<CredentialCheck> CheckCredentialsAsync(string email, string password, CancellationToken cancellationToken)
     {
         var user = await userManager.FindByEmailAsync(email);
         if (user is null)
         {
             userManager.PasswordHasher.VerifyHashedPassword(new ApplicationUser(), UnknownUserHash.Value, password);
-            return null;
+            return CredentialCheck.Invalid;
         }
 
-        return await userManager.CheckPasswordAsync(user, password) ? ToAccount(user) : null;
+        // Checked before the password: while locked, even the right password is refused.
+        if (await userManager.IsLockedOutAsync(user))
+        {
+            return CredentialCheck.LockedOut(user.LockoutEnd!.Value);
+        }
+
+        if (!await userManager.CheckPasswordAsync(user, password))
+        {
+            await userManager.AccessFailedAsync(user);
+            return CredentialCheck.Invalid;
+        }
+
+        await userManager.ResetAccessFailedCountAsync(user);
+        return CredentialCheck.Valid(ToAccount(user));
     }
 
     public Task<UserAccount?> FindByIdAsync(Guid userId, CancellationToken cancellationToken) =>

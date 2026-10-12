@@ -61,6 +61,14 @@ internal static class AuthApi
     public static Task<ApiResponse> PostAsync(HttpClient client, string path, object body, string? language = null, string? bearer = null) =>
         SendAsync(client, new HttpRequestMessage(HttpMethod.Post, new Uri(path, UriKind.Relative)) { Content = JsonContent.Create(body) }, language, bearer);
 
+    /// <summary>A POST from the given client IP (see <see cref="TestClientIp"/>).</summary>
+    public static Task<ApiResponse> PostFromAsync(HttpClient client, string clientIp, string path, object body, string? language = null)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, new Uri(path, UriKind.Relative)) { Content = JsonContent.Create(body) };
+        request.Headers.Add(TestClientIp.Header, clientIp);
+        return SendAsync(client, request, language);
+    }
+
     public static async Task<ApiResponse> SendAsync(HttpClient client, HttpRequestMessage request, string? language = null, string? bearer = null)
     {
         using (request)
@@ -83,13 +91,14 @@ internal static class AuthApi
                 raw,
                 response.Content.Headers.ContentType?.MediaType,
                 response.Headers.WwwAuthenticate.ToString(),
-                response.Headers.Location);
+                response.Headers.Location,
+                response.Headers.TryGetValues("Retry-After", out var retryAfter) ? retryAfter.Single() : null);
         }
     }
 }
 
 internal sealed record ApiResponse(
-    HttpStatusCode Status, JsonNode? Body, string Raw, string? ContentType, string WwwAuthenticate, Uri? Location)
+    HttpStatusCode Status, JsonNode? Body, string Raw, string? ContentType, string WwwAuthenticate, Uri? Location, string? RetryAfter)
 {
     public string? Code => Body?["code"]?.GetValue<string>();
 }

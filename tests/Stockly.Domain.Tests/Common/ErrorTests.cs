@@ -11,6 +11,19 @@ public sealed class ErrorTests
         Error.Forbidden("A.B", "m").Type.Should().Be(ErrorType.Forbidden);
         Error.Unauthorized("A.B", "m").Type.Should().Be(ErrorType.Unauthorized);
         Error.Validation("A.B", "m").FieldErrors.Should().BeNull();
+        Error.Locked("A.B", "m").Type.Should().Be(ErrorType.Locked);
+        Error.TooManyRequests("A.B", "m").Type.Should().Be(ErrorType.TooManyRequests);
+        Error.Validation("A.B", "m").RetryAfter.Should().BeNull();
+    }
+
+    [Fact]
+    public void RetryAfter_WithExpression_KeepsCodeAndType()
+    {
+        var error = Error.Locked("A.B", "m") with { RetryAfter = TimeSpan.FromSeconds(90) };
+
+        error.Code.Should().Be("A.B");
+        error.Type.Should().Be(ErrorType.Locked);
+        error.RetryAfter.Should().Be(TimeSpan.FromSeconds(90));
     }
 
     [Fact]

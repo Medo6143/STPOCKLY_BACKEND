@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
 using Stockly.Api.Middleware;
@@ -25,6 +26,8 @@ public static class StocklyProblems
         [StatusCodes.Status405MethodNotAllowed] = "https://tools.ietf.org/html/rfc9110#section-15.5.6",
         [StatusCodes.Status409Conflict] = "https://tools.ietf.org/html/rfc9110#section-15.5.10",
         [StatusCodes.Status415UnsupportedMediaType] = "https://tools.ietf.org/html/rfc9110#section-15.5.16",
+        [StatusCodes.Status423Locked] = "https://tools.ietf.org/html/rfc4918#section-11.3",
+        [StatusCodes.Status429TooManyRequests] = "https://tools.ietf.org/html/rfc6585#section-4",
         [StatusCodes.Status500InternalServerError] = "https://tools.ietf.org/html/rfc9110#section-15.6.1",
     };
 
@@ -41,13 +44,24 @@ public static class StocklyProblems
         return problem;
     }
 
+    /// <summary>The problem for <paramref name="error"/>. Also sets the <c>Retry-After</c> header when the error carries one.</summary>
     public static ProblemDetails FromError(HttpContext httpContext, Error error)
     {
+        ArgumentNullException.ThrowIfNull(httpContext);
         ArgumentNullException.ThrowIfNull(error);
+
+        if (error.RetryAfter is { } retryAfter)
+        {
+            httpContext.Response.Headers.RetryAfter = RetryAfterSeconds(retryAfter).ToString(CultureInfo.InvariantCulture);
+        }
+
         return Create(httpContext, StatusFor(error.Type), error.Code, error.FieldErrors);
     }
 
-    /// <summary>Contract §1.8: Validation 400, Unauthorized 401, Forbidden 403, NotFound 404, Conflict 409, Failure 500.</summary>
+    /// <summary>
+    /// Contract §1.8: Validation 400, Unauthorized 401, Forbidden 403, NotFound 404, Conflict 409, Failure 500;
+    /// v1.4: Locked 423, TooManyRequests 429.
+    /// </summary>
     public static int StatusFor(ErrorType type) => type switch
     {
         ErrorType.Validation => StatusCodes.Status400BadRequest,
@@ -55,8 +69,14 @@ public static class StocklyProblems
         ErrorType.Forbidden => StatusCodes.Status403Forbidden,
         ErrorType.NotFound => StatusCodes.Status404NotFound,
         ErrorType.Conflict => StatusCodes.Status409Conflict,
+        ErrorType.Locked => StatusCodes.Status423Locked,
+        ErrorType.TooManyRequests => StatusCodes.Status429TooManyRequests,
         _ => StatusCodes.Status500InternalServerError,
     };
+
+    /// <summary><c>Retry-After</c> value (contract §1.4): whole seconds, rounded up, at least 1.</summary>
+    public static long RetryAfterSeconds(TimeSpan retryAfter) =>
+        Math.Max(1, (long)Math.Ceiling(retryAfter.TotalSeconds));
 
     /// <summary>The code of a problem raised without one (framework errors): <c>Http.NotFound</c>, <c>Auth.Unauthenticated</c>...</summary>
     public static string DefaultCodeFor(int status) => status switch

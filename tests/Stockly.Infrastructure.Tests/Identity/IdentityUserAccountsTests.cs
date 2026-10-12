@@ -15,15 +15,16 @@ public sealed class IdentityUserAccountsTests(PostgresFixture fixture)
     private const string Password = "Str0ngPass";
 
     [Fact]
-    public async Task Create_ThenFindByCredentials_ReturnsTheAccountWithHashedPassword()
+    public async Task Create_ThenCheckCredentials_ReturnsTheAccountWithHashedPassword()
     {
         var email = NewEmail();
 
         var created = await CreateAsync(email, PreferredLanguage.En);
 
         created.IsSuccess.Should().BeTrue();
-        var account = await UseAccountsAsync(accounts => accounts.FindByCredentialsAsync(email.ToUpperInvariant(), Password, CancellationToken.None));
-        account.Should().BeEquivalentTo(new UserAccount(created.Value, email, "Mona Adel", "0100", PreferredLanguage.En));
+        var check = await UseAccountsAsync(accounts => accounts.CheckCredentialsAsync(email.ToUpperInvariant(), Password, CancellationToken.None));
+        check.Status.Should().Be(CredentialStatus.Valid);
+        check.User.Should().BeEquivalentTo(new UserAccount(created.Value, email, "Mona Adel", "0100", PreferredLanguage.En));
         (await fixture.ScalarAsync<string>("SELECT password_hash FROM users WHERE id = @p0", created.Value))
             .Should().NotBeNullOrEmpty().And.NotContain(Password);
         (await fixture.ScalarAsync<string>("SELECT phone FROM users WHERE id = @p0", created.Value)).Should().Be("0100");
@@ -62,22 +63,84 @@ public sealed class IdentityUserAccountsTests(PostgresFixture fixture)
     }
 
     [Theory]
-    [InlineData("Wr0ngPass", false)]
-    [InlineData(Password, true)]
-    public async Task FindByCredentials_ChecksThePassword(string password, bool found)
+    [InlineData("Wr0ngPass", CredentialStatus.Invalid)]
+    [InlineData(Password, CredentialStatus.Valid)]
+    public async Task CheckCredentials_ChecksThePassword(string password, CredentialStatus expected)
     {
         var email = NewEmail();
         await CreateAsync(email, PreferredLanguage.Ar);
 
-        var account = await UseAccountsAsync(accounts => accounts.FindByCredentialsAsync(email, password, CancellationToken.None));
+        var check = await UseAccountsAsync(accounts => accounts.CheckCredentialsAsync(email, password, CancellationToken.None));
 
-        (account is not null).Should().Be(found);
+        check.Status.Should().Be(expected);
+        (check.User is not null).Should().Be(expected == CredentialStatus.Valid);
     }
 
     [Fact]
-    public async Task FindByCredentials_UnknownEmail_ReturnsNull()
+    public async Task CheckCredentials_UnknownEmail_ReturnsInvalid()
     {
-        (await UseAccountsAsync(accounts => accounts.FindByCredentialsAsync(NewEmail(), Password, CancellationToken.None))).Should().BeNull();
+        (await UseAccountsAsync(accounts => accounts.CheckCredentialsAsync(NewEmail(), Password, CancellationToken.None)))
+            .Should().Be(CredentialCheck.Invalid);
+    }
+
+    [Fact]
+    public async Task CheckCredentials_FiveWrongPasswords_LocksForFifteenMinutesOfTheClockEvenForTheRightPassword()
+    {
+        var clock = new FakeClock(TestTime.T0);
+        var email = NewEmail();
+        var created = await CreateAsync(email, PreferredLanguage.Ar);
+
+        for (var attempt = 1; attempt <= AuthProtection.MaxFailedLoginAttempts; attempt++)
+        {
+            (await CheckAsync(clock, email, "Wr0ngPass")).Status.Should().Be(CredentialStatus.Invalid);
+        }
+
+        var locked = await CheckAsync(clock, email, Password);
+
+        locked.Should().Be(CredentialCheck.LockedOut(TestTime.T0 + AuthProtection.LockoutDuration));
+        (await fixture.ScalarAsync<DateTime>("SELECT lockout_end FROM users WHERE id = @p0", created.Value))
+            .Should().Be((TestTime.T0 + AuthProtection.LockoutDuration).UtcDateTime);
+
+        clock.UtcNow = TestTime.T0 + AuthProtection.LockoutDuration - TimeSpan.FromSeconds(1);
+        (await CheckAsync(clock, email, Password)).Status.Should().Be(CredentialStatus.LockedOut);
+
+        clock.UtcNow = TestTime.T0 + AuthProtection.LockoutDuration + TimeSpan.FromSeconds(1);
+        (await CheckAsync(clock, email, Password)).Status.Should().Be(CredentialStatus.Valid);
+    }
+
+    [Fact]
+    public async Task CheckCredentials_RightPassword_ResetsTheFailedCount()
+    {
+        var clock = new FakeClock(TestTime.T0);
+        var email = NewEmail();
+        var created = await CreateAsync(email, PreferredLanguage.Ar);
+
+        for (var attempt = 1; attempt < AuthProtection.MaxFailedLoginAttempts; attempt++)
+        {
+            await CheckAsync(clock, email, "Wr0ngPass");
+        }
+
+        (await CheckAsync(clock, email, Password)).Status.Should().Be(CredentialStatus.Valid);
+        (await fixture.ScalarAsync<int>("SELECT access_failed_count FROM users WHERE id = @p0", created.Value)).Should().Be(0);
+
+        for (var attempt = 1; attempt < AuthProtection.MaxFailedLoginAttempts; attempt++)
+        {
+            await CheckAsync(clock, email, "Wr0ngPass");
+        }
+
+        (await CheckAsync(clock, email, Password)).Status.Should().Be(CredentialStatus.Valid);
+    }
+
+    [Fact]
+    public async Task CheckCredentials_UnknownEmailManyTimes_NeverLocked()
+    {
+        var email = NewEmail();
+
+        for (var attempt = 0; attempt <= AuthProtection.MaxFailedLoginAttempts; attempt++)
+        {
+            (await UseAccountsAsync(accounts => accounts.CheckCredentialsAsync(email, Password, CancellationToken.None)))
+                .Should().Be(CredentialCheck.Invalid);
+        }
     }
 
     [Fact]
@@ -113,9 +176,12 @@ public sealed class IdentityUserAccountsTests(PostgresFixture fixture)
             CancellationToken.None);
     }
 
-    private async Task<T> UseAccountsAsync<T>(Func<IUserAccounts, Task<T>> use)
+    private Task<CredentialCheck> CheckAsync(FakeClock clock, string email, string password) =>
+        UseAccountsAsync(accounts => accounts.CheckCredentialsAsync(email, password, CancellationToken.None), clock);
+
+    private async Task<T> UseAccountsAsync<T>(Func<IUserAccounts, Task<T>> use, FakeClock? clock = null)
     {
-        await using var scope = fixture.CreateScope(shopId: null, withIdentity: true);
+        await using var scope = fixture.CreateScope(shopId: null, withIdentity: true, clock: clock);
         return await use(scope.ServiceProvider.GetRequiredService<IUserAccounts>());
     }
 }

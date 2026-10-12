@@ -19,8 +19,13 @@ public sealed class LoginCommandHandler(
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var user = await users.FindByCredentialsAsync(request.Email.Trim(), request.Password, cancellationToken);
-        if (user is null)
+        var check = await users.CheckCredentialsAsync(request.Email.Trim(), request.Password, cancellationToken);
+        if (check is { Status: CredentialStatus.LockedOut, LockedOutUntil: { } lockedOutUntil })
+        {
+            return AuthErrors.LockedOut with { RetryAfter = lockedOutUntil - clock.UtcNow };
+        }
+
+        if (check is not { Status: CredentialStatus.Valid, User: { } user })
         {
             return AuthErrors.InvalidCredentials;
         }

@@ -88,6 +88,18 @@
   <data name="Auth.RefreshTokenReused.Detail" xml:space="preserve">
     <value>تم إنهاء هذه الجلسة لأسباب أمنية. يرجى تسجيل الدخول مرة أخرى.</value>
   </data>
+  <data name="Auth.LockedOut.Title" xml:space="preserve">
+    <value>الحساب مقفل</value>
+  </data>
+  <data name="Auth.LockedOut.Detail" xml:space="preserve">
+    <value>محاولات دخول فاشلة كثيرة. تم قفل حسابك لمدة 15 دقيقة. حاول مرة أخرى لاحقاً.</value>
+  </data>
+  <data name="Auth.TooManyRequests.Title" xml:space="preserve">
+    <value>طلبات كثيرة جداً</value>
+  </data>
+  <data name="Auth.TooManyRequests.Detail" xml:space="preserve">
+    <value>طلبات كثيرة جداً. يرجى الانتظار قليلاً ثم المحاولة مرة أخرى.</value>
+  </data>
   <data name="Shop.NameRequired.Title" xml:space="preserve">
     <value>بيانات غير صالحة</value>
   </data>

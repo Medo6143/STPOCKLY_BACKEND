@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using Stockly.Application.Abstractions.Identity;
+using Stockly.Application.Abstractions.Time;
 using Stockly.Infrastructure;
 using Stockly.Infrastructure.Persistence;
 using Testcontainers.PostgreSql;
@@ -43,8 +44,13 @@ public sealed class ApiFixture : IAsyncLifetime
     }
 
     public StocklyApiFactory CreateFactory(
-        string? postgres = null, string? redis = null, bool includeTestEndpoints = false, string jwtSigningKey = TestJwt.SigningKey) =>
-        new(postgres ?? PostgresConnectionString, redis ?? RedisConnectionString, includeTestEndpoints, jwtSigningKey);
+        string? postgres = null,
+        string? redis = null,
+        bool includeTestEndpoints = false,
+        string jwtSigningKey = TestJwt.SigningKey,
+        string? authPermitLimit = StocklyApiFactory.RaisedAuthPermitLimit,
+        IClock? clock = null) =>
+        new(postgres ?? PostgresConnectionString, redis ?? RedisConnectionString, includeTestEndpoints, jwtSigningKey, authPermitLimit, clock);
 
     /// <summary>Raw SQL for arranging states the API cannot create yet (suspended shop, staff membership...).</summary>
     public async Task<int> ExecuteAsync(string sql, params object[] parameters)
