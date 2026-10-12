@@ -17,6 +17,8 @@ You have not seen the conversation that produced this brief. Everything you need
 - Anything not listed above, in particular: <paths>.
 - `docs/api/contract.md` (only the orchestrator changes the contract).
 
+**Git and machine safety:** never run git commands that change the working tree or history (`checkout`, `reset`, `stash`, `commit`, `merge`, `push`). To undo your own edit, edit the file back. Never kill processes by image name (`taskkill /IM`, `pkill <name>`, `Stop-Process -Name`); stop only processes you started, by PID. Never change anything outside this repository.
+
 ## 3. Critical rules for this task
 Full rules: `AGENTS.md`. The ones that matter most here (copied):
 - <rule number and text>
