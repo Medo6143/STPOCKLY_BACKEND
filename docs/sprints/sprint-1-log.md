@@ -114,3 +114,12 @@ Stop conditions. The message defining "the four stop conditions" did not reach t
 - Real run (`dotnet run`, Development, compose): `.env` loaded; `/health/ready` Healthy; 404 returns `application/problem+json` with `traceId`, `correlationId`, `instance`; `X-Correlation-Id` echoed; logs carry the correlation id and contain no secrets (scanned).
 
 **Finding fixed during 1.4b:** `.env.example` used `localhost` in connection strings. On Windows StackExchange.Redis tried `::1` first, compose binds `127.0.0.1` only, so Redis was permanently Degraded. All connection strings now use `127.0.0.1` (`.env.example`, README, redis.md).
+
+### Step 0 (orchestration): finish 1.4b
+
+- First commit built in a fresh worktree on D: (`D:\FLUTTER\_wt`), outside the repo, no `.env`: `dotnet restore` + `dotnet build -warnaserror` → 0 warnings, 0 errors. No error lines to report.
+- All six 1.4b commits build the same way (0 warnings each, no `.env`).
+- Cause (a) ruled out: without `.env`, without any `ConnectionStrings__*` variable and without `CI=true`, the build runs OpenAPI generation (placeholders, host built but never started, no `ValidateOnStart`) and reproduces the committed `docs/api/openapi.json` byte-for-byte.
+- Cause (b) ruled out: every commit builds on its own.
+- **Root cause (c): environment.** The earlier per-commit worktrees were in the agent scratchpad on drive C:, which is full (0.02–0.05 GB free); restore/build output failed to write. Worktrees now go to `D:\FLUTTER\_wt` and temp to `D:\FLUTTER\_tmp`.
+- Clean clone of `feature/api-cross-cutting`, no `.env`: build 0 warnings; Domain 186, Architecture 18 and the non-container Api tests 17 pass. The 55 container tests (Infrastructure 36, Api 19) passed on the same `src/` before C: filled up; Docker Desktop does not respond while C: is full, so their re-run is pending (blocker reported to the product owner).
