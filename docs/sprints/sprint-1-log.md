@@ -140,3 +140,18 @@ Stop conditions. The message defining "the four stop conditions" did not reach t
 - Orchestrator verification: `git status` matches the allowed scope; ERD diff read in full; spot-checked §6 resilience (retry only 429/5xx, 30 s per attempt, max 2 retries, fallback in the extractor: rule 17), §10 #13 (never both / confirmed never neither enforced by CHECKs with `confirmed_at` and `created_product_id`; `product_id` stays NULL after confirm so "never both" holds forever), §11 confirm (lock order invoice → products `ORDER BY id FOR UPDATE`, idempotent, cache bump after commit: rules 1, 3, 4, 23, 24). Result: accepted.
 - Notable design decisions (for the product owner before Sprint 2): two supporting columns on `invoice_items` (`confirmed_at`, `created_product_id`); unreadable AI lines are counted, not saved; timeouts go to the fallback model without retry; tenant for jobs via a scoped `JobTenantContext`.
 - 15 open questions in `docs/design/backend.md` §17 (contract v1.2 candidates: `newProduct` on `InvoiceItemDto`, 413/429 `ErrorType`s; others: rate limit value, line_total rounding, Hangfire DDL vs rule 31, image key extension, model ids, ...). They block Sprint 2 implementation, not Sprint 1.
+
+## Lane BACKEND: step 1.5 auth
+
+- Agent: general-purpose worker (background). Brief: `docs/agents/briefs/backend-1.5-auth.md` (contract v1.2 §1, A1–A5, §3, §4, codes; product-owner decisions: membership access by user id only, default plan 30 scans/day, token families).
+- Report: "AGENTS.md read: yes", contract deviations NONE.
+- Orchestrator verification:
+  - Build 0 warnings; tests Domain 221, Application 71, Architecture 23, Infrastructure 82, Api 139 (536, all green), on the branch and again on merged `main`. `has-pending-model-changes`: none.
+  - Migration `Identity` SQL read: every erd §3.1 index (unique normalized_email, token_hash, partial active indexes, one Owner per shop, one active subscription per shop, plans code) plus FK support indexes; deferred FK `stock_movements.created_by_user_id → users` is real; default plan seeded (`standard`, 30, 3, 0.00).
+  - Code read: refresh locks the token row (`FOR UPDATE`), reuse revokes only that family (`ExecuteUpdate` on `family_id`), commit-on-failure only for refresh (`ICommitOnFailure`); tenant = registration scope first, then `shop_id` claim, fail closed; `shop_members` only through `ShopMembershipRepository` (every read takes a user id; 4 architecture tests); no `IgnoreQueryFilters`; no secrets logged; `.env.example` adds `Jwt__Issuer`/`Jwt__Audience` only.
+  - Required test present: `Reuse_OnDeviceA_RevokesOnlyDeviceAFamily_DeviceBStillRefreshes`.
+- Commits: `97d804f` feat (auth), `6b3c6cb` test (architecture), `026fe76` docs; merge `da63d39` (contract change-log conflict resolved in favour of `main`'s v1.3 line; A1–A5 `implemented`).
+- Follow-up by the orchestrator: `refresh_tokens.family_id` added to the erd §2 diagram.
+- Worker decisions accepted: shop type as a string in the request (so an unknown type gives `Shop.UnknownType`); expiry timestamps as UTC `DateTime` serialized with `Z`; invariant formatting culture with ar/en UI culture; existing tests updated, none weakened (500 test now sends `Accept-Language: en`, a new test checks the Arabic title).
+- Open (known limitation, docs/features/auth.md): no login lockout or rate limiting yet.
+- Tool note: the `dotnet-ef` resolver cache pointed at the old C: NuGet path after the cache move; the stale cache entry was deleted and `dotnet tool restore` re-run.
