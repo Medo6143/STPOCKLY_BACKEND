@@ -42,6 +42,7 @@ erDiagram
     invoices ||--|{ invoice_items : contains
     products |o--o{ invoice_items : "matched to"
     product_units |o--o{ invoice_items : "in unit"
+    products |o--o{ invoice_items : "created from"
 
     shops ||--o{ sales : records
     sales ||--|{ sale_items : contains
@@ -187,12 +188,17 @@ erDiagram
         text raw_name
         uuid product_id FK
         uuid product_unit_id FK
+        text new_product_name
+        text new_product_base_unit_name
+        numeric new_product_sell_price
+        uuid created_product_id FK
         numeric quantity
         numeric unit_price
         numeric line_total
         date expiry_date
         text batch_no
         numeric match_confidence
+        timestamptz confirmed_at
     }
     sales {
         uuid id PK
@@ -347,14 +353,29 @@ Quantity is allowed to go negative (a sale recorded before the invoice was scann
 | `(status, created_at DESC) WHERE status = Failed` | admin "failed scans" screen |
 | `CHECK (confirmed_at IS NULL OR status = Confirmed)` | integrity |
 
-**invoice_items** — `product_id` NULL means "new product, create on confirm". `expiry_date`/`batch_no` are informational in v1 (ADR-0004).
+**invoice_items** — a line either references an **existing** product (`product_id` + `product_unit_id`) or describes a **new** one (`new_product_name`, `new_product_base_unit_name`, `new_product_sell_price numeric(18,2)`, contract v1.1 I4 `newProduct`; cost price = the line's `unit_price`, `quantity` in the new base unit). Never both; a confirmed line never has neither. Lines straight from the AI (`NeedsReview`) may have neither (unmatched). Two supporting columns make the rule enforceable in the row (design: `docs/design/backend.md` §10):
+- `confirmed_at timestamptz NULL`: set on every line, in the confirm transaction, to the invoice's `confirmed_at` (a CHECK cannot read `invoices.status`).
+- `created_product_id uuid NULL` FK `products`: the product created from `new_product_*` on confirm. `product_id` stays NULL on such a line, so "never both" holds after confirm too. Queries that need "the line's product" use `COALESCE(product_id, created_product_id)`.
+
+Other types: `quantity numeric(14,3)` (in the line's unit), `unit_price`/`line_total numeric(18,2)`, `match_confidence numeric(3,2)`. `expiry_date`/`batch_no` are informational in v1 (ADR-0004). Lines are replaced (deleted and re-inserted) only by the review edit while the invoice is `NeedsReview`.
 
 | Index / constraint | Serves |
 |---|---|
 | `UNIQUE (invoice_id, line_no)` | ordered review screen, stable edits |
 | `(shop_id, product_id)` | product purchase history |
-| `(shop_id, expiry_date) WHERE expiry_date IS NOT NULL` | "expiring soon" dashboard card |
-| `CHECK (quantity > 0 AND unit_price >= 0)` | integrity |
+| `(created_product_id) WHERE created_product_id IS NOT NULL` | product purchase history for products created from an invoice (`product_id = @p OR created_product_id = @p`); FK support |
+| `(shop_id, expiry_date) WHERE expiry_date IS NOT NULL` | "expiring soon" dashboard card (product = `COALESCE(product_id, created_product_id)`, confirmed lines only) |
+| `CHECK (quantity > 0 AND unit_price >= 0 AND line_total >= 0)` | integrity |
+| `CHECK (line_no BETWEEN 1 AND 100)` | 100-line cap (AGENTS.md rule 15, contract I4) |
+| `CHECK (match_confidence IS NULL OR match_confidence BETWEEN 0 AND 1)` | contract confidence range |
+| `CHECK (product_id IS NULL OR new_product_name IS NULL)` | **never both** existing and new product |
+| `CHECK (num_nonnulls(new_product_name, new_product_base_unit_name, new_product_sell_price) IN (0, 3))` | a new product is fully described or absent |
+| `CHECK (new_product_sell_price IS NULL OR new_product_sell_price >= 0)` | money never negative |
+| `CHECK ((product_id IS NULL) = (product_unit_id IS NULL))` | an existing product always comes with its unit |
+| `CHECK (confirmed_at IS NULL OR num_nonnulls(product_id, new_product_name) = 1)` | a **confirmed** line **never has neither** |
+| `CHECK ((created_product_id IS NOT NULL) = (new_product_name IS NOT NULL AND confirmed_at IS NOT NULL))` | the created product exists exactly for confirmed new-product lines |
+
+"`product_unit_id` is a unit of `product_id`" and "`confirmed_at` is set on every line exactly when the invoice is confirmed" cannot be CHECKs (they span rows/tables); the Domain (`Invoice`) enforces them and Infrastructure tests assert them.
 
 ### 3.4 Sales
 
@@ -420,8 +441,9 @@ Growth note: when this table passes ~10M rows, partition by month on `created_at
 | Migration | Tables | Notes |
 |---|---|---|
 | `InitialCatalog` (step 1.4a) | `shops`, `products`, `product_units`, `stock_movements` | `pg_trgm`; every index and check listed above for these tables |
+| `InvoiceScan` (Sprint 2, **planned**, not applied) | `suppliers`, `product_aliases`, `invoices`, `invoice_items`, `ai_usage_records`; schema `hangfire` | every index and check listed above for these tables; FKs `stock_movements.invoice_id` → `invoices`, `stock_movements.invoice_item_id` → `invoice_items`; Hangfire tables are created by `Hangfire.PostgreSql` at startup. Plan: `docs/design/backend.md` §12 |
 
-Implementation notes for these tables:
+Implementation notes for the `InitialCatalog` tables:
 - `products.updated_at` is an EF **shadow property** set by `AuditTimestampsInterceptor` from `IClock`; the Domain type has no such property.
 - `products` uses PostgreSQL's system column `xmin` as the optimistic concurrency token (shadow property, `IsRowVersion`); no column is created.
 - `ix_stock_movements_product_id` is created by EF to support the `product_id` foreign key (no listed index starts with `product_id`). It is not used by a named query.
