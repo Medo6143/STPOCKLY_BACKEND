@@ -1,6 +1,6 @@
 # ADR-0003: Product units with a base unit
 
-- Status: Proposed
+- Status: Accepted (2026-10-12)
 - Date: 2026-10-12
 
 ## Context

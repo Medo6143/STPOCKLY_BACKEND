@@ -1,6 +1,6 @@
 # ADR-0007: Redis usage and version-stamped cache keys
 
-- Status: Proposed
+- Status: Accepted (2026-10-12)
 - Date: 2026-10-12
 
 ## Decision

@@ -1,6 +1,6 @@
 # ADR-0002: Multi-tenancy with shop members and a global query filter
 
-- Status: Proposed
+- Status: Accepted (2026-10-12)
 - Date: 2026-10-12
 
 ## Context

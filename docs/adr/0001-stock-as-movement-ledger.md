@@ -1,6 +1,6 @@
 # ADR-0001: Stock is a ledger of movements
 
-- Status: Proposed
+- Status: Accepted (2026-10-12)
 - Date: 2026-10-12
 
 ## Context

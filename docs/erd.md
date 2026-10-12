@@ -1,14 +1,14 @@
 # Stockly — Entity Relationship Design (v1)
 
 Status: **Draft for review**
-Related ADRs: 0001 (stock ledger), 0002 (multi-tenancy), 0003 (units), 0004 (expiry), 0005 (platform admin), 0006 (offline idempotency), 0008 (image storage)
+Related ADRs: 0001 (stock ledger), 0002 (multi-tenancy), 0003 (units), 0004 (expiry), 0005 (platform admin), 0006 (offline idempotency), 0008 (image storage), 0009 (UUIDv7 in Domain)
 
 ## 1. Global conventions
 
 | Concern | Decision |
 |---|---|
 | Naming | `snake_case` tables/columns via `EFCore.NamingConventions`. C# stays PascalCase. |
-| Primary keys | `uuid`, generated in the app as **UUIDv7** (time-ordered → index-friendly inserts). .NET 8 has no built-in v7, use `UUIDNext`. |
+| Primary keys | `uuid`, generated in the app as **UUIDv7** (time-ordered → index-friendly inserts). .NET 8 has no built-in v7, use `UUIDNext`. The Domain `Entity` base assigns the id at construction (ADR-0009). |
 | Time | `timestamptz`, always UTC, produced by `IClock`. Business dates (invoice date, expiry) are `date`. |
 | Money | `numeric(18,2)`, C# `decimal`. Currency is EGP (one currency, no currency column). |
 | Quantities | `numeric(14,3)`, always stored in the product's **base unit** (supports 1.5 kg for groceries). |
@@ -294,13 +294,15 @@ Every index below exists because a named query needs it. The "Serves" column is 
 
 **products** — `quantity` is a **projection** of `stock_movements` (ADR-0001). It is written only by `IStockService` inside the same transaction as the movement. `cost_price` is per base unit.
 
+`low_stock_threshold` is `numeric(14,3) NOT NULL DEFAULT 0`, in base units. With the default 0, a product is low when `quantity <= 0`, so out-of-stock products always appear in the low-stock list. This is intended.
+
 | Index / constraint | Serves |
 |---|---|
 | `CHECK (low_stock_threshold >= 0)` | data integrity |
 | `UNIQUE (shop_id, barcode) WHERE barcode IS NOT NULL AND NOT is_archived` | barcode scan in sale screen |
 | `(shop_id, normalized_name) WHERE NOT is_archived` | product list sorted by name, paging |
-| `GIN (normalized_name gin_trgm_ops)` | search box, fuzzy match (Sprint 5) |
-| `(shop_id) WHERE quantity <= low_stock_threshold AND NOT is_archived` | `GET /products?lowStock=true` — tiny partial index, only low items live in it |
+| `GIN (normalized_name gin_trgm_ops)` | search box, fuzzy match (Sprint 6) |
+| `(shop_id) WHERE quantity <= low_stock_threshold AND NOT is_archived` | `GetLowStockQuery` (`GET /api/products?lowStock=true`) — tiny partial index, only low items live in it |
 
 Quantity is allowed to go negative (a sale recorded before the invoice was scanned is real life). Negative stock raises a warning on the dashboard, it does not block the cashier.
 
@@ -335,7 +337,7 @@ Quantity is allowed to go negative (a sale recorded before the invoice was scann
 | Index / constraint | Serves |
 |---|---|
 | `UNIQUE (shop_id, client_request_id)` | offline queue retries never create two invoices (ADR-0006) |
-| `(shop_id, created_at DESC)` | invoice history list |
+| `(shop_id, created_at DESC)` | invoice history list; daily scan quota fallback count when Redis is down (`docs/design/redis.md` §4) |
 | `(shop_id, status) WHERE status IN (Processing, NeedsReview)` | "waiting for review" badge |
 | `(shop_id, image_sha256)` | duplicate photo detection (DB side of the AI cache) |
 | `(shop_id, supplier_id, invoice_number) WHERE invoice_number IS NOT NULL` | duplicate invoice warning |
@@ -383,7 +385,7 @@ Quantity is allowed to go negative (a sale recorded before the invoice was scann
 
 | Index / constraint | Serves |
 |---|---|
-| `(shop_id, created_at DESC)` | per-shop usage, quota fallback count |
+| `(shop_id, created_at DESC)` | per-shop usage and cost in admin |
 | `(created_at DESC)` | platform-wide cost chart |
 | `(invoice_id)` | invoice detail in admin |
 

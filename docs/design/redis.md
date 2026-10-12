@@ -50,7 +50,7 @@ Deleting `stockly:{shopId}:products:*` needs `SCAN`, which is slow and not atomi
 | Read cache | Skip cache, read from Postgres | Warning, throttled to once per minute |
 | AI result cache | Treat as miss, call OpenRouter (costs money, still correct) | Warning |
 | Rate limit | **Fail open**: allow the request | Warning |
-| Daily quota | Fall back to `COUNT(*)` on `ai_usage_records` for today (indexed by `shop_id, created_at`) | Warning |
+| Daily quota | Fall back to `COUNT(*)` on `invoices` created today, where "today" starts at Africa/Cairo midnight from `IClock` (index `invoices (shop_id, created_at DESC)`). Not `ai_usage_records`: it has one row per AI call, including retries and cache hits, so it would over-count scans. | Warning |
 | Invoice status | Read from `invoices` table | none |
 
 Redis connection uses `AbortOnConnectFail = false` and a 250 ms operation timeout, so a dead Redis costs at most 250 ms per request and never crashes startup. Health check `/health/ready` reports Redis as *Degraded*, not *Unhealthy*.

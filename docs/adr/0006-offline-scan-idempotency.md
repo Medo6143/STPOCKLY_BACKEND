@@ -1,6 +1,6 @@
 # ADR-0006: Offline scan queue with client request IDs
 
-- Status: Proposed
+- Status: Accepted (2026-10-12)
 - Date: 2026-10-12
 
 ## Context
