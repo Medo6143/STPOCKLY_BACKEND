@@ -2,7 +2,7 @@
 
 **Version: v1.3** · Status: **Approved** (v1.1 at checkpoint 1, v1.3 at checkpoint 2, 2026-10-12; v1.2 clarifications by the orchestrator) · Owner: orchestrator
 
-Change log: v1 (2026-10-12) first draft · v1.1 (2026-10-12) opening stock on create (P3), list price and override flag on sales (S1, D1), `newProduct` without category (I4), `GET /api/auth/me` fields made explicit (A5) · v1.2 (2026-10-12) `Http.*` codes for framework errors (§1.8), `newProduct` on `InvoiceItemDto` (§6) · v1.3 (2026-10-12) `Retry-After` on `429 Scan.DailyQuotaExceeded` (I1).
+Change log: v1 (2026-10-12) first draft · v1.1 (2026-10-12) opening stock on create (P3), list price and override flag on sales (S1, D1), `newProduct` without category (I4), `GET /api/auth/me` fields made explicit (A5) · v1.2 (2026-10-12) `Http.*` codes for framework errors (§1.8), `newProduct` on `InvoiceItemDto` (§6), logout allowed for suspended shops (A4) · v1.3 (2026-10-12) `Retry-After` on `429 Scan.DailyQuotaExceeded` (I1).
 
 This is the binding contract between `stockly-backend` and `stockly-mobile` (and `Stockly.Admin` later) for Sprints 1–4. Field names, types, status codes and error codes here are exact. Only the orchestrator changes this file: every change bumps the version, updates the copy in `stockly-mobile/docs/api/contract.md`, and is announced to the running lanes.
 
@@ -46,7 +46,7 @@ The machine-readable spec is `docs/api/openapi.json`. A backend test checks that
 - **Refresh token**: opaque random string, lifetime **30 days**, stored hashed. Every refresh **rotates** it (the old one is revoked). Presenting a revoked refresh token **revokes the whole chain** and returns `401 Auth.RefreshTokenReused` (AGENTS.md rule 13).
 - **Client rule:** on `401` from any authenticated endpoint, the client calls `POST /api/auth/refresh` **once**, then retries the original request **once**. Concurrent `401`s share one refresh (request queue). If the refresh fails, the client signs out.
 - Roles: `user` = Owner or Staff of the active shop. `owner` = Owner only. A Staff user calling an owner-only endpoint gets `403 Auth.Forbidden`.
-- A suspended shop (`ShopStatus.Suspended`) gets `403 Shop.Suspended` on login, refresh and every authenticated call.
+- A suspended shop (`ShopStatus.Suspended`) gets `403 Shop.Suspended` on login, refresh and every authenticated call except logout (A4), so the user can always sign out.
 
 ### 1.5 Localization
 - `Accept-Language: ar` or `en` (default `ar`). It selects the language of ProblemDetails `title`/`detail` and validation messages. Codes never change with the language.
@@ -216,7 +216,7 @@ Request: `{ "refreshToken": string }` → `200` `AuthResponse` with a **new** re
 Errors: `401 Auth.InvalidRefreshToken` (unknown or expired), `401 Auth.RefreshTokenReused` (revoked token presented: the whole chain is revoked), `403 Shop.Suspended`.
 
 ### A4 `POST /api/auth/logout` (user)
-Request: `{ "refreshToken": string }` → `204`. Revokes that refresh token and its chain. Unknown or already revoked token → still `204` (logout is idempotent). `400 Validation.Failed` when the field is missing.
+Request: `{ "refreshToken": string }` → `204`. Revokes that refresh token and its chain. Works for suspended shops too (no 403). Unknown or already revoked token → still `204` (logout is idempotent). `400 Validation.Failed` when the field is missing.
 
 ### A5 `GET /api/auth/me` (user)
 Used at app start-up to restore the session.
