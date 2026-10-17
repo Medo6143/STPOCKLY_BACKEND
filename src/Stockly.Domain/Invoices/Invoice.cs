@@ -155,6 +155,65 @@ public sealed class Invoice : Entity, ITenantEntity
         return Result.Success();
     }
 
+    /// <summary>
+    /// The review edit (contract I4, docs/design/backend.md §9.1): replaces the header, every line and the warnings while
+    /// the invoice is <see cref="InvoiceStatus.NeedsReview"/>. A line keeps its match confidence only when its line number,
+    /// product and unit equal the previous line with that number. The caller removes the previous lines from persistence
+    /// (they are referenced by nothing before confirm). On failure nothing changes.
+    /// </summary>
+    public Result ReplaceLines(
+        InvoiceHeader header, IReadOnlyList<InvoiceReviewLine> lines, Guid? supplierId, IReadOnlyList<InvoiceWarning> warnings)
+    {
+        ArgumentNullException.ThrowIfNull(header);
+        ArgumentNullException.ThrowIfNull(lines);
+        ArgumentNullException.ThrowIfNull(warnings);
+
+        var error = (Status == InvoiceStatus.NeedsReview ? null : InvoiceErrors.NotEditable)
+            ?? (lines.Count == 0 ? InvoiceErrors.LinesRequired : null)
+            ?? (lines.Count > InvoiceLimits.MaxLines ? InvoiceErrors.TooManyLines : null)
+            ?? (lines.Select(line => line.LineNo).Distinct().Count() == lines.Count ? null : InvoiceErrors.LineNumberInvalid)
+            ?? (header.TotalAmount is { } total ? Precision.ValidateMoney(total, nameof(TotalAmount)) : null);
+        if (error is not null)
+        {
+            return error;
+        }
+
+        var previous = _items.ToDictionary(item => item.LineNo);
+        var items = new List<InvoiceItem>(lines.Count);
+        foreach (var line in lines.OrderBy(line => line.LineNo))
+        {
+            var item = InvoiceItem.FromReview(ShopId, Id, line, KeptConfidence(previous, line));
+            if (item.IsFailure)
+            {
+                return item.Error;
+            }
+
+            items.Add(item.Value);
+        }
+
+        var computedTotal = items.Sum(item => item.LineTotal);
+        var totalError = Precision.ValidateMoney(computedTotal, nameof(ComputedTotal));
+        if (totalError is not null)
+        {
+            return totalError;
+        }
+
+        _items.Clear();
+        _items.AddRange(items);
+        SupplierId = supplierId;
+        SupplierNameRaw = header.SupplierName;
+        InvoiceNumber = header.InvoiceNumber;
+        InvoiceDate = header.InvoiceDate;
+        TotalAmount = header.TotalAmount;
+        ComputedTotal = computedTotal;
+        Warnings = warnings.Distinct().ToArray();
+        return Result.Success();
+    }
+
+    /// <summary>Whether the current line <paramref name="lineNo"/> references <paramref name="productId"/> (unchanged product).</summary>
+    public bool HasProductOnLine(int lineNo, Guid productId) =>
+        _items.Any(item => item.LineNo == lineNo && item.ProductId == productId);
+
     /// <summary>The job could not produce lines. Terminal: the user scans again.</summary>
     public Result MarkFailed(InvoiceFailureReason reason, string? rawAiJson, DateTimeOffset now)
     {
@@ -170,6 +229,14 @@ public sealed class Invoice : Entity, ITenantEntity
         ProcessedAt = now;
         return Result.Success();
     }
+
+    private static decimal? KeptConfidence(Dictionary<int, InvoiceItem> previous, InvoiceReviewLine line) =>
+        line.Product is { } product
+        && previous.TryGetValue(line.LineNo, out var before)
+        && before.ProductId == product.ProductId
+        && before.ProductUnitId == product.ProductUnitId
+            ? before.MatchConfidence
+            : null;
 
     private static bool IsSha256Hex(string? value) =>
         value is { Length: InvoiceLimits.ImageSha256Length } && value.All(c => char.IsAsciiDigit(c) || c is >= 'a' and <= 'f');

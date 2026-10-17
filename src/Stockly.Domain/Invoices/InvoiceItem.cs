@@ -5,7 +5,8 @@ namespace Stockly.Domain.Invoices;
 
 /// <summary>
 /// One line of an <see cref="Invoice"/> (docs/design/backend.md §10). Created only by the invoice. A line from the AI
-/// references no product yet; the review edit and confirm (later steps) fill the product columns.
+/// references a matched product or nothing; a line of the review edit references an existing product or describes a new
+/// one; confirm (Sprint 4) fills the created product.
 /// </summary>
 public sealed class InvoiceItem : Entity, ITenantEntity
 {
@@ -72,6 +73,9 @@ public sealed class InvoiceItem : Entity, ITenantEntity
     /// <summary>Informational only (ADR-0004).</summary>
     public string? BatchNo { get; }
 
+    /// <summary>Decimals of <see cref="MatchConfidence"/> (contract §1.2, <c>numeric(3,2)</c>).</summary>
+    public const int MatchConfidenceDecimals = 2;
+
     /// <summary>0.00–1.00 when a product was matched automatically.</summary>
     public decimal? MatchConfidence { get; private set; }
 
@@ -85,6 +89,7 @@ public sealed class InvoiceItem : Entity, ITenantEntity
     public static decimal ComputeLineTotal(decimal quantity, decimal unitPrice) =>
         decimal.Round(quantity * unitPrice, Precision.MoneyDecimals, MidpointRounding.AwayFromZero);
 
+    /// <summary>A line of the extraction, matched to a product when <see cref="InvoiceLineDraft.Match"/> is set.</summary>
     internal static Result<InvoiceItem> FromDraft(Guid shopId, Guid invoiceId, int lineNo, InvoiceLineDraft draft)
     {
         if (lineNo is < 1 or > InvoiceLimits.MaxLines)
@@ -92,24 +97,99 @@ public sealed class InvoiceItem : Entity, ITenantEntity
             return InvoiceErrors.TooManyLines;
         }
 
-        var rawName = draft.RawName.Trim();
-        var error = (ArabicTextNormalizer.Normalize(rawName).Length == 0 ? InvoiceErrors.LineNameRequired : null)
-            ?? (draft.Quantity <= 0m ? InvoiceErrors.LineQuantityNotPositive : null)
-            ?? Precision.ValidateQuantity(draft.Quantity, nameof(draft.Quantity))
-            ?? Precision.ValidateMoney(draft.UnitPrice, nameof(draft.UnitPrice));
+        if (draft.Match is { } match && !IsValidConfidence(match.Confidence))
+        {
+            return InvoiceErrors.MatchConfidenceInvalid;
+        }
+
+        var created = Create(shopId, invoiceId, lineNo, draft.RawName, draft.Quantity, draft.UnitPrice, draft.ExpiryDate, draft.BatchNo);
+        if (created.IsFailure || draft.Match is null)
+        {
+            return created;
+        }
+
+        var item = created.Value;
+        item.ProductId = draft.Match.ProductId;
+        item.ProductUnitId = draft.Match.ProductUnitId;
+        item.MatchConfidence = draft.Match.Confidence;
+        return item;
+    }
+
+    /// <summary>
+    /// A line of the review edit (contract I4): an existing product with its unit, or a new product, never both or
+    /// neither. <paramref name="matchConfidence"/> is the kept confidence of an unchanged match, else <c>null</c>.
+    /// </summary>
+    internal static Result<InvoiceItem> FromReview(Guid shopId, Guid invoiceId, InvoiceReviewLine line, decimal? matchConfidence)
+    {
+        if (line.LineNo is < 1 or > InvoiceLimits.MaxLines)
+        {
+            return InvoiceErrors.LineNumberInvalid;
+        }
+
+        var error = (line.Product, line.NewProduct) switch
+        {
+            (not null, not null) => InvoiceErrors.LineProductConflict,
+            (null, null) => InvoiceErrors.LineProductRequired,
+            (null, { } newProduct) => ValidateNewProduct(newProduct),
+            _ => matchConfidence is { } confidence && !IsValidConfidence(confidence) ? InvoiceErrors.MatchConfidenceInvalid : null,
+        };
         if (error is not null)
         {
             return error;
         }
 
-        var lineTotal = ComputeLineTotal(draft.Quantity, draft.UnitPrice);
+        var created = Create(shopId, invoiceId, line.LineNo, line.RawName, line.Quantity, line.UnitPrice, line.ExpiryDate, line.BatchNo);
+        if (created.IsFailure)
+        {
+            return created;
+        }
+
+        var item = created.Value;
+        if (line.Product is { } product)
+        {
+            item.ProductId = product.ProductId;
+            item.ProductUnitId = product.ProductUnitId;
+            item.MatchConfidence = matchConfidence;
+        }
+        else
+        {
+            var newProduct = line.NewProduct!;
+            item.NewProductName = newProduct.Name.Trim();
+            item.NewProductBaseUnitName = newProduct.BaseUnitName.Trim();
+            item.NewProductSellPrice = newProduct.SellPrice;
+        }
+
+        return item;
+    }
+
+    private static Result<InvoiceItem> Create(
+        Guid shopId, Guid invoiceId, int lineNo, string rawName, decimal quantity, decimal unitPrice, DateOnly? expiryDate, string? batchNo)
+    {
+        var name = rawName.Trim();
+        var error = (ArabicTextNormalizer.Normalize(name).Length == 0 ? InvoiceErrors.LineNameRequired : null)
+            ?? (quantity <= 0m ? InvoiceErrors.LineQuantityNotPositive : null)
+            ?? Precision.ValidateQuantity(quantity, nameof(Quantity))
+            ?? Precision.ValidateMoney(unitPrice, nameof(UnitPrice));
+        if (error is not null)
+        {
+            return error;
+        }
+
+        var lineTotal = ComputeLineTotal(quantity, unitPrice);
         var totalError = Precision.ValidateMoney(lineTotal, nameof(LineTotal));
         if (totalError is not null)
         {
             return totalError;
         }
 
-        return new InvoiceItem(
-            shopId, invoiceId, lineNo, rawName, draft.Quantity, draft.UnitPrice, lineTotal, draft.ExpiryDate, OptionalText.Clean(draft.BatchNo));
+        return new InvoiceItem(shopId, invoiceId, lineNo, name, quantity, unitPrice, lineTotal, expiryDate, OptionalText.Clean(batchNo));
     }
+
+    private static Error? ValidateNewProduct(InvoiceNewProduct newProduct) =>
+        ArabicTextNormalizer.Normalize(newProduct.Name).Length == 0 || ArabicTextNormalizer.Normalize(newProduct.BaseUnitName).Length == 0
+            ? InvoiceErrors.NewProductIncomplete
+            : Precision.ValidateMoney(newProduct.SellPrice, nameof(NewProductSellPrice));
+
+    private static bool IsValidConfidence(decimal confidence) =>
+        confidence is >= 0m and <= 1m && decimal.Round(confidence, MatchConfidenceDecimals) == confidence;
 }
