@@ -82,11 +82,14 @@ erDiagram
     shops {
         uuid id PK
         text name
+        text normalized_name
         smallint shop_type
         text phone
         text governorate
         text address
         smallint status
+        timestamptz suspended_at
+        text suspended_reason
         timestamptz created_at
     }
     shop_members {
@@ -113,6 +116,7 @@ erDiagram
         smallint status
         date starts_on
         date ends_on
+        int daily_scan_quota_override
         timestamptz created_at
     }
     products {
@@ -253,10 +257,12 @@ erDiagram
     admin_audit_logs {
         uuid id PK
         uuid admin_user_id FK
-        text action
-        text target_type
+        varchar action
+        varchar target_type
         uuid target_id
-        jsonb payload
+        text reason
+        jsonb before
+        jsonb after
         timestamptz created_at
     }
 ```
@@ -272,6 +278,7 @@ Every index below exists because a named query needs it. The "Serves" column is 
 | Index / constraint | Serves |
 |---|---|
 | `UNIQUE (normalized_email)` (Identity column) | login |
+| `(normalized_email text_pattern_ops)` (`ix_users_normalized_email_pattern`, Sprint 5) | AD4 owner email search: `AdminShopQueries.ListAsync` `EXISTS (owner member JOIN users WHERE normalized_email LIKE 'TERM%')` (under a non-C collation a btree serves `LIKE` prefixes only with pattern operators) |
 
 **refresh_tokens** — only the SHA-256 hash of the token is stored. Rotation: each refresh revokes the old row and sets `replaced_by_id`; reuse of a revoked token revokes the whole chain (theft detection). **Token families** (step 1.5): each login or register (one device session) starts a family; `family_id uuid NOT NULL` is the id of the family's first token. Reuse revokes the whole family, including its active token; other families (other devices) of the same user are untouched.
 
@@ -283,9 +290,13 @@ Every index below exists because a named query needs it. The "Serves" column is 
 
 **shops** — `shop_type`: Pharmacy, Grocery, MobileShop, Other. `status`: Active, Suspended (set by platform admin).
 
+`normalized_name` (`text NOT NULL`, Sprint 5) is the `ArabicTextNormalizer` key of `name`, set by the Domain; migration `PlatformAdmin` backfilled existing rows with the same mapping in SQL. `suspended_at timestamptz NULL` and `suspended_reason text NULL` are set by AD6 and cleared by AD7.
+
 | Index / constraint | Serves |
 |---|---|
-| `(status, created_at DESC)` | admin shop list |
+| `(status, created_at DESC)` (`ix_shops_status_created_at`) | AD4 with a status filter: `AdminShopQueries.ListAsync` `WHERE status = @s [AND search] ORDER BY created_at DESC, id DESC OFFSET … LIMIT …` plus the count |
+| `(created_at DESC)` (`ix_shops_created_at`, Sprint 5) | AD4 without a status filter, same order |
+| `GIN (normalized_name gin_trgm_ops)` (`ix_shops_normalized_name_trgm`, Sprint 5) | AD4 search on the shop name: `normalized_name ILIKE '%term%'` (term Arabic-normalized, wildcards escaped) |
 
 **shop_members** — PK `(shop_id, user_id)`. `role`: Owner, Staff. A shop has exactly one Owner. Not a tenant table (no `shop_id` query filter): it maps users to tenants and is read at login before any tenant exists. Every query on it filters by a user id (ADR-0002, update 2026-10-12).
 
@@ -299,7 +310,8 @@ Every index below exists because a named query needs it. The "Serves" column is 
 | Index / constraint | Serves |
 |---|---|
 | `plans UNIQUE (code)` | seed / lookup |
-| `shop_subscriptions UNIQUE (shop_id) WHERE status = Active` | one active subscription per shop |
+| `shop_subscriptions UNIQUE (shop_id) WHERE status = Active` | one active subscription per shop; the scan's effective quota `ShopPlanQueries.GetDailyScanQuotaAsync` (`COALESCE(daily_scan_quota_override, plan.daily_scan_quota)`); the admin's reads of the active subscription (AD4 plan code, AD5, AD8, AD9: `AdminShopQueries.FindSubscriptionAsync`, `AdminShopRepository.FindActiveSubscriptionAsync`, without the tenant filter) |
+| `shop_subscriptions CHECK (daily_scan_quota_override IS NULL OR daily_scan_quota_override BETWEEN 0 AND 10000)` (`ck_shop_subscriptions_daily_scan_quota_override`, Sprint 5) | AD9 range |
 | `shop_subscriptions (ends_on) WHERE status = Active` | expiry job |
 
 Implementation notes for the identity and tenancy tables (migration `Identity`, step 1.5):
@@ -308,6 +320,8 @@ Implementation notes for the identity and tenancy tables (migration `Identity`, 
 - `refresh_tokens.token_hash` is the lower-case hex SHA-256 of the token. `refresh_tokens.user_id` → `users` is `ON DELETE CASCADE`; `replaced_by_id` is a plain column (no FK). The partial `(user_id)` and `(family_id)` indexes also back the FK and the family revoke.
 - `shop_members` FKs: `shop_id` → `shops` (covered by the PK), `user_id` → `users` (covered by the partial index); both restrict.
 - `shop_subscriptions.plan_id` → `plans` gets the EF-created `ix_shop_subscriptions_plan_id` (FK support; not used by a named query). `starts_on`/`ends_on` are `date` (Cairo business dates); `ends_on` NULL = open-ended.
+- `shop_subscriptions.daily_scan_quota_override int NULL` (Sprint 5, AD9): the platform admin's per-shop quota; `NULL` uses the plan's. AD8 copies it to the new subscription. AD8 inserts the new subscription with an explicit statement in `Infrastructure/Persistence/Admin` (an admin request has no tenant for the tenant stamp), after saving the ended one.
+- `shop_members` by shop id (ADR-0002 update 2026-10-18): only the platform admin's reads in `Infrastructure/Persistence/Admin` filter by `shop_id` (AD4 owner, AD5 members, AD6 token revocation through `ix_refresh_tokens_user_id_active`); the primary key `(shop_id, user_id)` serves them.
 - `plans` is seeded with the default plan (`Domain/Shops/DefaultPlan.cs`): `standard`, 30 scans/day, 3 members, 0.00 EGP, active (product-owner assumption, `docs/features/auth.md`).
 - `ix_stock_movements_created_by_user_id` is created by EF to support the now-real FK `stock_movements.created_by_user_id` → `users` (restrict). It is not used by a named query.
 
@@ -367,7 +381,7 @@ Quantity is allowed to go negative (a sale recorded before the invoice was scann
 | `(shop_id, status, created_at DESC)` (`ix_invoices_shop_id_status_created_at`) | I2 with a status filter, newest first, `InvoiceQueries.ListAsync` (`WHERE shop_id = @shop AND status = @status ORDER BY created_at DESC OFFSET … LIMIT …`, plus the count); "waiting for review" badge, D1 `invoicesAwaitingReview` (`WHERE shop_id = @shop AND status = 2`, count, Sprint 4). Replaces the planned partial `(shop_id, status) WHERE status IN (1, 2)` (backend.md §17.1 item 4) |
 | `(shop_id, image_sha256)` (`ix_invoices_shop_id_image_sha256`) | duplicate photo detection, DB side of the AI cache: `InvoiceRepository.FindReusableExtractionAsync` (`WHERE shop_id = @shop AND image_sha256 = @sha AND id <> @self AND status IN (2, 3) AND raw_ai_json IS NOT NULL ORDER BY created_at DESC LIMIT 1`) |
 | `(shop_id, supplier_id, invoice_number) WHERE invoice_number IS NOT NULL` (`ix_invoices_shop_id_supplier_id_invoice_number`) | duplicate invoice warning: `InvoiceRepository.ExistsOtherWithNumberAsync` (`WHERE shop_id = @shop AND invoice_number = @n AND supplier_id IS NOT DISTINCT FROM @supplier AND id <> @self AND status <> 4`) |
-| `(status, created_at DESC) WHERE status = Failed` (`ix_invoices_status_created_at_failed`) | admin "failed scans" screen |
+| `(status, created_at DESC) WHERE status = Failed` (`ix_invoices_status_created_at_failed`) | AD17 failed scans of every shop: `AdminInvoiceQueries.ListFailedAsync` `WHERE status = 4 ORDER BY created_at DESC, id DESC OFFSET … LIMIT …` plus the count (with `shopId`: `ix_invoices_shop_id_status_created_at`). AD4/AD5 `scansToday` (`WHERE shop_id = @shop AND created_at >= @cairoMidnight`) uses `ix_invoices_shop_id_created_at` |
 | primary key | the job's lookup (`FindProcessingInfoAsync`) and the row lock `SELECT 1 FROM invoices WHERE id = @id AND shop_id = @shop FOR UPDATE` (`InvoiceRepository.FindForUpdateAsync`, also the I4 lock and step 1 of the I5 confirm, Sprint 4); I3 `InvoiceQueries.FindDetailAsync` (one statement with the lines and their product/unit names) |
 | `CHECK (confirmed_at IS NULL OR status = Confirmed)` (`ck_invoices_confirmed_at`) | integrity |
 
@@ -450,21 +464,22 @@ Rules per reason (enforced in `Domain/Stock/StockMovement`; created only through
 
 | Index / constraint | Serves |
 |---|---|
-| `(shop_id, created_at DESC)` (`ix_ai_usage_records_shop_id_created_at`) | per-shop usage and cost in admin |
-| `(created_at DESC)` (`ix_ai_usage_records_created_at`) | platform-wide cost chart |
-| `(invoice_id)` (`ix_ai_usage_records_invoice_id`) | invoice detail in admin; the model of an earlier extraction (`FindReusableExtractionAsync` subquery `WHERE invoice_id = @earlier AND outcome = 1 ORDER BY created_at DESC LIMIT 1`) |
+| `(shop_id, created_at DESC)` (`ix_ai_usage_records_shop_id_created_at`) | per-shop usage and cost in admin: AD14 with `shopId` (`WHERE created_at >= @from AND created_at < @to AND shop_id = @shop GROUP BY (created_at AT TIME ZONE 'Africa/Cairo')::date`), AD5 `aiCostLast30DaysUsd` (`WHERE shop_id = @shop AND created_at >= now - 30 days`, sum) |
+| `(created_at DESC)` (`ix_ai_usage_records_created_at`) | platform-wide cost chart: AD14 without a shop (grouped by Cairo day), AD15 (`GROUP BY shop_id` joined to `shops`, `ORDER BY sum(cost_usd) DESC, shop_id LIMIT … OFFSET …` plus `count(DISTINCT shop_id)`), AD16 (`GROUP BY model ORDER BY sum(cost_usd) DESC, model`); all `WHERE created_at >= @from AND created_at < @to` (Cairo-day bounds in UTC) |
+| `(invoice_id)` (`ix_ai_usage_records_invoice_id`) | invoice detail in admin (AD18 usage rows, oldest first; AD17 `attempts` = count of rows that are not cache hits); the model of an earlier extraction (`FindReusableExtractionAsync` subquery `WHERE invoice_id = @earlier AND outcome = 1 ORDER BY created_at DESC LIMIT 1`) |
 | `CHECK (prompt_tokens >= 0 AND completion_tokens >= 0 AND cost_usd >= 0 AND latency_ms >= 0)` (`ck_ai_usage_records_non_negative`) | integrity (backend.md §17.1 item 15) |
 
 Columns: `cost_usd numeric(14,8)` (USD credits, not EGP money), `outcome smallint` (Succeeded 1, InvalidOutput 2, RateLimited 3, ServerError 4, ClientError 5, Timeout 6, NetworkError 7, Cancelled 8), `cache_hit boolean` (database reuse or Redis AI cache: 0 tokens, cost 0).
 
 Growth note: when this table passes ~10M rows, partition by month on `created_at` (not needed for v1).
 
-**admin_audit_logs** — every PlatformAdmin write (suspend shop, change plan, reset quota). No tenant filter by design (ADR-0005).
+**admin_audit_logs** — every PlatformAdmin write (AD6–AD10, AD12, AD13, AD19), in the same transaction as the write; idempotent repeats write none. No tenant filter by design (ADR-0005). Columns (migration `PlatformAdmin`, Sprint 5): `admin_user_id uuid` FK `users` (restrict, `fk_admin_audit_logs_users_admin_user_id`), `action varchar(64)` (e.g. `Shop.Suspend`), `target_type varchar(64)` (`Shop`, `Plan`, `Invoice`), `target_id uuid`, `reason text NULL`, `before jsonb NULL`, `after jsonb NULL` (camelCase objects of the changed fields), `created_at`. Replaces the draft's single `payload` column (contract §11.1).
 
 | Index / constraint | Serves |
 |---|---|
-| `(target_type, target_id, created_at DESC)` | "history of this shop" |
-| `(admin_user_id, created_at DESC)` | "what did this admin do" |
+| `(target_type, target_id, created_at DESC)` (`ix_admin_audit_logs_target_type_target_id_created_at`) | "history of this shop": AD20 `WHERE target_type = @t [AND target_id = @id] ORDER BY created_at DESC, id DESC` plus the count (a `targetType`-only filter uses its prefix) |
+| `(admin_user_id, created_at DESC)` (`ix_admin_audit_logs_admin_user_id_created_at`) | "what did this admin do": AD20 `WHERE admin_user_id = @a ORDER BY created_at DESC`; FK support |
+| `(created_at DESC)` (`ix_admin_audit_logs_created_at`) | AD20 without filters, newest first |
 
 ### 3.7 Migration status (what exists in the database today)
 
@@ -474,6 +489,7 @@ Growth note: when this table passes ~10M rows, partition by month on `created_at
 | `Identity` (step 1.5) | `users`, `user_claims`, `user_logins`, `user_tokens`, `refresh_tokens`, `shop_members`, `plans`, `shop_subscriptions` | every index and constraint listed in §3.1 (including `refresh_tokens.family_id` and its index); default plan seeded; FK `stock_movements.created_by_user_id` → `users` added |
 | `ProductsCatalog` (step 1.6) | — | `products.barcode text NULL`, `products.category text NULL`, `UNIQUE (shop_id, barcode) WHERE barcode IS NOT NULL AND NOT is_archived` (`ux_products_shop_id_barcode`) |
 | `Sales` (Sprint 4) | `sales`, `sale_items` | every index and check listed in §3.4; FKs `stock_movements.sale_id` → `sales`, `stock_movements.sale_item_id` → `sale_items` (restrict). Confirm, P12 and the dashboard add no index (their queries are listed next to existing indexes above) |
+| `PlatformAdmin` (Sprint 5, step 5a) | `admin_audit_logs` | `shops.normalized_name` (backfilled), `shops.suspended_at`, `shops.suspended_reason`, `shop_subscriptions.daily_scan_quota_override` with its CHECK; indexes `ix_shops_created_at`, `ix_shops_normalized_name_trgm`, `ix_users_normalized_email_pattern` and the three `admin_audit_logs` indexes (§3.1, §3.6). Docs: `docs/features/admin.md` |
 | `InvoiceScan` (Sprint 2, step 2a) | `suppliers`, `product_aliases`, `invoices`, `invoice_items`, `ai_usage_records`; schema `hangfire` | every index and check listed above for these tables; FKs `stock_movements.invoice_id` → `invoices`, `stock_movements.invoice_item_id` → `invoice_items` (restrict); Hangfire tables are created in schema `hangfire` by `Hangfire.PostgreSql` at startup (backend.md §17.1 item 8, documented exception to rule 31). Design: `docs/design/backend.md` §12 |
 
 Step 2b (matching, I2–I4) adds no migration: every filter and sort it uses is served by an index of `InitialCatalog` or `InvoiceScan` (the queries are listed next to those indexes above).
