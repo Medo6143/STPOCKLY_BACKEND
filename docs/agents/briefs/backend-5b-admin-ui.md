@@ -2,7 +2,7 @@ Read AGENTS.md fully before starting.
 
 # Brief: backend-5b-admin-ui
 
-Repository: `stockly-backend` (`D:\FLUTTER\stockly`), branch `feature/sprint-5-admin-ui` (already checked out, based on `main` with step 5a merged) · Lane: BACKEND (Admin) · Contract version: **v1.5** (`docs/api/contract.md`)
+Repository: `stockly-backend` (`D:\FLUTTER\stockly`), branch `feature/admin-ui` (already checked out, based on `main` with step 5a merged) · Lane: BACKEND (Admin) · Contract version: **v1.5** (`docs/api/contract.md`)
 
 You have not seen the conversation that produced this brief. Everything you need is here or in the files it links. If something you need is missing or contradicts AGENTS.md, ADR-0005 or the contract, **stop and report** instead of guessing.
 

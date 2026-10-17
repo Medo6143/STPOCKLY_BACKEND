@@ -2,7 +2,7 @@ Read AGENTS.md fully before starting.
 
 # Brief: backend-4-confirm-sales-dashboard
 
-Repository: `stockly-backend` (`D:\FLUTTER\stockly`), branch `feature/sprint-4` (already checked out, based on `main` with Sprint 2 merged) · Lane: BACKEND · Contract version: **v1.4** (`docs/api/contract.md`)
+Repository: `stockly-backend` (`D:\FLUTTER\stockly`), branch `feature/confirm-sales-dashboard` (already checked out, based on `main` with Sprint 2 merged) · Lane: BACKEND · Contract version: **v1.4** (`docs/api/contract.md`)
 
 You have not seen the conversation that produced this brief. Everything you need is here or in the files it links. If something you need is missing or contradicts AGENTS.md, the design or the contract, **stop and report** instead of guessing.
 
@@ -51,7 +51,7 @@ dotnet test
 Zero warnings, zero failures. Never skip, delete or weaken a test.
 
 ## 7. Do not commit, push or merge.
-Leave your changes in the working tree on `feature/sprint-4`. The orchestrator verifies and commits.
+Leave your changes in the working tree on `feature/confirm-sales-dashboard`. The orchestrator verifies and commits.
 
 ## 8. Final report (exact format)
 ```

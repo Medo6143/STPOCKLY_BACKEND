@@ -2,7 +2,7 @@ Read AGENTS.md fully before starting.
 
 # Brief: backend-6-matching-ci-hardening
 
-Repository: `stockly-backend` (`D:\FLUTTER\stockly`), branch `feature/sprint-6` (already checked out, based on `main` with Sprints 2–5 merged) · Lane: BACKEND · Contract version: **v1.5** (`docs/api/contract.md`)
+Repository: `stockly-backend` (`D:\FLUTTER\stockly`), branch `feature/matching-ci-hardening` (already checked out, based on `main` with Sprints 2–5 merged) · Lane: BACKEND · Contract version: **v1.5** (`docs/api/contract.md`)
 
 You have not seen the conversation that produced this brief. Everything you need is here or in the files it links. If something you need is missing or contradicts AGENTS.md, the design or the contract, **stop and report** instead of guessing.
 
