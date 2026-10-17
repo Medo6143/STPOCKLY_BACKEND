@@ -369,6 +369,66 @@ namespace Stockly.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Stockly.Domain.Platform.AdminAuditLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("action");
+
+                    b.Property<Guid>("AdminUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("admin_user_id");
+
+                    b.Property<string>("After")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("after");
+
+                    b.Property<string>("Before")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("before");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Reason")
+                        .HasColumnType("text")
+                        .HasColumnName("reason");
+
+                    b.Property<Guid>("TargetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_id");
+
+                    b.Property<string>("TargetType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("target_type");
+
+                    b.HasKey("Id")
+                        .HasName("pk_admin_audit_logs");
+
+                    b.HasIndex("CreatedAt")
+                        .IsDescending()
+                        .HasDatabaseName("ix_admin_audit_logs_created_at");
+
+                    b.HasIndex("AdminUserId", "CreatedAt")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("ix_admin_audit_logs_admin_user_id_created_at");
+
+                    b.HasIndex("TargetType", "TargetId", "CreatedAt")
+                        .IsDescending(false, false, true)
+                        .HasDatabaseName("ix_admin_audit_logs_target_type_target_id_created_at");
+
+                    b.ToTable("admin_audit_logs", (string)null);
+                });
+
             modelBuilder.Entity("Stockly.Domain.Platform.AiUsageRecord", b =>
                 {
                     b.Property<Guid>("Id")
@@ -793,6 +853,11 @@ namespace Stockly.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("name");
 
+                    b.Property<string>("NormalizedName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("normalized_name");
+
                     b.Property<string>("Phone")
                         .HasColumnType("text")
                         .HasColumnName("phone");
@@ -805,8 +870,26 @@ namespace Stockly.Infrastructure.Persistence.Migrations
                         .HasColumnType("smallint")
                         .HasColumnName("status");
 
+                    b.Property<DateTimeOffset?>("SuspendedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("suspended_at");
+
+                    b.Property<string>("SuspendedReason")
+                        .HasColumnType("text")
+                        .HasColumnName("suspended_reason");
+
                     b.HasKey("Id")
                         .HasName("pk_shops");
+
+                    b.HasIndex("CreatedAt")
+                        .IsDescending()
+                        .HasDatabaseName("ix_shops_created_at");
+
+                    b.HasIndex("NormalizedName")
+                        .HasDatabaseName("ix_shops_normalized_name_trgm");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("NormalizedName"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("NormalizedName"), new[] { "gin_trgm_ops" });
 
                     b.HasIndex("Status", "CreatedAt")
                         .IsDescending(false, true)
@@ -862,6 +945,10 @@ namespace Stockly.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<int?>("DailyScanQuotaOverride")
+                        .HasColumnType("integer")
+                        .HasColumnName("daily_scan_quota_override");
+
                     b.Property<DateOnly?>("EndsOn")
                         .HasColumnType("date")
                         .HasColumnName("ends_on");
@@ -897,7 +984,10 @@ namespace Stockly.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ux_shop_subscriptions_shop_id_active")
                         .HasFilter("status = 1");
 
-                    b.ToTable("shop_subscriptions", (string)null);
+                    b.ToTable("shop_subscriptions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_shop_subscriptions_daily_scan_quota_override", "daily_scan_quota_override IS NULL OR daily_scan_quota_override BETWEEN 0 AND 10000");
+                        });
                 });
 
             modelBuilder.Entity("Stockly.Domain.Stock.StockMovement", b =>
@@ -1277,6 +1367,11 @@ namespace Stockly.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ux_users_normalized_user_name");
 
+                    b.HasIndex(new[] { "NormalizedEmail" }, "ix_users_normalized_email_pattern")
+                        .HasDatabaseName("ix_users_normalized_email_pattern");
+
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex(new[] { "NormalizedEmail" }, "ix_users_normalized_email_pattern"), new[] { "text_pattern_ops" });
+
                     b.ToTable("users", (string)null);
                 });
 
@@ -1372,6 +1467,16 @@ namespace Stockly.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_invoice_items_shops_shop_id");
+                });
+
+            modelBuilder.Entity("Stockly.Domain.Platform.AdminAuditLog", b =>
+                {
+                    b.HasOne("Stockly.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("AdminUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_admin_audit_logs_users_admin_user_id");
                 });
 
             modelBuilder.Entity("Stockly.Domain.Platform.AiUsageRecord", b =>
