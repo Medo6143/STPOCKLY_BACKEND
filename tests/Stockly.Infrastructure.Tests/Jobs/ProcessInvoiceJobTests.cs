@@ -49,6 +49,30 @@ public sealed class ProcessInvoiceJobTests(PostgresFixture fixture) : IAsyncDisp
     }
 
     [Fact]
+    public async Task RunAsync_LineNamesAnExistingProduct_SavedMatchedWithoutChangingStock()
+    {
+        var shop = await fixture.CreateShopAsync();
+        var product = Catalog.NewProduct(shop.Id, "بنادول اكسترا");
+        await using (var seed = fixture.CreateContext(shop.Id))
+        {
+            seed.Products.Add(product);
+            await seed.SaveChangesAsync();
+        }
+
+        var invoice = await SeedProcessingInvoiceAsync(shop.Id);
+        _extractor.Result = Success(Line("بنادول إكسترا", "2", "15.00"), Line("غير معروف", "1", "1.00"));
+
+        await RunJobAsync(shop.Id, invoice.Id);
+
+        await using var context = fixture.CreateContext(shop.Id);
+        var items = await context.Set<InvoiceItem>().AsNoTracking()
+            .Where(item => item.InvoiceId == invoice.Id).OrderBy(item => item.LineNo).ToListAsync();
+        items.Select(item => (item.ProductId, item.ProductUnitId, item.MatchConfidence))
+            .Should().Equal((product.Id, product.BaseUnit.Id, 0.90m), (null, null, null));
+        (await context.Products.AsNoTracking().SingleAsync(p => p.Id == product.Id)).Quantity.Should().Be(0m, "rule 19");
+    }
+
+    [Fact]
     public async Task RunAsync_Twice_SecondRunWritesNothing()
     {
         var shop = await fixture.CreateShopAsync();

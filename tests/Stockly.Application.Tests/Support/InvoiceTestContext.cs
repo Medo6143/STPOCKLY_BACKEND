@@ -9,6 +9,7 @@ using Stockly.Application.Abstractions.Persistence;
 using Stockly.Application.Abstractions.Storage;
 using Stockly.Application.Abstractions.Time;
 using Stockly.Application.Features.Invoices;
+using Stockly.Application.Features.Invoices.Matching;
 using Stockly.Application.Features.Invoices.ProcessInvoice;
 using Stockly.Application.Features.Invoices.Validation;
 using Stockly.Domain.Common;
@@ -44,6 +45,12 @@ internal sealed class InvoiceTestContext
             .Returns(call => Stored.Find(invoice => invoice.Id == call.Arg<Guid>()) is { } invoice
                 ? new InvoiceProcessingInfo(invoice.Status, invoice.ImageObjectKey, invoice.ImageSha256)
                 : null);
+        Products.FindByNormalizedNamesAsync(Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
+            .Returns(new List<NamedProduct>());
+        Products.FindUnitsInfoAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(new List<ProductUnitsInfo>());
+        Aliases.FindExactAsync(Arg.Any<Guid?>(), Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
+            .Returns(new List<AliasMatch>());
         UsageRecords.When(repository => repository.Add(Arg.Any<AiUsageRecord>()))
             .Do(call => AddedUsage.Add(call.Arg<AiUsageRecord>()));
     }
@@ -78,6 +85,10 @@ internal sealed class InvoiceTestContext
 
     public IAiUsageRecordRepository UsageRecords { get; } = Substitute.For<IAiUsageRecordRepository>();
 
+    public IProductRepository Products { get; } = Substitute.For<IProductRepository>();
+
+    public IProductAliasRepository Aliases { get; } = Substitute.For<IProductAliasRepository>();
+
     public InlineUnitOfWork UnitOfWork { get; } = new();
 
     public ScanOptions ScanOptions { get; } = new();
@@ -92,6 +103,9 @@ internal sealed class InvoiceTestContext
 
     public InvoiceValidator InvoiceValidator() => new(
         [new ItemCapExceededRule(), new UnreadableLinesRule(), new TotalMismatchRule(), new DuplicateInvoiceNumberRule(Invoices)]);
+
+    /// <summary>The production matcher with both v1 strategies over the substituted repositories.</summary>
+    public ProductMatcher Matcher() => new([new ExactNameMatchStrategy(Products), new ExactAliasMatchStrategy(Aliases)]);
 
     /// <summary>A processing invoice of the shop that the repository finds.</summary>
     public Invoice ProcessingInvoice(string? sha256 = null)
