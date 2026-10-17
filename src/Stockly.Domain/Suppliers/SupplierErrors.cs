@@ -12,4 +12,7 @@ public static class SupplierErrors
 
     public static readonly Error AliasTextRequired =
         Error.Validation("ProductAlias.TextRequired", "An alias needs the text written on the invoice.");
+
+    public static readonly Error TimesConfirmedNotPositive =
+        Error.Validation("ProductAlias.TimesConfirmedNotPositive", "An alias is confirmed at least once.");
 }
