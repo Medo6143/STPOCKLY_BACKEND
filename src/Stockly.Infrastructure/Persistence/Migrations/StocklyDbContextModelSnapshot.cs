@@ -588,6 +588,127 @@ namespace Stockly.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Stockly.Domain.Sales.Sale", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ClientRequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("client_request_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text")
+                        .HasColumnName("note");
+
+                    b.Property<Guid>("ShopId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("shop_id");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("total_amount");
+
+                    b.HasKey("Id")
+                        .HasName("pk_sales");
+
+                    b.HasIndex("CreatedByUserId")
+                        .HasDatabaseName("ix_sales_created_by_user_id");
+
+                    b.HasIndex("ShopId", "ClientRequestId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_sales_shop_id_client_request_id");
+
+                    b.HasIndex("ShopId", "CreatedAt")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("ix_sales_shop_id_created_at");
+
+                    b.ToTable("sales", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_sales_total_amount", "total_amount >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("Stockly.Domain.Sales.SaleItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("LineNo")
+                        .HasColumnType("integer")
+                        .HasColumnName("line_no");
+
+                    b.Property<decimal>("LineTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("line_total");
+
+                    b.Property<decimal>("ListUnitPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("list_unit_price");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_id");
+
+                    b.Property<Guid>("ProductUnitId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_unit_id");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(14, 3)
+                        .HasColumnType("numeric(14,3)")
+                        .HasColumnName("quantity");
+
+                    b.Property<Guid>("SaleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sale_id");
+
+                    b.Property<Guid>("ShopId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("shop_id");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("unit_price");
+
+                    b.HasKey("Id")
+                        .HasName("pk_sale_items");
+
+                    b.HasIndex("ProductId")
+                        .HasDatabaseName("ix_sale_items_product_id");
+
+                    b.HasIndex("ProductUnitId")
+                        .HasDatabaseName("ix_sale_items_product_unit_id");
+
+                    b.HasIndex("SaleId", "LineNo")
+                        .IsUnique()
+                        .HasDatabaseName("ux_sale_items_sale_id_line_no");
+
+                    b.HasIndex("ShopId", "ProductId")
+                        .HasDatabaseName("ix_sale_items_shop_id_product_id");
+
+                    b.ToTable("sale_items", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_sale_items_amounts", "quantity > 0 AND list_unit_price >= 0 AND unit_price >= 0 AND line_total >= 0");
+
+                            t.HasCheckConstraint("ck_sale_items_line_no", "line_no BETWEEN 1 AND 100");
+                        });
+                });
+
             modelBuilder.Entity("Stockly.Domain.Shops.Plan", b =>
                 {
                     b.Property<Guid>("Id")
@@ -846,6 +967,9 @@ namespace Stockly.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ProductId")
                         .HasDatabaseName("ix_stock_movements_product_id");
+
+                    b.HasIndex("SaleId")
+                        .HasDatabaseName("ix_stock_movements_sale_id");
 
                     b.HasIndex("SaleItemId")
                         .IsUnique()
@@ -1293,6 +1417,54 @@ namespace Stockly.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_product_units_shops_shop_id");
                 });
 
+            modelBuilder.Entity("Stockly.Domain.Sales.Sale", b =>
+                {
+                    b.HasOne("Stockly.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_sales_users_created_by_user_id");
+
+                    b.HasOne("Stockly.Domain.Shops.Shop", null)
+                        .WithMany()
+                        .HasForeignKey("ShopId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_sales_shops_shop_id");
+                });
+
+            modelBuilder.Entity("Stockly.Domain.Sales.SaleItem", b =>
+                {
+                    b.HasOne("Stockly.Domain.Products.Product", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_sale_items_products_product_id");
+
+                    b.HasOne("Stockly.Domain.Products.ProductUnit", null)
+                        .WithMany()
+                        .HasForeignKey("ProductUnitId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_sale_items_product_units_product_unit_id");
+
+                    b.HasOne("Stockly.Domain.Sales.Sale", null)
+                        .WithMany("Items")
+                        .HasForeignKey("SaleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_sale_items_sales_sale_id");
+
+                    b.HasOne("Stockly.Domain.Shops.Shop", null)
+                        .WithMany()
+                        .HasForeignKey("ShopId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_sale_items_shops_shop_id");
+                });
+
             modelBuilder.Entity("Stockly.Domain.Shops.ShopMember", b =>
                 {
                     b.HasOne("Stockly.Domain.Shops.Shop", null)
@@ -1354,6 +1526,18 @@ namespace Stockly.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_stock_movements_products_product_id");
+
+                    b.HasOne("Stockly.Domain.Sales.Sale", null)
+                        .WithMany()
+                        .HasForeignKey("SaleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_stock_movements_sales_sale_id");
+
+                    b.HasOne("Stockly.Domain.Sales.SaleItem", null)
+                        .WithMany()
+                        .HasForeignKey("SaleItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_stock_movements_sale_items_sale_item_id");
 
                     b.HasOne("Stockly.Domain.Shops.Shop", null)
                         .WithMany()
@@ -1421,6 +1605,11 @@ namespace Stockly.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Stockly.Domain.Products.Product", b =>
                 {
                     b.Navigation("Units");
+                });
+
+            modelBuilder.Entity("Stockly.Domain.Sales.Sale", b =>
+                {
+                    b.Navigation("Items");
                 });
 #pragma warning restore 612, 618
         }
