@@ -110,7 +110,7 @@ Every error response is `application/problem+json`:
 | P10 | POST | /api/products/{id}/stock-counts | owner | 200, 400, 401, 403, 404 | 1.6 | implemented |
 | P11 | GET | /api/products/{id}/movements | user | 200, 400, 401, 403, 404 | 1.6 | implemented |
 | P12 | GET | /api/products/lookup | user | 200, 400, 401, 403, 404 | 4 | planned |
-| I1 | POST | /api/invoices/scan | user | 200, 202, 400, 401, 403, 413, 429 | 2 | planned |
+| I1 | POST | /api/invoices/scan | user | 200, 202, 400, 401, 403, 413, 429 | 2 | implemented |
 | I2 | GET | /api/invoices | user | 200, 400, 401, 403 | 2 | planned |
 | I3 | GET | /api/invoices/{id} | user | 200, 401, 403, 404 | 2 | planned |
 | I4 | PUT | /api/invoices/{id}/items | user | 200, 400, 401, 403, 404, 409 | 2 | planned |

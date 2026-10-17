@@ -65,7 +65,7 @@ public sealed class TenantIsolationTests(PostgresFixture fixture)
         var shop = await fixture.CreateShopAsync();
         var product = Catalog.NewProduct(shop.Id);
         product.AddUnit("علبة", 3m, 40m, null).IsSuccess.Should().BeTrue();
-        var movement = Catalog.Receive(product, 30m);
+        var movement = Catalog.Receive(product, 30m, await fixture.CreateInvoiceLineAsync(shop.Id));
 
         await using var context = fixture.CreateContext(shop.Id);
         context.Products.Add(product);

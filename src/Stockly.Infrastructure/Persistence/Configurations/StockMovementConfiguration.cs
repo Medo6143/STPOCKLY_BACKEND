@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Stockly.Domain.Invoices;
 using Stockly.Domain.Products;
 using Stockly.Domain.Shops;
 using Stockly.Domain.Stock;
@@ -34,11 +35,14 @@ internal sealed class StockMovementConfiguration : IEntityTypeConfiguration<Stoc
         builder.Property(m => m.BalanceAfter).HasPrecision(14, 3);
         builder.Property(m => m.Reason).HasConversion<short>();
 
-        // invoice_id, invoice_item_id, sale_id and sale_item_id are plain columns until their target tables exist;
-        // see "Deferred foreign keys" in docs/erd.md. created_by_user_id became a real FK in migration Identity (1.5).
+        // sale_id and sale_item_id are plain columns until their target tables exist; see "Deferred foreign keys" in
+        // docs/erd.md. created_by_user_id became a real FK in migration Identity (1.5), invoice_id and invoice_item_id
+        // in migration InvoiceScan (Sprint 2).
         builder.HasOne<Shop>().WithMany().HasForeignKey(m => m.ShopId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Product>().WithMany().HasForeignKey(m => m.ProductId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<ApplicationUser>().WithMany().HasForeignKey(m => m.CreatedByUserId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Invoice>().WithMany().HasForeignKey(m => m.InvoiceId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<InvoiceItem>().WithMany().HasForeignKey(m => m.InvoiceItemId).OnDelete(DeleteBehavior.Restrict);
 
         // Idempotent confirm; one terminal reversal per line (erd.md §3.5, ADR-0001).
         builder.HasIndex(m => new { m.InvoiceItemId, m.Reason })

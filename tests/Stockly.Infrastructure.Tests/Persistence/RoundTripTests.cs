@@ -15,8 +15,9 @@ public sealed class RoundTripTests(PostgresFixture fixture)
         var product = Product.Create(shop.Id, " Panadol بَنادول ", "شريط", 0.01m, 9_999_999_999_999_999.99m, 0.001m, TestTime.T0).Value;
         var box = product.AddUnit("علبة", 1.123456m, 40.05m, "6221234567890").Value;
         var drum = product.AddUnit("برميل", 99_999_999.999999m, 0m, null).Value;
+        var (invoiceId, itemId) = await fixture.CreateInvoiceLineAsync(shop.Id);
         var receipt = product.RecordMovement(
-            99_999_999_999.999m, MovementReason.InvoiceReceipt, MovementSource.FromInvoiceItem(Guid.NewGuid(), Guid.NewGuid()), Catalog.UserId, null, TestTime.T1).Value;
+            99_999_999_999.999m, MovementReason.InvoiceReceipt, MovementSource.FromInvoiceItem(invoiceId, itemId), Catalog.UserId, null, TestTime.T1).Value;
         var sale = product.RecordMovement(
             -0.001m, MovementReason.Sale, MovementSource.FromSaleItem(Guid.NewGuid(), Guid.NewGuid()), Catalog.UserId, null, TestTime.T2).Value;
 

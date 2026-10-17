@@ -10,6 +10,15 @@
     <!-- Read cache (IDistributedCache) and the catalog version counter (INCR), docs/design/redis.md. -->
     <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" />
     <PackageReference Include="StackExchange.Redis" />
+    <!-- ProcessInvoiceJob runs on Hangfire with PostgreSQL storage (docs/design/backend.md §4). -->
+    <PackageReference Include="Hangfire.AspNetCore" />
+    <PackageReference Include="Hangfire.PostgreSql" />
+    <!-- Security pin only: lifts Hangfire's transitive Newtonsoft.Json above the vulnerable 11.0.1. -->
+    <PackageReference Include="Newtonsoft.Json" />
+    <!-- Invoice images in MinIO through the S3 API (ADR-0008). -->
+    <PackageReference Include="AWSSDK.S3" />
+    <!-- OpenRouter retry and timeout pipeline (docs/design/backend.md §6). -->
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
   </ItemGroup>
 
   <ItemGroup>

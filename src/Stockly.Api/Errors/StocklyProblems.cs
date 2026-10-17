@@ -25,6 +25,7 @@ public static class StocklyProblems
         [StatusCodes.Status404NotFound] = "https://tools.ietf.org/html/rfc9110#section-15.5.5",
         [StatusCodes.Status405MethodNotAllowed] = "https://tools.ietf.org/html/rfc9110#section-15.5.6",
         [StatusCodes.Status409Conflict] = "https://tools.ietf.org/html/rfc9110#section-15.5.10",
+        [StatusCodes.Status413PayloadTooLarge] = "https://tools.ietf.org/html/rfc9110#section-15.5.14",
         [StatusCodes.Status415UnsupportedMediaType] = "https://tools.ietf.org/html/rfc9110#section-15.5.16",
         [StatusCodes.Status423Locked] = "https://tools.ietf.org/html/rfc4918#section-11.3",
         [StatusCodes.Status429TooManyRequests] = "https://tools.ietf.org/html/rfc6585#section-4",
@@ -60,7 +61,7 @@ public static class StocklyProblems
 
     /// <summary>
     /// Contract §1.8: Validation 400, Unauthorized 401, Forbidden 403, NotFound 404, Conflict 409, Failure 500;
-    /// v1.4: Locked 423, TooManyRequests 429.
+    /// v1.4: Locked 423, TooManyRequests 429; PayloadTooLarge 413 (I1, backend.md §13).
     /// </summary>
     public static int StatusFor(ErrorType type) => type switch
     {
@@ -71,6 +72,7 @@ public static class StocklyProblems
         ErrorType.Conflict => StatusCodes.Status409Conflict,
         ErrorType.Locked => StatusCodes.Status423Locked,
         ErrorType.TooManyRequests => StatusCodes.Status429TooManyRequests,
+        ErrorType.PayloadTooLarge => StatusCodes.Status413PayloadTooLarge,
         _ => StatusCodes.Status500InternalServerError,
     };
 

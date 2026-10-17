@@ -220,4 +220,40 @@
   <data name="Stock.NoteRequired.Detail" xml:space="preserve">
     <value>يجب كتابة ملاحظة توضح سبب التعديل.</value>
   </data>
+  <data name="Invoice.NotFound.Title" xml:space="preserve">
+    <value>غير موجود</value>
+  </data>
+  <data name="Invoice.NotFound.Detail" xml:space="preserve">
+    <value>لم يتم العثور على الفاتورة.</value>
+  </data>
+  <data name="Invoice.ImageRequired.Title" xml:space="preserve">
+    <value>الصورة مطلوبة</value>
+  </data>
+  <data name="Invoice.ImageRequired.Detail" xml:space="preserve">
+    <value>أرفق صورة الفاتورة.</value>
+  </data>
+  <data name="Invoice.UnsupportedImageType.Title" xml:space="preserve">
+    <value>صورة غير مدعومة</value>
+  </data>
+  <data name="Invoice.UnsupportedImageType.Detail" xml:space="preserve">
+    <value>يجب أن تكون الصورة بصيغة JPEG أو PNG أو WebP.</value>
+  </data>
+  <data name="Invoice.ImageTooLarge.Title" xml:space="preserve">
+    <value>الصورة كبيرة جدًا</value>
+  </data>
+  <data name="Invoice.ImageTooLarge.Detail" xml:space="preserve">
+    <value>حجم الصورة أكبر من 8 ميجابايت. التقط الصورة مرة أخرى بدقة أقل.</value>
+  </data>
+  <data name="Scan.RateLimited.Title" xml:space="preserve">
+    <value>عمليات مسح كثيرة</value>
+  </data>
+  <data name="Scan.RateLimited.Detail" xml:space="preserve">
+    <value>تم مسح فواتير كثيرة في هذه الدقيقة. انتظر قليلًا ثم حاول مرة أخرى.</value>
+  </data>
+  <data name="Scan.DailyQuotaExceeded.Title" xml:space="preserve">
+    <value>تم الوصول إلى حد المسح اليومي</value>
+  </data>
+  <data name="Scan.DailyQuotaExceeded.Detail" xml:space="preserve">
+    <value>انتهت عمليات مسح الفواتير المتاحة في باقتك اليوم. يتجدد الحد عند منتصف الليل بتوقيت القاهرة.</value>
+  </data>
 </root>

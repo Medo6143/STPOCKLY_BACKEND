@@ -223,4 +223,40 @@
   <data name="Stock.NoteRequired.Detail" xml:space="preserve">
     <value>A note explaining the adjustment is required.</value>
   </data>
+  <data name="Invoice.NotFound.Title" xml:space="preserve">
+    <value>Not found</value>
+  </data>
+  <data name="Invoice.NotFound.Detail" xml:space="preserve">
+    <value>The invoice was not found.</value>
+  </data>
+  <data name="Invoice.ImageRequired.Title" xml:space="preserve">
+    <value>Image required</value>
+  </data>
+  <data name="Invoice.ImageRequired.Detail" xml:space="preserve">
+    <value>Attach a photo of the invoice.</value>
+  </data>
+  <data name="Invoice.UnsupportedImageType.Title" xml:space="preserve">
+    <value>Unsupported image</value>
+  </data>
+  <data name="Invoice.UnsupportedImageType.Detail" xml:space="preserve">
+    <value>The image must be a JPEG, PNG or WebP photo.</value>
+  </data>
+  <data name="Invoice.ImageTooLarge.Title" xml:space="preserve">
+    <value>Image too large</value>
+  </data>
+  <data name="Invoice.ImageTooLarge.Detail" xml:space="preserve">
+    <value>The image is larger than 8 MB. Take the photo again at a lower resolution.</value>
+  </data>
+  <data name="Scan.RateLimited.Title" xml:space="preserve">
+    <value>Too many scans</value>
+  </data>
+  <data name="Scan.RateLimited.Detail" xml:space="preserve">
+    <value>Too many invoices were scanned this minute. Wait a moment and try again.</value>
+  </data>
+  <data name="Scan.DailyQuotaExceeded.Title" xml:space="preserve">
+    <value>Daily scan limit reached</value>
+  </data>
+  <data name="Scan.DailyQuotaExceeded.Detail" xml:space="preserve">
+    <value>Your plan's invoice scans for today are used up. They reset at midnight Cairo time.</value>
+  </data>
 </root>

@@ -1,8 +1,8 @@
 <Project>
 
   <!--
-    Central package versions (AGENTS.md §7). Sprint 1 packages only;
-    Sprint 2 adds Hangfire, AWSSDK.S3, Http.Resilience and Testcontainers.Minio.
+    Central package versions (AGENTS.md §7). Sprint 2 added Hangfire, AWSSDK.S3, Http.Resilience and
+    Testcontainers.Minio (docs/design/backend.md §12.4).
     Upgrades are deliberate: bump the version here, never in a .csproj.
   -->
   <PropertyGroup>
@@ -28,6 +28,15 @@
     <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.12" />
     <PackageVersion Include="StackExchange.Redis" Version="2.13.17" />
     <PackageVersion Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.12" />
+    <!-- Background jobs (ProcessInvoiceJob), PostgreSQL storage in schema "hangfire". -->
+    <PackageVersion Include="Hangfire.AspNetCore" Version="1.8.25" />
+    <PackageVersion Include="Hangfire.PostgreSql" Version="1.21.1" />
+    <!-- SECURITY PIN: Hangfire.Core asks for Newtonsoft.Json >= 11.0.1, which has GHSA-5crp-9r3c-p9vr. -->
+    <PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
+    <!-- Invoice images in MinIO (S3 API), ADR-0008. -->
+    <PackageVersion Include="AWSSDK.S3" Version="4.0.104.4" />
+    <!-- OpenRouter retry and timeout (AGENTS.md rule 17). -->
+    <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.11.0" />
   </ItemGroup>
 
   <!-- Api -->
@@ -52,6 +61,7 @@
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.12" />
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.16.0" />
     <PackageVersion Include="Testcontainers.Redis" Version="4.16.0" />
+    <PackageVersion Include="Testcontainers.Minio" Version="4.15.0" />
   </ItemGroup>
 
 </Project>

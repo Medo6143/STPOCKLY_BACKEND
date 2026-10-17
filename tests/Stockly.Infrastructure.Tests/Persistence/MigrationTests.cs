@@ -36,6 +36,25 @@ public sealed class MigrationTests(PostgresFixture fixture)
 
         // ProductsCatalog (erd.md §3.2, step 1.6)
         "ux_products_shop_id_barcode",
+
+        // InvoiceScan (erd.md §3.2, §3.3, §3.6, Sprint 2)
+        "ux_suppliers_shop_id_normalized_name",
+        "ix_suppliers_normalized_name_trgm",
+        "ux_product_aliases_shop_id_supplier_id_normalized_alias",
+        "ix_product_aliases_normalized_alias_trgm",
+        "ux_invoices_shop_id_client_request_id",
+        "ix_invoices_shop_id_created_at",
+        "ix_invoices_shop_id_status_created_at",
+        "ix_invoices_shop_id_image_sha256",
+        "ix_invoices_shop_id_supplier_id_invoice_number",
+        "ix_invoices_status_created_at_failed",
+        "ux_invoice_items_invoice_id_line_no",
+        "ix_invoice_items_shop_id_product_id",
+        "ix_invoice_items_shop_id_expiry_date",
+        "ix_invoice_items_created_product_id",
+        "ix_ai_usage_records_shop_id_created_at",
+        "ix_ai_usage_records_created_at",
+        "ix_ai_usage_records_invoice_id",
     ];
 
     private static readonly string[] ExpectedChecks =
@@ -44,6 +63,18 @@ public sealed class MigrationTests(PostgresFixture fixture)
         "ck_product_units_factor",
         "ck_stock_movements_quantity_change",
         "ck_stock_movements_single_source",
+        "ck_product_aliases_times_confirmed",
+        "ck_invoices_confirmed_at",
+        "ck_invoice_items_product_or_new",
+        "ck_invoice_items_new_product_complete",
+        "ck_invoice_items_new_product_sell_price",
+        "ck_invoice_items_unit_requires_product",
+        "ck_invoice_items_confirmed_resolved",
+        "ck_invoice_items_created_product",
+        "ck_invoice_items_amounts",
+        "ck_invoice_items_line_no",
+        "ck_invoice_items_match_confidence",
+        "ck_ai_usage_records_non_negative",
     ];
 
     [Fact]
@@ -75,7 +106,7 @@ public sealed class MigrationTests(PostgresFixture fixture)
     }
 
     [Fact]
-    public async Task Migrate_EmptyDatabase_CreatesSprint1Tables()
+    public async Task Migrate_EmptyDatabase_CreatesEveryErdTable()
     {
         var tables = await fixture.ColumnAsync(
             "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name <> '__ef_migrations_history'");
@@ -92,7 +123,12 @@ public sealed class MigrationTests(PostgresFixture fixture)
             "refresh_tokens",
             "shop_members",
             "plans",
-            "shop_subscriptions");
+            "shop_subscriptions",
+            "suppliers",
+            "product_aliases",
+            "invoices",
+            "invoice_items",
+            "ai_usage_records");
     }
 
     [Fact]
@@ -111,6 +147,11 @@ public sealed class MigrationTests(PostgresFixture fixture)
     [InlineData("ux_shop_subscriptions_shop_id_active", "WHERE (status = 1)")]
     [InlineData("ix_shop_subscriptions_ends_on_active", "WHERE (status = 1)")]
     [InlineData("ux_products_shop_id_barcode", "WHERE ((barcode IS NOT NULL) AND (NOT is_archived))")]
+    [InlineData("ux_suppliers_shop_id_normalized_name", "WHERE (NOT is_archived)")]
+    [InlineData("ix_invoices_shop_id_supplier_id_invoice_number", "WHERE (invoice_number IS NOT NULL)")]
+    [InlineData("ix_invoices_status_created_at_failed", "WHERE (status = 4)")]
+    [InlineData("ix_invoice_items_created_product_id", "WHERE (created_product_id IS NOT NULL)")]
+    [InlineData("ix_invoice_items_shop_id_expiry_date", "WHERE (expiry_date IS NOT NULL)")]
     public async Task Migrate_PartialIndexes_HaveTheErdPredicate(string index, string predicate)
     {
         var definition = await fixture.ScalarAsync<string>("SELECT indexdef FROM pg_indexes WHERE indexname = @p0", index);
@@ -134,6 +175,34 @@ public sealed class MigrationTests(PostgresFixture fixture)
             "SELECT confrelid::regclass::text FROM pg_constraint WHERE conname = 'fk_stock_movements_users_created_by_user_id' AND contype = 'f'");
 
         target.Should().Be("users");
+    }
+
+    [Theory]
+    [InlineData("fk_stock_movements_invoices_invoice_id", "invoices")]
+    [InlineData("fk_stock_movements_invoice_items_invoice_item_id", "invoice_items")]
+    public async Task Migrate_StockMovementInvoiceColumns_AreNowForeignKeys(string constraint, string target)
+    {
+        var table = await fixture.ScalarAsync<string>(
+            "SELECT confrelid::regclass::text FROM pg_constraint WHERE conname = @p0 AND contype = 'f'", constraint);
+
+        table.Should().Be(target);
+    }
+
+    [Fact]
+    public async Task Migrate_ProductAliasesUniqueIndex_TreatsNullSupplierAsEqual()
+    {
+        var definition = await fixture.ScalarAsync<string>(
+            "SELECT indexdef FROM pg_indexes WHERE indexname = 'ux_product_aliases_shop_id_supplier_id_normalized_alias'");
+
+        definition.Should().EndWith("NULLS NOT DISTINCT");
+    }
+
+    [Fact]
+    public async Task Migrate_EmptyDatabase_CreatesTheHangfireSchema()
+    {
+        var count = await fixture.ScalarAsync<long>("SELECT count(*) FROM pg_namespace WHERE nspname = 'hangfire'");
+
+        count.Should().Be(1, "Hangfire.PostgreSql creates its tables in it at startup (backend.md §12.4)");
     }
 
     [Fact]

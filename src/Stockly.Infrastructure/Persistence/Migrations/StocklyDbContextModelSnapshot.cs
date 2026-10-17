@@ -104,6 +104,339 @@ namespace Stockly.Infrastructure.Persistence.Migrations
                     b.ToTable("user_tokens", (string)null);
                 });
 
+            modelBuilder.Entity("Stockly.Domain.Invoices.Invoice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ClientRequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("client_request_id");
+
+                    b.Property<decimal?>("ComputedTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("computed_total");
+
+                    b.Property<DateTimeOffset?>("ConfirmedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("confirmed_at");
+
+                    b.Property<Guid?>("ConfirmedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("confirmed_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<string>("FailureReason")
+                        .HasColumnType("text")
+                        .HasColumnName("failure_reason");
+
+                    b.Property<string>("ImageObjectKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("image_object_key");
+
+                    b.Property<string>("ImageSha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character(64)")
+                        .HasColumnName("image_sha256")
+                        .IsFixedLength();
+
+                    b.Property<DateOnly?>("InvoiceDate")
+                        .HasColumnType("date")
+                        .HasColumnName("invoice_date");
+
+                    b.Property<string>("InvoiceNumber")
+                        .HasColumnType("text")
+                        .HasColumnName("invoice_number");
+
+                    b.Property<DateTimeOffset?>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("processed_at");
+
+                    b.Property<string>("RawAiJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("raw_ai_json");
+
+                    b.Property<Guid>("ShopId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("shop_id");
+
+                    b.Property<short>("Status")
+                        .HasColumnType("smallint")
+                        .HasColumnName("status");
+
+                    b.Property<Guid?>("SupplierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("supplier_id");
+
+                    b.Property<string>("SupplierNameRaw")
+                        .HasColumnType("text")
+                        .HasColumnName("supplier_name_raw");
+
+                    b.Property<decimal?>("TotalAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("total_amount");
+
+                    b.Property<string>("Warnings")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("warnings")
+                        .HasDefaultValueSql("'[]'::jsonb");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_invoices");
+
+                    b.HasIndex("ConfirmedByUserId")
+                        .HasDatabaseName("ix_invoices_confirmed_by_user_id");
+
+                    b.HasIndex("CreatedByUserId")
+                        .HasDatabaseName("ix_invoices_created_by_user_id");
+
+                    b.HasIndex("SupplierId")
+                        .HasDatabaseName("ix_invoices_supplier_id");
+
+                    b.HasIndex("ShopId", "ClientRequestId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_invoices_shop_id_client_request_id");
+
+                    b.HasIndex("ShopId", "CreatedAt")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("ix_invoices_shop_id_created_at");
+
+                    b.HasIndex("ShopId", "ImageSha256")
+                        .HasDatabaseName("ix_invoices_shop_id_image_sha256");
+
+                    b.HasIndex("Status", "CreatedAt")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("ix_invoices_status_created_at_failed")
+                        .HasFilter("status = 4");
+
+                    b.HasIndex("ShopId", "Status", "CreatedAt")
+                        .IsDescending(false, false, true)
+                        .HasDatabaseName("ix_invoices_shop_id_status_created_at");
+
+                    b.HasIndex("ShopId", "SupplierId", "InvoiceNumber")
+                        .HasDatabaseName("ix_invoices_shop_id_supplier_id_invoice_number")
+                        .HasFilter("invoice_number IS NOT NULL");
+
+                    b.ToTable("invoices", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_invoices_confirmed_at", "confirmed_at IS NULL OR status = 3");
+                        });
+                });
+
+            modelBuilder.Entity("Stockly.Domain.Invoices.InvoiceItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("BatchNo")
+                        .HasColumnType("text")
+                        .HasColumnName("batch_no");
+
+                    b.Property<DateTimeOffset?>("ConfirmedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("confirmed_at");
+
+                    b.Property<Guid?>("CreatedProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_product_id");
+
+                    b.Property<DateOnly?>("ExpiryDate")
+                        .HasColumnType("date")
+                        .HasColumnName("expiry_date");
+
+                    b.Property<Guid>("InvoiceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("invoice_id");
+
+                    b.Property<int>("LineNo")
+                        .HasColumnType("integer")
+                        .HasColumnName("line_no");
+
+                    b.Property<decimal>("LineTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("line_total");
+
+                    b.Property<decimal?>("MatchConfidence")
+                        .HasPrecision(3, 2)
+                        .HasColumnType("numeric(3,2)")
+                        .HasColumnName("match_confidence");
+
+                    b.Property<string>("NewProductBaseUnitName")
+                        .HasColumnType("text")
+                        .HasColumnName("new_product_base_unit_name");
+
+                    b.Property<string>("NewProductName")
+                        .HasColumnType("text")
+                        .HasColumnName("new_product_name");
+
+                    b.Property<decimal?>("NewProductSellPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("new_product_sell_price");
+
+                    b.Property<Guid?>("ProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_id");
+
+                    b.Property<Guid?>("ProductUnitId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_unit_id");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(14, 3)
+                        .HasColumnType("numeric(14,3)")
+                        .HasColumnName("quantity");
+
+                    b.Property<string>("RawName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("raw_name");
+
+                    b.Property<Guid>("ShopId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("shop_id");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("unit_price");
+
+                    b.HasKey("Id")
+                        .HasName("pk_invoice_items");
+
+                    b.HasIndex("CreatedProductId")
+                        .HasDatabaseName("ix_invoice_items_created_product_id")
+                        .HasFilter("created_product_id IS NOT NULL");
+
+                    b.HasIndex("ProductId")
+                        .HasDatabaseName("ix_invoice_items_product_id");
+
+                    b.HasIndex("ProductUnitId")
+                        .HasDatabaseName("ix_invoice_items_product_unit_id");
+
+                    b.HasIndex("InvoiceId", "LineNo")
+                        .IsUnique()
+                        .HasDatabaseName("ux_invoice_items_invoice_id_line_no");
+
+                    b.HasIndex("ShopId", "ExpiryDate")
+                        .HasDatabaseName("ix_invoice_items_shop_id_expiry_date")
+                        .HasFilter("expiry_date IS NOT NULL");
+
+                    b.HasIndex("ShopId", "ProductId")
+                        .HasDatabaseName("ix_invoice_items_shop_id_product_id");
+
+                    b.ToTable("invoice_items", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_invoice_items_amounts", "quantity > 0 AND unit_price >= 0 AND line_total >= 0");
+
+                            t.HasCheckConstraint("ck_invoice_items_confirmed_resolved", "confirmed_at IS NULL OR num_nonnulls(product_id, new_product_name) = 1");
+
+                            t.HasCheckConstraint("ck_invoice_items_created_product", "(created_product_id IS NOT NULL) = (new_product_name IS NOT NULL AND confirmed_at IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_invoice_items_line_no", "line_no BETWEEN 1 AND 100");
+
+                            t.HasCheckConstraint("ck_invoice_items_match_confidence", "match_confidence IS NULL OR match_confidence BETWEEN 0 AND 1");
+
+                            t.HasCheckConstraint("ck_invoice_items_new_product_complete", "num_nonnulls(new_product_name, new_product_base_unit_name, new_product_sell_price) IN (0, 3)");
+
+                            t.HasCheckConstraint("ck_invoice_items_new_product_sell_price", "new_product_sell_price IS NULL OR new_product_sell_price >= 0");
+
+                            t.HasCheckConstraint("ck_invoice_items_product_or_new", "product_id IS NULL OR new_product_name IS NULL");
+
+                            t.HasCheckConstraint("ck_invoice_items_unit_requires_product", "(product_id IS NULL) = (product_unit_id IS NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("Stockly.Domain.Platform.AiUsageRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("CacheHit")
+                        .HasColumnType("boolean")
+                        .HasColumnName("cache_hit");
+
+                    b.Property<int>("CompletionTokens")
+                        .HasColumnType("integer")
+                        .HasColumnName("completion_tokens");
+
+                    b.Property<decimal>("CostUsd")
+                        .HasPrecision(14, 8)
+                        .HasColumnType("numeric(14,8)")
+                        .HasColumnName("cost_usd");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("InvoiceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("invoice_id");
+
+                    b.Property<int>("LatencyMs")
+                        .HasColumnType("integer")
+                        .HasColumnName("latency_ms");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("model");
+
+                    b.Property<short>("Outcome")
+                        .HasColumnType("smallint")
+                        .HasColumnName("outcome");
+
+                    b.Property<int>("PromptTokens")
+                        .HasColumnType("integer")
+                        .HasColumnName("prompt_tokens");
+
+                    b.Property<Guid>("ShopId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("shop_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ai_usage_records");
+
+                    b.HasIndex("CreatedAt")
+                        .IsDescending()
+                        .HasDatabaseName("ix_ai_usage_records_created_at");
+
+                    b.HasIndex("InvoiceId")
+                        .HasDatabaseName("ix_ai_usage_records_invoice_id");
+
+                    b.HasIndex("ShopId", "CreatedAt")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("ix_ai_usage_records_shop_id_created_at");
+
+                    b.ToTable("ai_usage_records", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_ai_usage_records_non_negative", "prompt_tokens >= 0 AND completion_tokens >= 0 AND cost_usd >= 0 AND latency_ms >= 0");
+                        });
+                });
+
             modelBuilder.Entity("Stockly.Domain.Products.Product", b =>
                 {
                     b.Property<Guid>("Id")
@@ -508,6 +841,9 @@ namespace Stockly.Infrastructure.Persistence.Migrations
                     b.HasIndex("CreatedByUserId")
                         .HasDatabaseName("ix_stock_movements_created_by_user_id");
 
+                    b.HasIndex("InvoiceId")
+                        .HasDatabaseName("ix_stock_movements_invoice_id");
+
                     b.HasIndex("ProductId")
                         .HasDatabaseName("ix_stock_movements_product_id");
 
@@ -535,6 +871,129 @@ namespace Stockly.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_stock_movements_single_source", "num_nonnulls(invoice_item_id, sale_item_id) <= 1");
                         });
+                });
+
+            modelBuilder.Entity("Stockly.Domain.Suppliers.ProductAlias", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AliasText")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("alias_text");
+
+                    b.Property<DateTimeOffset>("LastUsedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_used_at");
+
+                    b.Property<string>("NormalizedAlias")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("normalized_alias");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_id");
+
+                    b.Property<Guid>("ProductUnitId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_unit_id");
+
+                    b.Property<Guid>("ShopId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("shop_id");
+
+                    b.Property<Guid?>("SupplierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("supplier_id");
+
+                    b.Property<int>("TimesConfirmed")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("times_confirmed");
+
+                    b.HasKey("Id")
+                        .HasName("pk_product_aliases");
+
+                    b.HasIndex("NormalizedAlias")
+                        .HasDatabaseName("ix_product_aliases_normalized_alias_trgm");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("NormalizedAlias"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("NormalizedAlias"), new[] { "gin_trgm_ops" });
+
+                    b.HasIndex("ProductId")
+                        .HasDatabaseName("ix_product_aliases_product_id");
+
+                    b.HasIndex("ProductUnitId")
+                        .HasDatabaseName("ix_product_aliases_product_unit_id");
+
+                    b.HasIndex("SupplierId")
+                        .HasDatabaseName("ix_product_aliases_supplier_id");
+
+                    b.HasIndex("ShopId", "SupplierId", "NormalizedAlias")
+                        .IsUnique()
+                        .HasDatabaseName("ux_product_aliases_shop_id_supplier_id_normalized_alias");
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("ShopId", "SupplierId", "NormalizedAlias"), false);
+
+                    b.ToTable("product_aliases", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_product_aliases_times_confirmed", "times_confirmed > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Stockly.Domain.Suppliers.Supplier", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<bool>("IsArchived")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_archived");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("name");
+
+                    b.Property<string>("NormalizedName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("normalized_name");
+
+                    b.Property<string>("Phone")
+                        .HasColumnType("text")
+                        .HasColumnName("phone");
+
+                    b.Property<Guid>("ShopId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("shop_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_suppliers");
+
+                    b.HasIndex("NormalizedName")
+                        .HasDatabaseName("ix_suppliers_normalized_name_trgm");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("NormalizedName"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("NormalizedName"), new[] { "gin_trgm_ops" });
+
+                    b.HasIndex("ShopId", "NormalizedName")
+                        .IsUnique()
+                        .HasDatabaseName("ux_suppliers_shop_id_normalized_name")
+                        .HasFilter("NOT is_archived");
+
+                    b.ToTable("suppliers", (string)null);
                 });
 
             modelBuilder.Entity("Stockly.Domain.Users.RefreshToken", b =>
@@ -727,6 +1186,86 @@ namespace Stockly.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_user_tokens_users_user_id");
                 });
 
+            modelBuilder.Entity("Stockly.Domain.Invoices.Invoice", b =>
+                {
+                    b.HasOne("Stockly.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("ConfirmedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_invoices_users_confirmed_by_user_id");
+
+                    b.HasOne("Stockly.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_invoices_users_created_by_user_id");
+
+                    b.HasOne("Stockly.Domain.Shops.Shop", null)
+                        .WithMany()
+                        .HasForeignKey("ShopId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_invoices_shops_shop_id");
+
+                    b.HasOne("Stockly.Domain.Suppliers.Supplier", null)
+                        .WithMany()
+                        .HasForeignKey("SupplierId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_invoices_suppliers_supplier_id");
+                });
+
+            modelBuilder.Entity("Stockly.Domain.Invoices.InvoiceItem", b =>
+                {
+                    b.HasOne("Stockly.Domain.Products.Product", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_invoice_items_products_created_product_id");
+
+                    b.HasOne("Stockly.Domain.Invoices.Invoice", null)
+                        .WithMany("Items")
+                        .HasForeignKey("InvoiceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_invoice_items_invoices_invoice_id");
+
+                    b.HasOne("Stockly.Domain.Products.Product", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_invoice_items_products_product_id");
+
+                    b.HasOne("Stockly.Domain.Products.ProductUnit", null)
+                        .WithMany()
+                        .HasForeignKey("ProductUnitId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_invoice_items_product_units_product_unit_id");
+
+                    b.HasOne("Stockly.Domain.Shops.Shop", null)
+                        .WithMany()
+                        .HasForeignKey("ShopId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_invoice_items_shops_shop_id");
+                });
+
+            modelBuilder.Entity("Stockly.Domain.Platform.AiUsageRecord", b =>
+                {
+                    b.HasOne("Stockly.Domain.Invoices.Invoice", null)
+                        .WithMany()
+                        .HasForeignKey("InvoiceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_ai_usage_records_invoices_invoice_id");
+
+                    b.HasOne("Stockly.Domain.Shops.Shop", null)
+                        .WithMany()
+                        .HasForeignKey("ShopId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ai_usage_records_shops_shop_id");
+                });
+
             modelBuilder.Entity("Stockly.Domain.Products.Product", b =>
                 {
                     b.HasOne("Stockly.Domain.Shops.Shop", null)
@@ -797,6 +1336,18 @@ namespace Stockly.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_stock_movements_users_created_by_user_id");
 
+                    b.HasOne("Stockly.Domain.Invoices.Invoice", null)
+                        .WithMany()
+                        .HasForeignKey("InvoiceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_stock_movements_invoices_invoice_id");
+
+                    b.HasOne("Stockly.Domain.Invoices.InvoiceItem", null)
+                        .WithMany()
+                        .HasForeignKey("InvoiceItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_stock_movements_invoice_items_invoice_item_id");
+
                     b.HasOne("Stockly.Domain.Products.Product", null)
                         .WithMany()
                         .HasForeignKey("ProductId")
@@ -812,6 +1363,46 @@ namespace Stockly.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_stock_movements_shops_shop_id");
                 });
 
+            modelBuilder.Entity("Stockly.Domain.Suppliers.ProductAlias", b =>
+                {
+                    b.HasOne("Stockly.Domain.Products.Product", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_product_aliases_products_product_id");
+
+                    b.HasOne("Stockly.Domain.Products.ProductUnit", null)
+                        .WithMany()
+                        .HasForeignKey("ProductUnitId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_product_aliases_product_units_product_unit_id");
+
+                    b.HasOne("Stockly.Domain.Shops.Shop", null)
+                        .WithMany()
+                        .HasForeignKey("ShopId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_product_aliases_shops_shop_id");
+
+                    b.HasOne("Stockly.Domain.Suppliers.Supplier", null)
+                        .WithMany()
+                        .HasForeignKey("SupplierId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_product_aliases_suppliers_supplier_id");
+                });
+
+            modelBuilder.Entity("Stockly.Domain.Suppliers.Supplier", b =>
+                {
+                    b.HasOne("Stockly.Domain.Shops.Shop", null)
+                        .WithMany()
+                        .HasForeignKey("ShopId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_suppliers_shops_shop_id");
+                });
+
             modelBuilder.Entity("Stockly.Domain.Users.RefreshToken", b =>
                 {
                     b.HasOne("Stockly.Infrastructure.Identity.ApplicationUser", null)
@@ -820,6 +1411,11 @@ namespace Stockly.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_refresh_tokens_users_user_id");
+                });
+
+            modelBuilder.Entity("Stockly.Domain.Invoices.Invoice", b =>
+                {
+                    b.Navigation("Items");
                 });
 
             modelBuilder.Entity("Stockly.Domain.Products.Product", b =>

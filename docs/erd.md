@@ -13,7 +13,7 @@ Related ADRs: 0001 (stock ledger), 0002 (multi-tenancy), 0003 (units), 0004 (exp
 | Money | `numeric(18,2)`, C# `decimal`, never negative. Currency is EGP (one currency, no currency column). |
 | Quantities | `numeric(14,3)`, always stored in the product's **base unit** (supports 1.5 kg for groceries). |
 | Unit factors | `numeric(14,6)`, > 0. |
-| Precision rule | Values with more decimal places than the column allows are **rejected** with a validation error, never silently rounded (`Domain/Common/Precision`). The only rounding is unit conversion: `ProductUnit.ToBase` rounds to 3 decimals, `MidpointRounding.AwayFromZero`. |
+| Precision rule | Values with more decimal places than the column allows are **rejected** with a validation error, never silently rounded (`Domain/Common/Precision`). The only roundings are unit conversion (`ProductUnit.ToBase` rounds to 3 decimals) and line totals (`line_total = round(quantity × unit_price, 2)` on `invoice_items` and `sale_items`, `InvoiceItem.ComputeLineTotal`; backend.md §17.1 item 6), both `MidpointRounding.AwayFromZero`. `ai_usage_records.cost_usd` (a provider-reported USD measurement, not EGP money) is rounded to 8 decimals. |
 | Concurrency | Postgres `xmin` mapped as EF concurrency token on `products`, `invoices`. |
 | Tenancy | Every tenant table has `shop_id NOT NULL` + EF global query filter from `ICurrentTenant`. Child tables also carry `shop_id` (denormalized) so the filter and indexes never need a join. |
 | Soft delete | Only `products` and `suppliers` (`is_archived`). Ledger tables are append-only, never deleted. |
@@ -339,19 +339,20 @@ Quantity is allowed to go negative (a sale recorded before the invoice was scann
 | `(product_id)` covered by the unique above | load units with product (P2 detail, every product edit) |
 | `UNIQUE (shop_id, barcode) WHERE barcode IS NOT NULL` | a box and a strip can have different barcodes; P6/P7 duplicate check `ProductRepository.IsUnitBarcodeUsedAsync`: `WHERE shop_id = @shop AND barcode = @b AND id <> @self` (archived products' units included) |
 
-**product_aliases** — learned on every invoice confirmation: "the supplier wrote X, the user mapped it to product P in unit U". Next scan from the same supplier auto-matches with confidence 1.0.
+**product_aliases** — learned on every invoice confirmation: "the supplier wrote X, the user mapped it to product P in unit U". Next scan from the same supplier auto-matches with confidence 1.0. `product_unit_id` is `NOT NULL` (aliases are learned only from confirmed lines, which always have a unit); `times_confirmed integer NOT NULL DEFAULT 1`.
 
 | Index / constraint | Serves |
 |---|---|
-| `UNIQUE NULLS NOT DISTINCT (shop_id, supplier_id, normalized_alias)` (PG 15+) | exact-match lookup during matching |
-| `GIN (normalized_alias gin_trgm_ops)` | fuzzy match fallback |
+| `UNIQUE NULLS NOT DISTINCT (shop_id, supplier_id, normalized_alias)` (PG 15+, `ux_product_aliases_shop_id_supplier_id_normalized_alias`) | exact-match lookup during matching (step 2b); upsert on confirm |
+| `GIN (normalized_alias gin_trgm_ops)` (`ix_product_aliases_normalized_alias_trgm`) | fuzzy match fallback |
+| `CHECK (times_confirmed > 0)` (`ck_product_aliases_times_confirmed`) | integrity (backend.md §17.1 item 15) |
 
 **suppliers**
 
 | Index / constraint | Serves |
 |---|---|
-| `UNIQUE (shop_id, normalized_name) WHERE NOT is_archived` | dedupe when AI returns a known supplier |
-| `GIN (normalized_name gin_trgm_ops)` | supplier fuzzy match |
+| `UNIQUE (shop_id, normalized_name) WHERE NOT is_archived` (`ux_suppliers_shop_id_normalized_name`) | `SupplierRepository.FindIdByNormalizedNameAsync` (scan job: `WHERE shop_id = @shop AND normalized_name = @n AND NOT is_archived`); dedupe on confirm |
+| `GIN (normalized_name gin_trgm_ops)` (`ix_suppliers_normalized_name_trgm`) | supplier fuzzy match |
 
 ### 3.3 Invoices
 
@@ -359,13 +360,16 @@ Quantity is allowed to go negative (a sale recorded before the invoice was scann
 
 | Index / constraint | Serves |
 |---|---|
-| `UNIQUE (shop_id, client_request_id)` | offline queue retries never create two invoices (ADR-0006) |
-| `(shop_id, created_at DESC)` | invoice history list; daily scan quota fallback count when Redis is down (`docs/design/redis.md` §4) |
-| `(shop_id, status) WHERE status IN (Processing, NeedsReview)` | "waiting for review" badge |
-| `(shop_id, image_sha256)` | duplicate photo detection (DB side of the AI cache) |
-| `(shop_id, supplier_id, invoice_number) WHERE invoice_number IS NOT NULL` | duplicate invoice warning |
-| `(status, created_at DESC) WHERE status = Failed` | admin "failed scans" screen |
-| `CHECK (confirmed_at IS NULL OR status = Confirmed)` | integrity |
+| `UNIQUE (shop_id, client_request_id)` (`ux_invoices_shop_id_client_request_id`) | offline queue retries never create two invoices (ADR-0006): `InvoiceQueries.FindListItemByClientRequestIdAsync` (`WHERE shop_id = @shop AND client_request_id = @id`); a concurrent repeat loses on this index and gets the winner |
+| `(shop_id, created_at DESC)` (`ix_invoices_shop_id_created_at`) | invoice history list (I2); daily scan quota fallback count when Redis is down: `InvoiceRepository.CountCreatedSinceAsync` (`WHERE shop_id = @shop AND created_at >= @cairoDayStart`, `docs/design/redis.md` §4) |
+| `(shop_id, status, created_at DESC)` (`ix_invoices_shop_id_status_created_at`) | I2 with a status filter, newest first; "waiting for review" badge. Replaces the planned partial `(shop_id, status) WHERE status IN (1, 2)` (backend.md §17.1 item 4) |
+| `(shop_id, image_sha256)` (`ix_invoices_shop_id_image_sha256`) | duplicate photo detection, DB side of the AI cache: `InvoiceRepository.FindReusableExtractionAsync` (`WHERE shop_id = @shop AND image_sha256 = @sha AND id <> @self AND status IN (2, 3) AND raw_ai_json IS NOT NULL ORDER BY created_at DESC LIMIT 1`) |
+| `(shop_id, supplier_id, invoice_number) WHERE invoice_number IS NOT NULL` (`ix_invoices_shop_id_supplier_id_invoice_number`) | duplicate invoice warning: `InvoiceRepository.ExistsOtherWithNumberAsync` (`WHERE shop_id = @shop AND invoice_number = @n AND supplier_id IS NOT DISTINCT FROM @supplier AND id <> @self AND status <> 4`) |
+| `(status, created_at DESC) WHERE status = Failed` (`ix_invoices_status_created_at_failed`) | admin "failed scans" screen |
+| primary key | the job's lookup (`FindProcessingInfoAsync`) and the row lock `SELECT 1 FROM invoices WHERE id = @id AND shop_id = @shop FOR UPDATE` (`InvoiceRepository.FindForUpdateAsync`) |
+| `CHECK (confirmed_at IS NULL OR status = Confirmed)` (`ck_invoices_confirmed_at`) | integrity |
+
+Other column details (migration `InvoiceScan`): `image_sha256 character(64)` (lower-case hex), `warnings jsonb NOT NULL DEFAULT '[]'` (array of warning names, e.g. `["TotalMismatch"]`), `raw_ai_json jsonb NULL` (model output that is not JSON is stored as a JSON string literal; at most 256 KB), `failure_reason text NULL` (`ImageMissing`, `AiUnavailable`, `AiOutputInvalid`, `AiNoItems`, `Unexpected`), `status smallint` (Processing 1, NeedsReview 2, Confirmed 3, Failed 4).
 
 **invoice_items** — a line either references an **existing** product (`product_id` + `product_unit_id`) or describes a **new** one (`new_product_name`, `new_product_base_unit_name`, `new_product_sell_price numeric(18,2)`, contract v1.1 I4 `newProduct`; cost price = the line's `unit_price`, `quantity` in the new base unit). Never both; a confirmed line never has neither. Lines straight from the AI (`NeedsReview`) may have neither (unmatched). Two supporting columns make the rule enforceable in the row (design: `docs/design/backend.md` §10):
 - `confirmed_at timestamptz NULL`: set on every line, in the confirm transaction, to the invoice's `confirmed_at` (a CHECK cannot read `invoices.status`).
@@ -375,7 +379,7 @@ Other types: `quantity numeric(14,3)` (in the line's unit), `unit_price`/`line_t
 
 | Index / constraint | Serves |
 |---|---|
-| `UNIQUE (invoice_id, line_no)` | ordered review screen, stable edits |
+| `UNIQUE (invoice_id, line_no)` (`ux_invoice_items_invoice_id_line_no`) | ordered review screen, stable edits; loading the lines of an invoice (`FindForUpdateAsync`, the item count of `FindListItemByClientRequestIdAsync`); FK support for `invoice_id` |
 | `(shop_id, product_id)` | product purchase history |
 | `(created_product_id) WHERE created_product_id IS NOT NULL` | product purchase history for products created from an invoice (`product_id = @p OR created_product_id = @p`); FK support |
 | `(shop_id, expiry_date) WHERE expiry_date IS NOT NULL` | "expiring soon" dashboard card (product = `COALESCE(product_id, created_product_id)`, confirmed lines only) |
@@ -437,9 +441,12 @@ Rules per reason (enforced in `Domain/Stock/StockMovement`; created only through
 
 | Index / constraint | Serves |
 |---|---|
-| `(shop_id, created_at DESC)` | per-shop usage and cost in admin |
-| `(created_at DESC)` | platform-wide cost chart |
-| `(invoice_id)` | invoice detail in admin |
+| `(shop_id, created_at DESC)` (`ix_ai_usage_records_shop_id_created_at`) | per-shop usage and cost in admin |
+| `(created_at DESC)` (`ix_ai_usage_records_created_at`) | platform-wide cost chart |
+| `(invoice_id)` (`ix_ai_usage_records_invoice_id`) | invoice detail in admin; the model of an earlier extraction (`FindReusableExtractionAsync` subquery `WHERE invoice_id = @earlier AND outcome = 1 ORDER BY created_at DESC LIMIT 1`) |
+| `CHECK (prompt_tokens >= 0 AND completion_tokens >= 0 AND cost_usd >= 0 AND latency_ms >= 0)` (`ck_ai_usage_records_non_negative`) | integrity (backend.md §17.1 item 15) |
+
+Columns: `cost_usd numeric(14,8)` (USD credits, not EGP money), `outcome smallint` (Succeeded 1, InvalidOutput 2, RateLimited 3, ServerError 4, ClientError 5, Timeout 6, NetworkError 7, Cancelled 8), `cache_hit boolean` (database reuse or Redis AI cache: 0 tokens, cost 0).
 
 Growth note: when this table passes ~10M rows, partition by month on `created_at` (not needed for v1).
 
@@ -457,7 +464,7 @@ Growth note: when this table passes ~10M rows, partition by month on `created_at
 | `InitialCatalog` (step 1.4a) | `shops`, `products`, `product_units`, `stock_movements` | `pg_trgm`; every index and check listed above for these tables |
 | `Identity` (step 1.5) | `users`, `user_claims`, `user_logins`, `user_tokens`, `refresh_tokens`, `shop_members`, `plans`, `shop_subscriptions` | every index and constraint listed in §3.1 (including `refresh_tokens.family_id` and its index); default plan seeded; FK `stock_movements.created_by_user_id` → `users` added |
 | `ProductsCatalog` (step 1.6) | — | `products.barcode text NULL`, `products.category text NULL`, `UNIQUE (shop_id, barcode) WHERE barcode IS NOT NULL AND NOT is_archived` (`ux_products_shop_id_barcode`) |
-| `InvoiceScan` (Sprint 2, **planned**, not applied) | `suppliers`, `product_aliases`, `invoices`, `invoice_items`, `ai_usage_records`; schema `hangfire` | every index and check listed above for these tables; FKs `stock_movements.invoice_id` → `invoices`, `stock_movements.invoice_item_id` → `invoice_items`; Hangfire tables are created by `Hangfire.PostgreSql` at startup. Plan: `docs/design/backend.md` §12 |
+| `InvoiceScan` (Sprint 2, step 2a) | `suppliers`, `product_aliases`, `invoices`, `invoice_items`, `ai_usage_records`; schema `hangfire` | every index and check listed above for these tables; FKs `stock_movements.invoice_id` → `invoices`, `stock_movements.invoice_item_id` → `invoice_items` (restrict); Hangfire tables are created in schema `hangfire` by `Hangfire.PostgreSql` at startup (backend.md §17.1 item 8, documented exception to rule 31). Design: `docs/design/backend.md` §12 |
 
 Implementation notes for the `InitialCatalog` tables:
 - `products.updated_at` is an EF **shadow property** set by `AuditTimestampsInterceptor` from `IClock`; the Domain type has no such property.
@@ -471,10 +478,12 @@ Implementation notes for the `InitialCatalog` tables:
 | Column | Null | Target | Added in |
 |---|---|---|---|
 | `stock_movements.created_by_user_id` | NOT NULL | `users` | 1.5 (**done**, migration `Identity`) |
-| `stock_movements.invoice_id` | NULL | `invoices` | Sprint 2 |
-| `stock_movements.invoice_item_id` | NULL | `invoice_items` | Sprint 2 |
+| `stock_movements.invoice_id` | NULL | `invoices` | Sprint 2 (**done**, migration `InvoiceScan`) |
+| `stock_movements.invoice_item_id` | NULL | `invoice_items` | Sprint 2 (**done**, migration `InvoiceScan`) |
 | `stock_movements.sale_id` | NULL | `sales` | Sprint 4 |
 | `stock_movements.sale_item_id` | NULL | `sale_items` | Sprint 4 |
+
+**FK-support indexes of `InvoiceScan`.** EF creates a plain index for every foreign key that no listed index starts with; none serves a named query: `ix_invoices_supplier_id`, `ix_invoices_created_by_user_id`, `ix_invoices_confirmed_by_user_id`, `ix_invoice_items_product_id`, `ix_invoice_items_product_unit_id` (also serves `ProductUnit.InUse`, P8, once invoice lines reference units), `ix_product_aliases_product_id`, `ix_product_aliases_supplier_id`, `ix_product_aliases_product_unit_id`, `ix_stock_movements_invoice_id`.
 
 **Deferred columns and index:** `products.barcode`, `products.category` and `UNIQUE (shop_id, barcode) WHERE barcode IS NOT NULL AND NOT is_archived` were added in step 1.6 (**done**, migration `ProductsCatalog`).
 

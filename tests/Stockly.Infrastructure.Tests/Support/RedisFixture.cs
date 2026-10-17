@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 using Stockly.Application.Abstractions.Caching;
 using Stockly.Application.Abstractions.Time;
+using Stockly.Application.Features.Invoices;
 using Testcontainers.Redis;
 
 namespace Stockly.Infrastructure.Tests.Support;
@@ -51,6 +52,42 @@ public sealed class RedisFixture : IAsyncLifetime
         var provider = services.BuildServiceProvider(validateScopes: true);
         _providers.Add(provider);
         return provider.GetRequiredService<ICacheService>();
+    }
+
+    /// <summary>
+    /// The production Redis wiring (<c>AddStocklyCaching</c>) with <paramref name="scanOptions"/> for the scan limiter;
+    /// resolve <c>IScanRateLimiter</c>, <c>IScanQuotaCounter</c>, <c>IAiResultCache</c> or <c>IInvoiceStatusCache</c> from it.
+    /// </summary>
+    public IServiceProvider CreateServices(string connectionString, IClock clock, ScanOptions? scanOptions = null, ILoggerProvider? logs = null)
+    {
+        var services = new ServiceCollection();
+        services.AddLogging(logging =>
+        {
+            if (logs is not null)
+            {
+                logging.AddProvider(logs);
+            }
+        });
+        services.AddSingleton(clock);
+        services.AddSingleton(scanOptions ?? new ScanOptions());
+        services.AddStocklyCaching(connectionString);
+
+        var provider = services.BuildServiceProvider(validateScopes: true);
+        _providers.Add(provider);
+        return provider;
+    }
+
+    public async Task SetAsync(string key, string value)
+    {
+        await using var connection = await ConnectionMultiplexer.ConnectAsync(ConnectionString);
+        await connection.GetDatabase().StringSetAsync(key, value, TimeSpan.FromMinutes(5));
+    }
+
+    public async Task<string?> GetAsync(string key)
+    {
+        await using var connection = await ConnectionMultiplexer.ConnectAsync(ConnectionString);
+        var value = await connection.GetDatabase().StringGetAsync(key);
+        return value.IsNull ? null : value.ToString();
     }
 
     public async Task<TimeSpan?> TimeToLiveAsync(string key)

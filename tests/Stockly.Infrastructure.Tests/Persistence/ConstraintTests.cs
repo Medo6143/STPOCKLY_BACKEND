@@ -95,7 +95,7 @@ public sealed class ConstraintTests(PostgresFixture fixture)
     public async Task StockMovements_DuplicateInvoiceItemAndReason_Rejected()
     {
         var product = await SaveProductAsync();
-        var (invoiceId, itemId) = (Guid.NewGuid(), Guid.NewGuid());
+        var (invoiceId, itemId) = await fixture.CreateInvoiceLineAsync(product.ShopId);
         await InsertMovementAsync(product, 5m, MovementReason.InvoiceReceipt, invoiceId, itemId, null, null);
 
         var act = () => InsertMovementAsync(product, 5m, MovementReason.InvoiceReceipt, invoiceId, itemId, null, null);
@@ -107,7 +107,7 @@ public sealed class ConstraintTests(PostgresFixture fixture)
     public async Task StockMovements_ReceiptThenReversalOfSameLine_Allowed()
     {
         var product = await SaveProductAsync();
-        var (invoiceId, itemId) = (Guid.NewGuid(), Guid.NewGuid());
+        var (invoiceId, itemId) = await fixture.CreateInvoiceLineAsync(product.ShopId);
         await InsertMovementAsync(product, 5m, MovementReason.InvoiceReceipt, invoiceId, itemId, null, null);
 
         var reversal = () => InsertMovementAsync(product, -5m, MovementReason.InvoiceReversal, invoiceId, itemId, null, null);
