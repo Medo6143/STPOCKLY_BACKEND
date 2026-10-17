@@ -136,6 +136,31 @@ public sealed class PostgresFixture : IAsyncLifetime
         return (invoiceId, itemId);
     }
 
+    /// <summary>
+    /// Inserts a sale of the shop with one line of the product's unit (raw SQL) and returns their ids, so a sale movement
+    /// can reference a real line (stock_movements.sale_id and sale_item_id are FKs since migration Sales).
+    /// </summary>
+    public async Task<(Guid SaleId, Guid ItemId)> CreateSaleLineAsync(Guid shopId, Guid productId, Guid productUnitId)
+    {
+        var saleId = Guid.CreateVersion7();
+        var itemId = Guid.CreateVersion7();
+        await ExecuteAsync(
+            "INSERT INTO sales (id, shop_id, client_request_id, created_by_user_id, total_amount, created_at) VALUES (@p0, @p1, @p2, @p3, 1, now())",
+            saleId,
+            shopId,
+            Guid.CreateVersion7(),
+            Catalog.UserId);
+        await ExecuteAsync(
+            "INSERT INTO sale_items (id, shop_id, sale_id, line_no, product_id, product_unit_id, quantity, list_unit_price, unit_price, line_total) " +
+            "VALUES (@p0, @p1, @p2, 1, @p3, @p4, 1, 1, 1, 1)",
+            itemId,
+            shopId,
+            saleId,
+            productId,
+            productUnitId);
+        return (saleId, itemId);
+    }
+
     public async Task<int> ExecuteAsync(string sql, params object[] parameters)
     {
         await using var connection = new NpgsqlConnection(ConnectionString);

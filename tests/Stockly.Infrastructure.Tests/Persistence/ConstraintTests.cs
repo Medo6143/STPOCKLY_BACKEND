@@ -121,7 +121,7 @@ public sealed class ConstraintTests(PostgresFixture fixture)
     public async Task StockMovements_DuplicateSaleItem_Rejected()
     {
         var product = await SaveProductAsync();
-        var (saleId, itemId) = (Guid.NewGuid(), Guid.NewGuid());
+        var (saleId, itemId) = await fixture.CreateSaleLineAsync(product.ShopId, product.Id, product.BaseUnit.Id);
         await InsertMovementAsync(product, -1m, MovementReason.Sale, null, null, saleId, itemId);
 
         var act = () => InsertMovementAsync(product, -1m, MovementReason.Sale, null, null, saleId, itemId);

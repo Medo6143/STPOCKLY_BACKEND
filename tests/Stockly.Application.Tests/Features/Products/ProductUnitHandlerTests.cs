@@ -1,4 +1,5 @@
 using NSubstitute;
+using Stockly.Application.Abstractions.Persistence;
 using Stockly.Application.Features.Products.AddProductUnit;
 using Stockly.Application.Features.Products.RemoveProductUnit;
 using Stockly.Application.Features.Products.UpdateProductUnit;
@@ -13,6 +14,7 @@ namespace Stockly.Application.Tests.Features.Products;
 public sealed class ProductUnitHandlerTests
 {
     private readonly ProductTestContext _context = new();
+    private readonly IProductUnitUsageQueries _usage = Substitute.For<IProductUnitUsageQueries>();
 
     [Fact]
     public async Task Add_ValidUnit_AddsSavesAndReturnsFormattedDto()
@@ -151,7 +153,9 @@ public sealed class ProductUnitHandlerTests
 
         result.IsSuccess.Should().BeTrue();
         product.Units.Should().ContainSingle();
-        await _context.UnitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+        await _context.UnitOfWork.Received(1).TrySaveChangesAsync(Arg.Any<CancellationToken>());
+        await _usage.Received(1).IsUsedByInvoiceLinesAsync(box.Id, Arg.Any<CancellationToken>());
+        await _usage.Received(1).IsUsedBySaleLinesAsync(box.Id, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -162,7 +166,7 @@ public sealed class ProductUnitHandlerTests
         var result = await RemoveHandler().Handle(new RemoveProductUnitCommand(product.Id, product.BaseUnit.Id), CancellationToken.None);
 
         result.Error.Should().Be(ProductUnitErrors.BaseUnitCannotBeRemoved);
-        await _context.UnitOfWork.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+        await _context.UnitOfWork.DidNotReceive().TrySaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -176,6 +180,42 @@ public sealed class ProductUnitHandlerTests
         product.Archive();
         (await RemoveHandler().Handle(new RemoveProductUnitCommand(product.Id, Guid.CreateVersion7()), CancellationToken.None))
             .Error.Should().Be(ProductErrors.Archived);
+    }
+
+    [Fact]
+    public async Task Remove_UnitOnAnInvoiceLine_ReturnsInUseAndKeepsTheUnit()
+    {
+        var product = _context.Existing();
+        var box = product.AddUnit("علبة", 3m, 40m, null).Value;
+        _usage.IsUsedByInvoiceLinesAsync(box.Id, Arg.Any<CancellationToken>()).Returns(true);
+
+        var result = await RemoveHandler().Handle(new RemoveProductUnitCommand(product.Id, box.Id), CancellationToken.None);
+
+        result.Error.Should().Be(ProductUnitErrors.InUse);
+        product.Units.Should().HaveCount(2);
+        await _context.UnitOfWork.DidNotReceive().TrySaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Remove_UnitOnASaleLine_ReturnsInUse()
+    {
+        var product = _context.Existing();
+        var box = product.AddUnit("علبة", 3m, 40m, null).Value;
+        _usage.IsUsedBySaleLinesAsync(box.Id, Arg.Any<CancellationToken>()).Returns(true);
+
+        (await RemoveHandler().Handle(new RemoveProductUnitCommand(product.Id, box.Id), CancellationToken.None))
+            .Error.Should().Be(ProductUnitErrors.InUse);
+    }
+
+    [Fact]
+    public async Task Remove_ConcurrentLineWonTheForeignKey_ReturnsInUseFromTheUnitOfWork()
+    {
+        var product = _context.Existing();
+        var box = product.AddUnit("علبة", 3m, 40m, null).Value;
+        _context.UnitOfWork.TrySaveChangesAsync(Arg.Any<CancellationToken>()).Returns(Result.Failure(ProductUnitErrors.InUse));
+
+        (await RemoveHandler().Handle(new RemoveProductUnitCommand(product.Id, box.Id), CancellationToken.None))
+            .Error.Should().Be(ProductUnitErrors.InUse);
     }
 
     [Fact]
@@ -194,5 +234,5 @@ public sealed class ProductUnitHandlerTests
 
     private UpdateProductUnitCommandHandler UpdateHandler() => new(_context.Products, _context.UnitOfWork);
 
-    private RemoveProductUnitCommandHandler RemoveHandler() => new(_context.Products, _context.UnitOfWork);
+    private RemoveProductUnitCommandHandler RemoveHandler() => new(_context.Products, _usage, _context.UnitOfWork);
 }
