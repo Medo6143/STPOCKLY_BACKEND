@@ -13,7 +13,7 @@ public sealed partial class ContractConformanceTests
 {
     private const string ContractPath = "docs/api/contract.md";
     private const string Implemented = "implemented";
-    private const int MinimumIndexRows = 27;
+    private const int MinimumIndexRows = 47;
 
     private static readonly string[] HttpMethods = ["get", "post", "put", "delete", "patch"];
 
@@ -83,8 +83,8 @@ public sealed partial class ContractConformanceTests
         }
     }
 
-    // | P2 | GET | /api/products/{id} | user | 200, 401, 403, 404 | 1.6 | planned |
-    [GeneratedRegex(@"^\|\s*[A-Z]\d+\s*\|\s*(?<method>GET|POST|PUT|DELETE|PATCH)\s*\|\s*(?<path>/\S+)\s*\|[^|]*\|\s*(?<statuses>[0-9,\s]+)\|[^|]*\|\s*(?<state>[a-z]+)\s*\|\s*$")]
+    // | P2 | GET | /api/products/{id} | user | 200, 401, 403, 404 | 1.6 | planned |  (and two-letter ids: | AD1 | ...)
+    [GeneratedRegex(@"^\|\s*[A-Z]{1,2}\d+\s*\|\s*(?<method>GET|POST|PUT|DELETE|PATCH)\s*\|\s*(?<path>/\S+)\s*\|[^|]*\|\s*(?<statuses>[0-9,\s]+)\|[^|]*\|\s*(?<state>[a-z]+)\s*\|\s*$")]
     private static partial Regex IndexRow();
 
     private sealed record ContractRow(string Operation, string[] Statuses, string State);

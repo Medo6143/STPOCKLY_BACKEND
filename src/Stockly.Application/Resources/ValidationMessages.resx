@@ -43,4 +43,10 @@
   <data name="ProductAndUnitTogether" xml:space="preserve">
     <value>productId and productUnitId must be given together.</value>
   </data>
+  <data name="EndsBeforeToday" xml:space="preserve">
+    <value>The end date must not be before today.</value>
+  </data>
+  <data name="UsageRangeInvalid" xml:space="preserve">
+    <value>The range must end on or after its start and cover at most 92 days.</value>
+  </data>
 </root>

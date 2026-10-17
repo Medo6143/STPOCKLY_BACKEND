@@ -1,6 +1,7 @@
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using Stockly.Application.Behaviors;
+using Stockly.Application.Features.Admin;
 using Stockly.Application.Features.Auth;
 using Stockly.Application.Features.Invoices.Matching;
 using Stockly.Application.Features.Invoices.Validation;
@@ -29,6 +30,8 @@ public static class DependencyInjection
         });
         services.AddValidatorsFromAssembly(assembly);
         services.AddScoped<AuthSessions>();
+        services.AddScoped<AdminSessions>();
+        services.AddScoped<AdminAudit>();
         services.AddScoped<CatalogListCache>();
         services.AddScoped<InvoiceValidator>();
         services.AddScoped<IInvoiceValidationRule, ItemCapExceededRule>();

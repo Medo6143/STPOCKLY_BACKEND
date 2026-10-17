@@ -279,6 +279,29 @@ public sealed class ProcessInvoiceCommandHandlerTests
         _context.Extractor.ExtractAsync(Arg.Any<AiExtractionRequest>(), Arg.Any<CancellationToken>()).Returns(new AiExtractionResult(
             extraction, null, Primary, AiJson.Serialize(extraction), [Attempt(Primary, AiCallOutcome.Succeeded, 200)]));
 
+    [Fact]
+    public async Task Handle_AdminRerun_BypassesEarlierExtractionAndAiCacheAndCallsTheAi()
+    {
+        var invoice = _context.ProcessingInvoice();
+        var earlier = Extraction(total: null, Line("بنادول", "1", "10.00"));
+        _context.Invoices.FindReusableExtractionAsync(Sha256, invoice.Id, Arg.Any<CancellationToken>())
+            .Returns(new ReusableExtraction(AiJson.Serialize(earlier), Fallback));
+        var fresh = Extraction(total: null, Line("كونجستال", "2", "5.00"));
+        _context.Extractor.ExtractAsync(Arg.Any<AiExtractionRequest>(), Arg.Any<CancellationToken>()).Returns(new AiExtractionResult(
+            fresh, null, Primary, AiJson.Serialize(fresh), [Attempt(Primary, AiCallOutcome.Succeeded, 200, tokens: 300, cost: 0.0004m)]));
+
+        var result = await Handle(invoice.Id, bypassAiCache: true);
+
+        result.Value.Status.Should().Be(InvoiceStatus.NeedsReview);
+        invoice.Items.Should().ContainSingle().Which.RawName.Should().Be("كونجستال");
+        await _context.Invoices.DidNotReceiveWithAnyArgs().FindReusableExtractionAsync(default!, default, default);
+        await _context.AiCache.DidNotReceiveWithAnyArgs().GetAsync(default, default!, default);
+        await _context.Extractor.Received(1).ExtractAsync(Arg.Any<AiExtractionRequest>(), Arg.Any<CancellationToken>());
+        _context.AddedUsage.Should().ContainSingle("every AI call still writes a usage row (rule 18)")
+            .Which.Should().Match<AiUsageRecord>(record => !record.CacheHit && record.CostUsd == 0.0004m);
+        await _context.AiCache.Received(1).SetAsync(ShopId, Sha256, Primary, fresh, Arg.Any<CancellationToken>());
+    }
+
     private static ExtractedInvoice Extraction(string? total, params ExtractedInvoiceLine[] lines) =>
         new(null, null, "2026-10-10", total, false, lines);
 
@@ -288,7 +311,7 @@ public sealed class ProcessInvoiceCommandHandlerTests
     private static AiAttempt Attempt(string model, AiCallOutcome outcome, int? status, int tokens = 0, decimal cost = 0m) =>
         new(model, outcome, status, tokens, tokens / 3, cost, 1500);
 
-    private Task<Result<ProcessInvoiceOutcome>> Handle(Guid invoiceId) =>
+    private Task<Result<ProcessInvoiceOutcome>> Handle(Guid invoiceId, bool bypassAiCache = false) =>
         new ProcessInvoiceCommandHandler(
                 _context.CurrentTenant,
                 _context.Invoices,
@@ -303,5 +326,5 @@ public sealed class ProcessInvoiceCommandHandlerTests
                 _context.StatusCache,
                 _context.UnitOfWork,
                 _context.Clock)
-            .Handle(new ProcessInvoiceCommand(invoiceId), CancellationToken.None);
+            .Handle(new ProcessInvoiceCommand(invoiceId, bypassAiCache), CancellationToken.None);
 }

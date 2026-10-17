@@ -34,13 +34,44 @@ public sealed class Plan : Entity
 
     public bool IsActive { get; private set; }
 
-    public static Result<Plan> Create(string code, string nameAr, string nameEn, int dailyScanQuota, int maxMembers, decimal monthlyPrice)
+    public static Result<Plan> Create(
+        string code, string nameAr, string nameEn, int dailyScanQuota, int maxMembers, decimal monthlyPrice, bool isActive = true)
     {
         if (string.IsNullOrWhiteSpace(code))
         {
             return PlanErrors.CodeRequired;
         }
 
+        var error = Validate(nameAr, nameEn, dailyScanQuota, maxMembers, monthlyPrice);
+        if (error is not null)
+        {
+            return error;
+        }
+
+        return new Plan(
+            code.Trim().ToLowerInvariant(), nameAr.Trim(), nameEn.Trim(), dailyScanQuota, maxMembers, monthlyPrice, isActive);
+    }
+
+    /// <summary>Changes everything but the <see cref="Code"/>, which is immutable (contract AD13). On failure nothing changes.</summary>
+    public Result Update(string nameAr, string nameEn, int dailyScanQuota, int maxMembers, decimal monthlyPrice, bool isActive)
+    {
+        var error = Validate(nameAr, nameEn, dailyScanQuota, maxMembers, monthlyPrice);
+        if (error is not null)
+        {
+            return error;
+        }
+
+        NameAr = nameAr.Trim();
+        NameEn = nameEn.Trim();
+        DailyScanQuota = dailyScanQuota;
+        MaxMembers = maxMembers;
+        MonthlyPrice = monthlyPrice;
+        IsActive = isActive;
+        return Result.Success();
+    }
+
+    private static Error? Validate(string nameAr, string nameEn, int dailyScanQuota, int maxMembers, decimal monthlyPrice)
+    {
         if (string.IsNullOrWhiteSpace(nameAr) || string.IsNullOrWhiteSpace(nameEn))
         {
             return PlanErrors.NameRequired;
@@ -56,13 +87,6 @@ public sealed class Plan : Entity
             return PlanErrors.NoMembers;
         }
 
-        var priceError = Precision.ValidateMoney(monthlyPrice, nameof(monthlyPrice));
-        if (priceError is not null)
-        {
-            return priceError;
-        }
-
-        return new Plan(
-            code.Trim().ToLowerInvariant(), nameAr.Trim(), nameEn.Trim(), dailyScanQuota, maxMembers, monthlyPrice, isActive: true);
+        return Precision.ValidateMoney(monthlyPrice, nameof(monthlyPrice));
     }
 }

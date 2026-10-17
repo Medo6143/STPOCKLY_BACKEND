@@ -11,6 +11,12 @@ public interface IScanQuotaCounter
 
     /// <summary>Gives back a scan taken by <see cref="TryConsumeAsync"/> (upload failed, or a concurrent repeat won).</summary>
     Task ReleaseAsync(Guid shopId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Deletes today's counter of the shop (contract AD10), so the full quota is available again. Returns <c>false</c> when
+    /// Redis could not be reached (nothing was reset; the PostgreSQL fallback count cannot be reset).
+    /// </summary>
+    Task<bool> ResetAsync(Guid shopId, CancellationToken cancellationToken);
 }
 
 public enum ScanQuotaResult

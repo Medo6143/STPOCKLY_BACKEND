@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Stockly.Api.Errors;
+using Stockly.Application.Abstractions.Identity;
 using Stockly.Domain.Shops;
 using Stockly.Infrastructure.Identity;
 
@@ -31,7 +32,13 @@ public static class AuthenticationSetup
             .AddPolicy(AuthPolicies.Owner, ActiveShopPolicy().RequireRole(nameof(ShopRole.Owner)).Build())
             .AddPolicy(AuthPolicies.AllowSuspendedShop, policy => policy
                 .AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme)
-                .RequireAuthenticatedUser());
+                .RequireAuthenticatedUser()
+                .RequireClaim(StocklyClaimTypes.ShopId))
+            .AddPolicy(AuthPolicies.PlatformAdmin, policy => policy
+                .AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme)
+                .RequireAuthenticatedUser()
+                .RequireClaim(StocklyClaimTypes.PlatformRole, StocklyClaimTypes.PlatformAdminValue)
+                .RequireAssertion(context => !context.User.HasClaim(claim => claim.Type == StocklyClaimTypes.ShopId)));
 
         return services;
     }

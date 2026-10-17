@@ -304,4 +304,40 @@
   <data name="ProductUnit.InUse.Detail" xml:space="preserve">
     <value>هذه الوحدة مستخدمة في بنود فواتير أو مبيعات ولا يمكن حذفها.</value>
   </data>
+  <data name="Admin.ReasonRequired.Title" xml:space="preserve">
+    <value>السبب مطلوب</value>
+  </data>
+  <data name="Admin.ReasonRequired.Detail" xml:space="preserve">
+    <value>اكتب سبب هذا التغيير؛ يُحفظ في سجل المراجعة.</value>
+  </data>
+  <data name="Shop.NotFound.Title" xml:space="preserve">
+    <value>غير موجود</value>
+  </data>
+  <data name="Shop.NotFound.Detail" xml:space="preserve">
+    <value>لم يتم العثور على المتجر.</value>
+  </data>
+  <data name="Plan.NotFound.Title" xml:space="preserve">
+    <value>غير موجود</value>
+  </data>
+  <data name="Plan.NotFound.Detail" xml:space="preserve">
+    <value>لم يتم العثور على الباقة.</value>
+  </data>
+  <data name="Plan.CodeTaken.Title" xml:space="preserve">
+    <value>الرمز مستخدم</value>
+  </data>
+  <data name="Plan.CodeTaken.Detail" xml:space="preserve">
+    <value>توجد باقة أخرى بهذا الرمز.</value>
+  </data>
+  <data name="Plan.Inactive.Title" xml:space="preserve">
+    <value>الباقة غير مفعّلة</value>
+  </data>
+  <data name="Plan.Inactive.Detail" xml:space="preserve">
+    <value>لا يمكن إسناد باقة غير مفعّلة إلى متجر.</value>
+  </data>
+  <data name="Invoice.NotRerunnable.Title" xml:space="preserve">
+    <value>لا يمكن إعادة معالجة الفاتورة</value>
+  </data>
+  <data name="Invoice.NotRerunnable.Detail" xml:space="preserve">
+    <value>يمكن إعادة معالجة الفاتورة الفاشلة فقط.</value>
+  </data>
 </root>

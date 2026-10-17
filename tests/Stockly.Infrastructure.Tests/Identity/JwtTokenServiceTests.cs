@@ -33,6 +33,24 @@ public sealed class JwtTokenServiceTests
     }
 
     [Fact]
+    public async Task CreateAdminAccessToken_HasThePlatformRoleAndNoShop()
+    {
+        var service = new JwtTokenService(Options, new FakeClock(DateTimeOffset.UtcNow));
+        var userId = Guid.CreateVersion7();
+
+        var access = service.CreateAdminAccessToken(userId);
+        var validation = await new JsonWebTokenHandler().ValidateTokenAsync(access.Token, Options.CreateValidationParameters());
+
+        validation.IsValid.Should().BeTrue();
+        var token = (JsonWebToken)validation.SecurityToken;
+        token.GetClaim("sub").Value.Should().Be(userId.ToString());
+        token.GetClaim("platform_role").Value.Should().Be("PlatformAdmin");
+        token.TryGetClaim("shop_id", out _).Should().BeFalse();
+        token.TryGetClaim("role", out _).Should().BeFalse();
+        access.ExpiresAt.Should().BeCloseTo(DateTimeOffset.UtcNow.AddMinutes(15), TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
     public void CreateAccessToken_ExpiresIn15MinutesFromTheClock_InWholeSeconds()
     {
         var service = new JwtTokenService(Options, new FakeClock(Now));

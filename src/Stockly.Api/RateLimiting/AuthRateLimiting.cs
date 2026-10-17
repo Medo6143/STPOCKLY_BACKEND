@@ -15,6 +15,9 @@ public static class AuthRateLimiting
     public const string LoginPolicy = "auth-login";
     public const string RegisterPolicy = "auth-register";
 
+    /// <summary>AD1 admin login: the same limit as A2, counted separately (contract §11.1).</summary>
+    public const string AdminLoginPolicy = "admin-auth-login";
+
     /// <summary>Partition for requests without a remote address (e.g. in-memory hosts); they share one limit.</summary>
     public const string UnknownClientPartition = "unknown-client";
 
@@ -30,6 +33,7 @@ public static class AuthRateLimiting
             limiter.OnRejected = (context, cancellationToken) => RejectAsync(context, options.Window, cancellationToken);
             limiter.AddPolicy(LoginPolicy, context => PerClientIp(context, options));
             limiter.AddPolicy(RegisterPolicy, context => PerClientIp(context, options));
+            limiter.AddPolicy(AdminLoginPolicy, context => PerClientIp(context, options));
         });
         return services;
     }

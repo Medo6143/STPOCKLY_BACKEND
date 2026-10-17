@@ -1,8 +1,8 @@
 # Stockly API contract
 
-**Version: v1.5** · Status: **Approved** (v1.1 at checkpoint 1, v1.3 at checkpoint 2, v1.4 by the product owner, 2026-10-12; v1.2 clarifications and v1.5 admin section by the orchestrator under the product owner's no-pause mandate, 2026-10-17) · Owner: orchestrator
+**Version: v1.6** · Status: **Approved** (v1.1 at checkpoint 1, v1.3 at checkpoint 2, v1.4 by the product owner, 2026-10-12; v1.2 clarifications and v1.5 admin section by the orchestrator under the product owner's no-pause mandate, 2026-10-17) · Owner: orchestrator
 
-Change log: v1 (2026-10-12) first draft · v1.1 (2026-10-12) opening stock on create (P3), list price and override flag on sales (S1, D1), `newProduct` without category (I4), `GET /api/auth/me` fields made explicit (A5) · v1.2 (2026-10-12) `Http.*` codes for framework errors (§1.8), `newProduct` on `InvoiceItemDto` (§6), logout allowed for suspended shops (A4) · v1.3 (2026-10-12) `Retry-After` on `429 Scan.DailyQuotaExceeded` (I1) · v1.4 (2026-10-12) account lockout (`423 Auth.LockedOut`) and per-IP rate limiting (`429 Auth.TooManyRequests`) on A1/A2 · v1.5 (2026-10-17) platform admin API for `Stockly.Admin` (§11, AD1–AD20); no change to A/P/I/S/D endpoints.
+Change log: v1 (2026-10-12) first draft · v1.1 (2026-10-12) opening stock on create (P3), list price and override flag on sales (S1, D1), `newProduct` without category (I4), `GET /api/auth/me` fields made explicit (A5) · v1.2 (2026-10-12) `Http.*` codes for framework errors (§1.8), `newProduct` on `InvoiceItemDto` (§6), logout allowed for suspended shops (A4) · v1.3 (2026-10-12) `Retry-After` on `429 Scan.DailyQuotaExceeded` (I1) · v1.4 (2026-10-12) account lockout (`423 Auth.LockedOut`) and per-IP rate limiting (`429 Auth.TooManyRequests`) on A1/A2 · v1.5 (2026-10-17) platform admin API for `Stockly.Admin` (§11, AD1–AD20); no change to A/P/I/S/D endpoints · v1.6 (2026-10-18) `403 Auth.Forbidden` listed on A4 (admin token) and AD3 (shop token), as §11.1 already required.
 
 This is the binding contract between `stockly-backend` and `stockly-mobile` (and `Stockly.Admin` later) for Sprints 1–5. Field names, types, status codes and error codes here are exact. Only the orchestrator changes this file: every change bumps the version, updates the copy in `stockly-mobile/docs/api/contract.md`, and is announced to the running lanes.
 
@@ -96,7 +96,7 @@ Every error response is `application/problem+json`:
 | A1 | POST | /api/auth/register | anonymous | 201, 400, 409, 429 | 1.5 | implemented |
 | A2 | POST | /api/auth/login | anonymous | 200, 400, 401, 403, 423, 429 | 1.5 | implemented |
 | A3 | POST | /api/auth/refresh | anonymous | 200, 400, 401, 403 | 1.5 | implemented |
-| A4 | POST | /api/auth/logout | user | 204, 400, 401 | 1.5 | implemented |
+| A4 | POST | /api/auth/logout | user | 204, 400, 401, 403 | 1.5 | implemented |
 | A5 | GET | /api/auth/me | user | 200, 401, 403 | 1.5 | implemented |
 | P1 | GET | /api/products | user | 200, 400, 401, 403 | 1.6 | implemented |
 | P2 | GET | /api/products/{id} | user | 200, 401, 403, 404 | 1.6 | implemented |
@@ -120,26 +120,26 @@ Every error response is `application/problem+json`:
 | S3 | GET | /api/sales/{id} | user | 200, 401, 403, 404 | 4 | implemented |
 | D1 | GET | /api/dashboard/summary | user | 200, 401, 403 | 4 | implemented |
 | D2 | GET | /api/dashboard/expiring-soon | user | 200, 400, 401, 403 | 4 | implemented |
-| AD1 | POST | /api/admin/auth/login | anonymous | 200, 400, 401, 403, 423, 429 | 5 | planned |
-| AD2 | POST | /api/admin/auth/refresh | anonymous | 200, 400, 401 | 5 | planned |
-| AD3 | POST | /api/admin/auth/logout | admin | 204, 400, 401 | 5 | planned |
-| AD4 | GET | /api/admin/shops | admin | 200, 400, 401, 403 | 5 | planned |
-| AD5 | GET | /api/admin/shops/{id} | admin | 200, 401, 403, 404 | 5 | planned |
-| AD6 | POST | /api/admin/shops/{id}/suspend | admin | 204, 400, 401, 403, 404 | 5 | planned |
-| AD7 | POST | /api/admin/shops/{id}/activate | admin | 204, 400, 401, 403, 404 | 5 | planned |
-| AD8 | PUT | /api/admin/shops/{id}/subscription | admin | 200, 400, 401, 403, 404 | 5 | planned |
-| AD9 | PUT | /api/admin/shops/{id}/quota-override | admin | 200, 400, 401, 403, 404 | 5 | planned |
-| AD10 | POST | /api/admin/shops/{id}/quota/reset | admin | 204, 400, 401, 403, 404 | 5 | planned |
-| AD11 | GET | /api/admin/plans | admin | 200, 401, 403 | 5 | planned |
-| AD12 | POST | /api/admin/plans | admin | 201, 400, 401, 403, 409 | 5 | planned |
-| AD13 | PUT | /api/admin/plans/{id} | admin | 200, 400, 401, 403, 404 | 5 | planned |
-| AD14 | GET | /api/admin/ai-usage/daily | admin | 200, 400, 401, 403 | 5 | planned |
-| AD15 | GET | /api/admin/ai-usage/by-shop | admin | 200, 400, 401, 403 | 5 | planned |
-| AD16 | GET | /api/admin/ai-usage/by-model | admin | 200, 400, 401, 403 | 5 | planned |
-| AD17 | GET | /api/admin/invoices/failed | admin | 200, 400, 401, 403 | 5 | planned |
-| AD18 | GET | /api/admin/invoices/{id} | admin | 200, 401, 403, 404 | 5 | planned |
-| AD19 | POST | /api/admin/invoices/{id}/rerun | admin | 202, 400, 401, 403, 404, 409 | 5 | planned |
-| AD20 | GET | /api/admin/audit-logs | admin | 200, 400, 401, 403 | 5 | planned |
+| AD1 | POST | /api/admin/auth/login | anonymous | 200, 400, 401, 403, 423, 429 | 5 | implemented |
+| AD2 | POST | /api/admin/auth/refresh | anonymous | 200, 400, 401 | 5 | implemented |
+| AD3 | POST | /api/admin/auth/logout | admin | 204, 400, 401, 403 | 5 | implemented |
+| AD4 | GET | /api/admin/shops | admin | 200, 400, 401, 403 | 5 | implemented |
+| AD5 | GET | /api/admin/shops/{id} | admin | 200, 401, 403, 404 | 5 | implemented |
+| AD6 | POST | /api/admin/shops/{id}/suspend | admin | 204, 400, 401, 403, 404 | 5 | implemented |
+| AD7 | POST | /api/admin/shops/{id}/activate | admin | 204, 400, 401, 403, 404 | 5 | implemented |
+| AD8 | PUT | /api/admin/shops/{id}/subscription | admin | 200, 400, 401, 403, 404 | 5 | implemented |
+| AD9 | PUT | /api/admin/shops/{id}/quota-override | admin | 200, 400, 401, 403, 404 | 5 | implemented |
+| AD10 | POST | /api/admin/shops/{id}/quota/reset | admin | 204, 400, 401, 403, 404 | 5 | implemented |
+| AD11 | GET | /api/admin/plans | admin | 200, 401, 403 | 5 | implemented |
+| AD12 | POST | /api/admin/plans | admin | 201, 400, 401, 403, 409 | 5 | implemented |
+| AD13 | PUT | /api/admin/plans/{id} | admin | 200, 400, 401, 403, 404 | 5 | implemented |
+| AD14 | GET | /api/admin/ai-usage/daily | admin | 200, 400, 401, 403 | 5 | implemented |
+| AD15 | GET | /api/admin/ai-usage/by-shop | admin | 200, 400, 401, 403 | 5 | implemented |
+| AD16 | GET | /api/admin/ai-usage/by-model | admin | 200, 400, 401, 403 | 5 | implemented |
+| AD17 | GET | /api/admin/invoices/failed | admin | 200, 400, 401, 403 | 5 | implemented |
+| AD18 | GET | /api/admin/invoices/{id} | admin | 200, 401, 403, 404 | 5 | implemented |
+| AD19 | POST | /api/admin/invoices/{id}/rerun | admin | 202, 400, 401, 403, 404, 409 | 5 | implemented |
+| AD20 | GET | /api/admin/audit-logs | admin | 200, 400, 401, 403 | 5 | implemented |
 
 Not in the API (by design): `/health/live`, `/health/ready` (operations, not part of the mobile contract) and `/openapi/v1.json`.
 

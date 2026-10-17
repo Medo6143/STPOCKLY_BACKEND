@@ -143,6 +143,43 @@ public sealed class InvoiceTests
     }
 
     [Fact]
+    public void Rerun_Failed_IsProcessingAgainWithoutTheFailureButWithTheRawJson()
+    {
+        var invoice = NewInvoice();
+        invoice.MarkFailed(InvoiceFailureReason.AiOutputInvalid, "\"not json\"", Later);
+
+        var result = invoice.Rerun();
+
+        result.IsSuccess.Should().BeTrue();
+        invoice.Status.Should().Be(InvoiceStatus.Processing);
+        invoice.FailureReason.Should().BeNull();
+        invoice.ProcessedAt.Should().BeNull();
+        invoice.RawAiJson.Should().Be("\"not json\"", "the earlier output stays until the next run replaces it");
+    }
+
+    [Fact]
+    public void Rerun_NotFailed_ReturnsNotRerunnable()
+    {
+        var invoice = NewInvoice();
+
+        invoice.Rerun().Error.Should().Be(InvoiceErrors.NotRerunnable);
+        invoice.Status.Should().Be(InvoiceStatus.Processing);
+    }
+
+    [Fact]
+    public void Rerun_ThenExtraction_CompletesNormally()
+    {
+        var invoice = NewInvoice();
+        invoice.MarkFailed(InvoiceFailureReason.AiUnavailable, null, Later);
+        invoice.Rerun();
+
+        var result = invoice.CompleteExtraction(InvoiceHeader.Empty, [Line("بنادول", 1m, 10m)], [], "{}", null, Later);
+
+        result.IsSuccess.Should().BeTrue();
+        invoice.Status.Should().Be(InvoiceStatus.NeedsReview);
+    }
+
+    [Fact]
     public void MarkFailed_AlreadyFailed_IsTerminal()
     {
         var invoice = NewInvoice();

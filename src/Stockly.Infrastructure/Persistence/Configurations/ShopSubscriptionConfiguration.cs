@@ -6,11 +6,15 @@ namespace Stockly.Infrastructure.Persistence.Configurations;
 
 internal sealed class ShopSubscriptionConfiguration : IEntityTypeConfiguration<ShopSubscription>
 {
+    public const string TableName = "shop_subscriptions";
+
     private static readonly string ActiveFilter = $"status = {(short)SubscriptionStatus.Active}";
 
     public void Configure(EntityTypeBuilder<ShopSubscription> builder)
     {
-        builder.ToTable("shop_subscriptions");
+        builder.ToTable(TableName, table => table.HasCheckConstraint(
+            "ck_shop_subscriptions_daily_scan_quota_override",
+            $"daily_scan_quota_override IS NULL OR daily_scan_quota_override BETWEEN 0 AND {ShopSubscription.MaxQuotaOverride}"));
         builder.HasKey(s => s.Id);
         builder.Property(s => s.Id).ValueGeneratedNever();
 

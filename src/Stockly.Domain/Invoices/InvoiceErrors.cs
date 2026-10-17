@@ -91,6 +91,10 @@ public static class InvoiceErrors
     public static readonly Error AlreadyConfirmed =
         Error.Conflict("Invoice.AlreadyConfirmed", "The invoice was already confirmed.");
 
+    /// <summary>Only a <see cref="InvoiceStatus.Failed"/> invoice can be processed again by the platform admin (AD19).</summary>
+    public static readonly Error NotRerunnable =
+        Error.Conflict("Invoice.NotRerunnable", "Only a failed invoice can be processed again.");
+
     /// <summary>Internal guard: confirm names a created product for exactly the new-product lines.</summary>
     public static readonly Error CreatedProductsMismatch =
         Error.Validation("Invoice.CreatedProductsMismatch", "Every new-product line, and only those, needs its created product.");

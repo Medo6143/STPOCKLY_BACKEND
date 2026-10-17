@@ -5,6 +5,7 @@ using Stockly.Domain.Common;
 using Stockly.Domain.Invoices;
 using Stockly.Domain.Products;
 using Stockly.Domain.Sales;
+using Stockly.Domain.Shops;
 using Stockly.Infrastructure.Persistence.Configurations;
 
 namespace Stockly.Infrastructure.Persistence;
@@ -25,6 +26,7 @@ internal sealed class UnitOfWork(StocklyDbContext db) : IUnitOfWork
         [InvoiceConfiguration.ClientRequestIndex] = InvoiceErrors.DuplicateClientRequest,
         [SaleConfiguration.ClientRequestIndex] = SaleErrors.DuplicateClientRequest,
         [StockMovementConfiguration.InvoiceItemReasonIndex] = InvoiceErrors.AlreadyConfirmed,
+        [PlanConfiguration.CodeIndex] = PlanErrors.CodeTaken,
     };
 
     /// <summary>

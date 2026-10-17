@@ -1,6 +1,7 @@
 using Serilog;
 using Stockly.Api.Authentication;
 using Stockly.Api.Configuration;
+using Stockly.Api.Hangfire;
 using Stockly.Api.Health;
 using Stockly.Api.Identity;
 using Stockly.Api.Middleware;
@@ -38,6 +39,8 @@ builder.Services.AddStocklyCaching(redis);
 builder.Services.AddInvoiceScanning(builder.Configuration, postgres);
 builder.Services.AddStocklyIdentity(jwt);
 builder.Services.AddApplication();
+builder.Services.AddPlatformAdmin(builder.Configuration);
+builder.Services.AddDataProtection();
 builder.Services.AddStocklyAuthentication(jwt);
 builder.Services.AddStocklyLocalization();
 builder.Services.AddStocklyRateLimiting(authRateLimit);
@@ -59,6 +62,7 @@ app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
+app.MapStocklyHangfireDashboard();
 app.MapStocklyHealthChecks();
 app.MapControllers();
 if (!app.Environment.IsProduction())

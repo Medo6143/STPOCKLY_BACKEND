@@ -248,7 +248,25 @@ public sealed class Invoice : Entity, ITenantEntity
     public bool HasProductOnLine(int lineNo, Guid productId) =>
         _items.Any(item => item.LineNo == lineNo && item.ProductId == productId);
 
-    /// <summary>The job could not produce lines. Terminal: the user scans again.</summary>
+    /// <summary>
+    /// The platform admin queues a <see cref="InvoiceStatus.Failed"/> invoice for processing again (contract AD19): it
+    /// goes back to <see cref="InvoiceStatus.Processing"/> without its failure. The earlier raw AI output stays until the
+    /// next run replaces it. Any other status fails with <see cref="InvoiceErrors.NotRerunnable"/>.
+    /// </summary>
+    public Result Rerun()
+    {
+        if (Status != InvoiceStatus.Failed)
+        {
+            return InvoiceErrors.NotRerunnable;
+        }
+
+        Status = InvoiceStatus.Processing;
+        FailureReason = null;
+        ProcessedAt = null;
+        return Result.Success();
+    }
+
+    /// <summary>The job could not produce lines. Terminal for the user: they scan again (the admin may re-run it, AD19).</summary>
     public Result MarkFailed(InvoiceFailureReason reason, string? rawAiJson, DateTimeOffset now)
     {
         var error = EnsureProcessing();

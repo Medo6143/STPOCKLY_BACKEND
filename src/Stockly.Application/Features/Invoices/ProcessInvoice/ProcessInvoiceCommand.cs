@@ -9,8 +9,10 @@ namespace Stockly.Application.Features.Invoices.ProcessInvoice;
 /// <c>NeedsReview</c> or <c>Failed</c>. Sent by <c>ProcessInvoiceJob</c> inside the invoice's tenant scope, never from
 /// an HTTP request (AGENTS.md rule 14). Idempotent: an invoice that is no longer processing returns
 /// <c>Invoice.NotProcessing</c> and nothing is written. Manages its own transaction (the final save locks the invoice).
+/// <see cref="BypassAiCache"/> (the admin's re-run, contract AD19) skips the reuse of an earlier extraction and the AI
+/// result cache, so OpenRouter is called; every call still writes an <c>AiUsageRecord</c> (rule 18).
 /// </summary>
-public sealed record ProcessInvoiceCommand(Guid InvoiceId) : IRequest<Result<ProcessInvoiceOutcome>>;
+public sealed record ProcessInvoiceCommand(Guid InvoiceId, bool BypassAiCache = false) : IRequest<Result<ProcessInvoiceOutcome>>;
 
 /// <summary>What the job did, for its log line: the new status, the failure reason, warnings, lines and AI usage rows.</summary>
 public sealed record ProcessInvoiceOutcome(

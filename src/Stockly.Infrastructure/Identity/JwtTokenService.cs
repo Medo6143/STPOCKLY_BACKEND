@@ -21,7 +21,36 @@ public sealed class JwtTokenService(JwtOptions options, IClock clock) : ITokenSe
     private readonly JsonWebTokenHandler _handler = new();
     private readonly SigningCredentials _credentials = new(options.CreateSigningKey(), SecurityAlgorithms.HmacSha256);
 
-    public AccessToken CreateAccessToken(Guid userId, Guid shopId, ShopRole role)
+    public AccessToken CreateAccessToken(Guid userId, Guid shopId, ShopRole role) =>
+        Create(new Dictionary<string, object>
+        {
+            [StocklyClaimTypes.Subject] = userId.ToString(),
+            [StocklyClaimTypes.ShopId] = shopId.ToString(),
+            [StocklyClaimTypes.Role] = role.ToString(),
+            [StocklyClaimTypes.TokenId] = Guid.NewGuid().ToString(),
+        });
+
+    public AccessToken CreateAdminAccessToken(Guid userId) =>
+        Create(new Dictionary<string, object>
+        {
+            [StocklyClaimTypes.Subject] = userId.ToString(),
+            [StocklyClaimTypes.PlatformRole] = StocklyClaimTypes.PlatformAdminValue,
+            [StocklyClaimTypes.TokenId] = Guid.NewGuid().ToString(),
+        });
+
+    public RefreshTokenValue CreateRefreshToken()
+    {
+        var token = Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(RefreshTokenBytes));
+        return new RefreshTokenValue(token, HashRefreshToken(token));
+    }
+
+    public string HashRefreshToken(string refreshToken)
+    {
+        ArgumentNullException.ThrowIfNull(refreshToken);
+        return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(refreshToken)));
+    }
+
+    private AccessToken Create(Dictionary<string, object> claims)
     {
         var now = DateTimeOffset.FromUnixTimeSeconds(clock.UtcNow.ToUnixTimeSeconds());
         var expiresAt = now + TokenLifetimes.AccessToken;
@@ -34,27 +63,9 @@ public sealed class JwtTokenService(JwtOptions options, IClock clock) : ITokenSe
             NotBefore = now.UtcDateTime,
             Expires = expiresAt.UtcDateTime,
             SigningCredentials = _credentials,
-            Claims = new Dictionary<string, object>
-            {
-                [StocklyClaimTypes.Subject] = userId.ToString(),
-                [StocklyClaimTypes.ShopId] = shopId.ToString(),
-                [StocklyClaimTypes.Role] = role.ToString(),
-                [StocklyClaimTypes.TokenId] = Guid.NewGuid().ToString(),
-            },
+            Claims = claims,
         };
 
         return new AccessToken(_handler.CreateToken(descriptor), expiresAt);
-    }
-
-    public RefreshTokenValue CreateRefreshToken()
-    {
-        var token = Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(RefreshTokenBytes));
-        return new RefreshTokenValue(token, HashRefreshToken(token));
-    }
-
-    public string HashRefreshToken(string refreshToken)
-    {
-        ArgumentNullException.ThrowIfNull(refreshToken);
-        return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(refreshToken)));
     }
 }

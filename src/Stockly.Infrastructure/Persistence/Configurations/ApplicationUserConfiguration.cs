@@ -21,6 +21,11 @@ internal sealed class ApplicationUserConfiguration : IEntityTypeConfiguration<Ap
             .IsUnique()
             .HasDatabaseName("ux_users_normalized_email");
 
+        // AD4 search by owner email prefix: LIKE 'TERM%' needs pattern operators under a non-C collation.
+        builder.HasIndex(u => u.NormalizedEmail, "ix_users_normalized_email_pattern")
+            .HasOperators("text_pattern_ops")
+            .HasDatabaseName("ix_users_normalized_email_pattern");
+
         // Identity's own user-name index; the user name is the email.
         builder.HasIndex(u => u.NormalizedUserName)
             .IsUnique()

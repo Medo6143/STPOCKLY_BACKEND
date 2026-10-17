@@ -125,5 +125,40 @@ public sealed class RedisScanLimiterTests(RedisFixture fixture)
         logs.Entries.Where(entry => entry.Level == LogLevel.Warning).Should().ContainSingle("the warning is throttled to once a minute");
     }
 
+    [Fact]
+    public async Task Reset_UsedUpQuota_DeletesTodaysCounterSoTheFullQuotaIsBack()
+    {
+        var quota = Services().GetRequiredService<IScanQuotaCounter>();
+        var shopId = Guid.CreateVersion7();
+        await quota.TryConsumeAsync(shopId, 1, CancellationToken.None);
+        (await quota.TryConsumeAsync(shopId, 1, CancellationToken.None)).Should().Be(ScanQuotaResult.Exceeded);
+
+        var reset = await quota.ResetAsync(shopId, CancellationToken.None);
+
+        reset.Should().BeTrue();
+        (await fixture.GetAsync(CacheKeys.ScanQuota(shopId, new DateOnly(2026, 10, 12)))).Should().BeNull();
+        (await quota.TryConsumeAsync(shopId, 1, CancellationToken.None)).Should().Be(ScanQuotaResult.Allowed);
+    }
+
+    [Fact]
+    public async Task Reset_OtherShop_KeepsItsCounter()
+    {
+        var quota = Services().GetRequiredService<IScanQuotaCounter>();
+        var other = Guid.CreateVersion7();
+        await quota.TryConsumeAsync(other, 1, CancellationToken.None);
+
+        await quota.ResetAsync(Guid.CreateVersion7(), CancellationToken.None);
+
+        (await quota.TryConsumeAsync(other, 1, CancellationToken.None)).Should().Be(ScanQuotaResult.Exceeded);
+    }
+
+    [Fact]
+    public async Task Reset_RedisDown_ReturnsFalseWithoutThrowing()
+    {
+        var quota = fixture.CreateServices(RedisFixture.UnreachableRedis, _clock).GetRequiredService<IScanQuotaCounter>();
+
+        (await quota.ResetAsync(Guid.CreateVersion7(), CancellationToken.None)).Should().BeFalse();
+    }
+
     private IServiceProvider Services(ScanOptions? options = null) => fixture.CreateServices(fixture.ConnectionString, _clock, options);
 }

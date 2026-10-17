@@ -43,4 +43,10 @@
   <data name="ProductAndUnitTogether" xml:space="preserve">
     <value>يجب إرسال المنتج ووحدته معاً.</value>
   </data>
+  <data name="EndsBeforeToday" xml:space="preserve">
+    <value>يجب ألا يكون تاريخ الانتهاء قبل اليوم.</value>
+  </data>
+  <data name="UsageRangeInvalid" xml:space="preserve">
+    <value>يجب أن ينتهي النطاق في يوم بدايته أو بعده وألا يتجاوز 92 يوماً.</value>
+  </data>
 </root>
