@@ -71,12 +71,13 @@ public sealed class AuthController(ISender sender) : ControllerBase
         return result.ToActionResult(this, Ok);
     }
 
-    /// <summary>A4: end this device session. Allowed for suspended shops.</summary>
+    /// <summary>A4: end this device session. Allowed for suspended shops; an admin token is 403 (contract v1.6).</summary>
     [HttpPost("logout")]
     [Authorize(Policy = AuthPolicies.AllowSuspendedShop)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest, StocklyProblems.ContentType)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, StocklyProblems.ContentType)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, StocklyProblems.ContentType)]
     public async Task<IActionResult> LogoutAsync(RefreshTokenRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);

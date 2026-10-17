@@ -307,4 +307,40 @@
   <data name="ProductUnit.InUse.Detail" xml:space="preserve">
     <value>This unit is used by invoice or sale lines and cannot be removed.</value>
   </data>
+  <data name="Admin.ReasonRequired.Title" xml:space="preserve">
+    <value>Reason required</value>
+  </data>
+  <data name="Admin.ReasonRequired.Detail" xml:space="preserve">
+    <value>Give a reason for this change; it is kept in the audit log.</value>
+  </data>
+  <data name="Shop.NotFound.Title" xml:space="preserve">
+    <value>Not found</value>
+  </data>
+  <data name="Shop.NotFound.Detail" xml:space="preserve">
+    <value>The shop was not found.</value>
+  </data>
+  <data name="Plan.NotFound.Title" xml:space="preserve">
+    <value>Not found</value>
+  </data>
+  <data name="Plan.NotFound.Detail" xml:space="preserve">
+    <value>The plan was not found.</value>
+  </data>
+  <data name="Plan.CodeTaken.Title" xml:space="preserve">
+    <value>Code taken</value>
+  </data>
+  <data name="Plan.CodeTaken.Detail" xml:space="preserve">
+    <value>A plan with this code already exists.</value>
+  </data>
+  <data name="Plan.Inactive.Title" xml:space="preserve">
+    <value>Plan inactive</value>
+  </data>
+  <data name="Plan.Inactive.Detail" xml:space="preserve">
+    <value>An inactive plan cannot be assigned to a shop.</value>
+  </data>
+  <data name="Invoice.NotRerunnable.Title" xml:space="preserve">
+    <value>Invoice cannot be processed again</value>
+  </data>
+  <data name="Invoice.NotRerunnable.Detail" xml:space="preserve">
+    <value>Only a failed invoice can be processed again.</value>
+  </data>
 </root>
