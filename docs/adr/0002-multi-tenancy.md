@@ -28,3 +28,7 @@ Approved by the product owner, with a condition.
 - **`Plan` is global** (no tenant filter). **`ShopSubscription` is an `ITenantEntity`** (query filter and stamp interceptor apply). **`RefreshToken` belongs to a user, not a shop** (no tenant filter; looked up only by the hash of a presented token).
 - **Registering a shop without a token.** `ITenantScope.BeginForNewShop(shopId)` (Application, scoped per request) opens a scope in which `ICurrentTenant` is the new shop; `HttpContextCurrentTenant` reads an open scope first, then the `shop_id` claim. Scopes do not nest. Only `Application/Features/Auth/Register` may use `ITenantScope`, checked by the architecture test `TenantScopeUsageTests` (source scan, like `IgnoreQueryFiltersTests`).
 - **Suspended shops.** The default authorization policy checks the token's shop status on every authenticated request (no tracking) and returns `403 Shop.Suspended`; logout is exempt so a suspended shop can always sign out.
+
+## Update 2026-10-18: `shop_members` by shop id for the platform admin
+
+The platform admin needs members of a given shop (owner email in the shop list and search, the member list on shop detail, and revoking members' refresh tokens on suspend). These by-shop reads are allowed only in `Infrastructure/Persistence/Admin/`, used only by `Application/Features/Admin` handlers; `ShopMemberAccessTests` allows exactly that folder in addition to `ShopMembershipRepository`. Every other `shop_members` query still filters by a user id.

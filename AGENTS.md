@@ -108,7 +108,7 @@ These boundaries are enforced by `tests/Stockly.ArchitectureTests`. A failing ar
 
 ### Tenancy & security
 8. `ShopId` comes from the JWT via `ICurrentTenant`, never from the request. Every tenant entity has the EF global query filter (ADR-0002).
-9. `IgnoreQueryFilters()` is allowed only under `Application/Features/Admin`. Every admin write writes an `AdminAuditLog` (ADR-0005).
+9. Cross-tenant access (`IgnoreQueryFilters()`) is allowed only in `Infrastructure/Persistence/Admin/`, behind ports used only by `Application/Features/Admin`. Every admin write writes an `AdminAuditLog` (ADR-0005, update 2026-10-18).
 10. Wrong-tenant access returns **404**, never 403.
 11. Secrets (OpenRouter key, JWT key, DB/Redis/MinIO passwords) live in `.env` / user-secrets only. `.env` is git-ignored. `.env.example` has placeholders.
 12. Never log secrets, tokens, passwords, full images or raw AI JSON. Log IDs and sizes.
