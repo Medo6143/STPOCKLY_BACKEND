@@ -7,6 +7,8 @@ namespace Stockly.Infrastructure.Persistence.Configurations;
 /// <summary>Plans are global (not tenant entities). The default plan is seeded from <see cref="DefaultPlan"/>.</summary>
 internal sealed class PlanConfiguration : IEntityTypeConfiguration<Plan>
 {
+    public const string CodeIndex = "ux_plans_code";
+
     public void Configure(EntityTypeBuilder<Plan> builder)
     {
         builder.ToTable("plans");
@@ -22,7 +24,7 @@ internal sealed class PlanConfiguration : IEntityTypeConfiguration<Plan>
         // Seed and lookup by code.
         builder.HasIndex(p => p.Code)
             .IsUnique()
-            .HasDatabaseName("ux_plans_code");
+            .HasDatabaseName(CodeIndex);
 
         builder.HasData(new
         {

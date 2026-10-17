@@ -30,8 +30,11 @@ public static class BusinessCalendar
         return StartOfDayUtc(clock.Today().AddDays(1)) - clock.UtcNow;
     }
 
-    // Egypt starts summer time at local midnight, so 00:00 can be skipped: the day then starts at the first valid hour.
-    private static DateTimeOffset StartOfDayUtc(DateOnly date)
+    /// <summary>
+    /// The UTC instant a Cairo calendar day starts. Egypt starts summer time at local midnight, so 00:00 can be skipped:
+    /// the day then starts at the first valid hour.
+    /// </summary>
+    public static DateTimeOffset StartOfDayUtc(DateOnly date)
     {
         var local = date.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
         while (Cairo.IsInvalidTime(local))

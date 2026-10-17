@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Http.Resilience;
 using Microsoft.Extensions.Options;
 using Polly;
+using Stockly.Application.Abstractions.Admin;
 using Stockly.Application.Abstractions.Ai;
 using Stockly.Application.Abstractions.Caching;
 using Stockly.Application.Abstractions.Identity;
@@ -19,6 +20,7 @@ using Stockly.Application.Abstractions.Persistence;
 using Stockly.Application.Abstractions.Stock;
 using Stockly.Application.Abstractions.Storage;
 using Stockly.Application.Abstractions.Time;
+using Stockly.Application.Features.Admin.SeedPlatformAdmin;
 using Stockly.Application.Features.Auth;
 using Stockly.Application.Features.Invoices;
 using Stockly.Infrastructure.Ai.OpenRouter;
@@ -27,6 +29,7 @@ using Stockly.Infrastructure.Configuration;
 using Stockly.Infrastructure.Identity;
 using Stockly.Infrastructure.Jobs;
 using Stockly.Infrastructure.Persistence;
+using Stockly.Infrastructure.Persistence.Admin;
 using Stockly.Infrastructure.Persistence.Interceptors;
 using Stockly.Infrastructure.Persistence.Queries;
 using Stockly.Infrastructure.Persistence.Repositories;
@@ -88,6 +91,14 @@ public static class DependencyInjection
         services.AddScoped<IDashboardQueries, DashboardQueries>();
         services.AddScoped<IProductUnitUsageQueries, ProductUnitUsageQueries>();
 
+        // Platform admin (ADR-0005, update 2026-10-18): the only cross-tenant access, used only by Features/Admin.
+        services.AddScoped<IAdminShopQueries, AdminShopQueries>();
+        services.AddScoped<IAdminShopRepository, AdminShopRepository>();
+        services.AddScoped<IAdminPlanRepository, AdminPlanRepository>();
+        services.AddScoped<IAdminAiUsageQueries, AdminAiUsageQueries>();
+        services.AddScoped<IAdminInvoiceQueries, AdminInvoiceQueries>();
+        services.AddScoped<IAdminAuditLog, AdminAuditLogRepository>();
+
         return services;
     }
 
@@ -145,8 +156,27 @@ public static class DependencyInjection
             })
             .AddUserManager<StocklyUserManager>()
             .AddEntityFrameworkStores<StocklyDbContext>();
-        services.AddScoped<IUserAccounts, IdentityUserAccounts>();
+        services.AddScoped<IdentityUserAccounts>();
+        services.AddScoped<IUserAccounts>(provider => provider.GetRequiredService<IdentityUserAccounts>());
+        services.AddScoped<IPlatformAdminAccounts>(provider => provider.GetRequiredService<IdentityUserAccounts>());
 
+        return services;
+    }
+
+    /// <summary>
+    /// The start-up seed of the first platform admin from configuration section <c>Admin</c> (<c>Admin__Email</c>,
+    /// <c>Admin__Password</c>, <c>Admin__FullName</c>), and the one-time Hangfire dashboard codes. Requires MediatR
+    /// (<c>AddApplication</c>), <see cref="AddStocklyIdentity"/> and logging.
+    /// </summary>
+    public static IServiceCollection AddPlatformAdmin(this IServiceCollection services, IConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        var seed = new AdminSeedOptions();
+        configuration.GetSection(AdminSeedOptions.SectionName).Bind(seed);
+        services.AddSingleton(seed);
+        services.AddHostedService<PlatformAdminSeeder>();
+        services.AddSingleton<IHangfireSessionCodes, InMemoryHangfireSessionCodes>();
         return services;
     }
 
@@ -166,12 +196,16 @@ public static class DependencyInjection
         return services;
     }
 
-    /// <summary>Invoice images in S3-compatible storage (MinIO, ADR-0008) as <see cref="IFileStorage"/>.</summary>
+    /// <summary>
+    /// Invoice images in S3-compatible storage (MinIO, ADR-0008) as <see cref="IFileStorage"/>. Pre-signed URLs expire by
+    /// <see cref="IClock"/> (the system clock unless one is registered).
+    /// </summary>
     public static IServiceCollection AddStocklyStorage(this IServiceCollection services, IConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
         services.AddValidatedOptions<StorageOptions>(configuration, StorageOptions.SectionName);
+        services.TryAddSingleton<IClock, SystemClock>();
         services.AddSingleton<IAmazonS3>(provider =>
         {
             var options = provider.GetRequiredService<StorageOptions>();

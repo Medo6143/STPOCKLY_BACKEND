@@ -65,7 +65,7 @@ public sealed class ProcessInvoiceCommandHandler(
                 shopId, request.InvoiceId, [], invoice => invoice.MarkFailed(InvoiceFailureReason.ImageMissing, null, clock.UtcNow), cancellationToken);
         }
 
-        var extracted = await ExtractAsync(shopId, request.InvoiceId, info.ImageSha256, image, cancellationToken);
+        var extracted = await ExtractAsync(shopId, request.InvoiceId, info.ImageSha256, image, request.BypassAiCache, cancellationToken);
         if (extracted.Extraction is null)
         {
             var reason = extracted.Failure ?? InvoiceFailureReason.AiOutputInvalid;
@@ -129,20 +129,23 @@ public sealed class ProcessInvoiceCommandHandler(
     }
 
     private async Task<Extracted> ExtractAsync(
-        Guid shopId, Guid invoiceId, string imageSha256, StoredFile image, CancellationToken cancellationToken)
+        Guid shopId, Guid invoiceId, string imageSha256, StoredFile image, bool bypassAiCache, CancellationToken cancellationToken)
     {
         var started = Stopwatch.GetTimestamp();
 
-        var reusable = await invoices.FindReusableExtractionAsync(imageSha256, invoiceId, cancellationToken);
-        if (reusable is not null && TryParseUsable(reusable.RawAiJson) is { } reused)
+        if (!bypassAiCache)
         {
-            return CacheHit(shopId, invoiceId, reusable.Model, reused, reusable.RawAiJson, started);
-        }
+            var reusable = await invoices.FindReusableExtractionAsync(imageSha256, invoiceId, cancellationToken);
+            if (reusable is not null && TryParseUsable(reusable.RawAiJson) is { } reused)
+            {
+                return CacheHit(shopId, invoiceId, reusable.Model, reused, reusable.RawAiJson, started);
+            }
 
-        var cached = await aiCache.GetAsync(shopId, imageSha256, cancellationToken);
-        if (cached is not null && IsUsable(cached.Extraction))
-        {
-            return CacheHit(shopId, invoiceId, cached.Model, cached.Extraction, AiJson.Serialize(cached.Extraction), started);
+            var cached = await aiCache.GetAsync(shopId, imageSha256, cancellationToken);
+            if (cached is not null && IsUsable(cached.Extraction))
+            {
+                return CacheHit(shopId, invoiceId, cached.Model, cached.Extraction, AiJson.Serialize(cached.Extraction), started);
+            }
         }
 
         var result = await extractor.ExtractAsync(new AiExtractionRequest(image.Content, image.ContentType), cancellationToken);

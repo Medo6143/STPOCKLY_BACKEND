@@ -8,9 +8,11 @@ namespace Stockly.Infrastructure.Persistence.Configurations;
 
 internal sealed class AiUsageRecordConfiguration : IEntityTypeConfiguration<AiUsageRecord>
 {
+    public const string TableName = "ai_usage_records";
+
     public void Configure(EntityTypeBuilder<AiUsageRecord> builder)
     {
-        builder.ToTable("ai_usage_records", table => table.HasCheckConstraint(
+        builder.ToTable(TableName, table => table.HasCheckConstraint(
             "ck_ai_usage_records_non_negative",
             "prompt_tokens >= 0 AND completion_tokens >= 0 AND cost_usd >= 0 AND latency_ms >= 0"));
 

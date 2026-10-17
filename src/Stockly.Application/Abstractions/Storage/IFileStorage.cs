@@ -12,6 +12,12 @@ public interface IFileStorage
     /// <summary>The object, or <c>null</c> when it does not exist.</summary>
     Task<StoredFile?> GetAsync(string key, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// A pre-signed GET URL of the object valid for <paramref name="validFor"/> (the admin's invoice view, AD18), or
+    /// <c>null</c> when the object does not exist.
+    /// </summary>
+    Task<string?> GetDownloadUrlAsync(string key, TimeSpan validFor, CancellationToken cancellationToken);
+
     /// <summary>Removes the object; a missing object is not an error.</summary>
     Task DeleteAsync(string key, CancellationToken cancellationToken);
 }

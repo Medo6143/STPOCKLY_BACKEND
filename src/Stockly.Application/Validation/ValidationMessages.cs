@@ -32,6 +32,10 @@ public static class ValidationMessages
 
     public static string ProductAndUnitTogether => Get(nameof(ProductAndUnitTogether));
 
+    public static string EndsBeforeToday => Get(nameof(EndsBeforeToday));
+
+    public static string UsageRangeInvalid => Get(nameof(UsageRangeInvalid));
+
     private static string Get(string key) =>
         Resources.GetString(key, CultureInfo.CurrentUICulture)
         ?? throw new InvalidOperationException($"Validation message '{key}' is missing.");

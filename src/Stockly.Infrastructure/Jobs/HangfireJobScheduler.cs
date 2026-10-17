@@ -13,6 +13,12 @@ internal sealed partial class HangfireJobScheduler(HangfireStorage storage, ILog
         LogQueued(logger, nameof(ProcessInvoiceJob), invoiceId, shopId, jobId);
     }
 
+    public void EnqueueRerunInvoice(Guid shopId, Guid invoiceId)
+    {
+        var jobId = Client().Enqueue<ProcessInvoiceJob>(job => job.RerunAsync(shopId, invoiceId, CancellationToken.None));
+        LogQueued(logger, nameof(ProcessInvoiceJob.RerunAsync), invoiceId, shopId, jobId);
+    }
+
     /// <summary>Queues <see cref="FailInvoiceProcessingJob"/> (used by <see cref="InvoiceJobFailureFilter"/>).</summary>
     public void EnqueueFailInvoiceProcessing(Guid shopId, Guid invoiceId)
     {

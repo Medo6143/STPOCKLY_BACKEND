@@ -107,9 +107,28 @@ internal sealed partial class RedisScanLimiter(
         }
     }
 
+    public async Task<bool> ResetAsync(Guid shopId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var database = await redis.GetDatabaseAsync(cancellationToken);
+            await database.KeyDeleteAsync(CacheKeys.ScanQuota(shopId, clock.Today())).WaitAsync(cancellationToken);
+            LogQuotaReset(logger, shopId);
+            return true;
+        }
+        catch (Exception exception) when (RedisDegradationLog.IsRedisFailure(exception))
+        {
+            degradation.Warn(nameof(ResetAsync), exception);
+            return false;
+        }
+    }
+
     [LoggerMessage(EventId = 10, Level = LogLevel.Information, Message = "Scan rate limit reached for shop {ShopId}: {Count} scans this minute")]
     private static partial void LogRateLimited(ILogger logger, Guid shopId, long count);
 
     [LoggerMessage(EventId = 11, Level = LogLevel.Information, Message = "Daily scan quota used up for shop {ShopId} (quota {DailyQuota})")]
     private static partial void LogQuotaExceeded(ILogger logger, Guid shopId, int dailyQuota);
+
+    [LoggerMessage(EventId = 12, Level = LogLevel.Information, Message = "Daily scan counter of shop {ShopId} reset by the platform admin")]
+    private static partial void LogQuotaReset(ILogger logger, Guid shopId);
 }

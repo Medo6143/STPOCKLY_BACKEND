@@ -20,7 +20,19 @@ public sealed partial class ProcessInvoiceJob(JobTenantContext tenant, ISender s
 
     [Queue(HangfireOptions.InvoicesQueue)]
     [AutomaticRetry(Attempts = RetryAttempts, OnAttemptsExceeded = AttemptsExceededAction.Fail)]
-    public async Task RunAsync(Guid shopId, Guid invoiceId, CancellationToken cancellationToken)
+    public Task RunAsync(Guid shopId, Guid invoiceId, CancellationToken cancellationToken) =>
+        ProcessAsync(shopId, invoiceId, bypassAiCache: false, cancellationToken);
+
+    /// <summary>
+    /// The platform admin's re-run of a failed invoice (contract AD19): the same work without the AI result cache and the
+    /// reuse of an earlier extraction. Same arguments, so <see cref="InvoiceJobFailureFilter"/> handles both methods.
+    /// </summary>
+    [Queue(HangfireOptions.InvoicesQueue)]
+    [AutomaticRetry(Attempts = RetryAttempts, OnAttemptsExceeded = AttemptsExceededAction.Fail)]
+    public Task RerunAsync(Guid shopId, Guid invoiceId, CancellationToken cancellationToken) =>
+        ProcessAsync(shopId, invoiceId, bypassAiCache: true, cancellationToken);
+
+    private async Task ProcessAsync(Guid shopId, Guid invoiceId, bool bypassAiCache, CancellationToken cancellationToken)
     {
         tenant.Set(shopId);
         using var scope = logger.BeginScope(new Dictionary<string, object> { ["ShopId"] = shopId, ["InvoiceId"] = invoiceId });
@@ -29,7 +41,7 @@ public sealed partial class ProcessInvoiceJob(JobTenantContext tenant, ISender s
 
         try
         {
-            var result = await sender.Send(new ProcessInvoiceCommand(invoiceId), cancellationToken);
+            var result = await sender.Send(new ProcessInvoiceCommand(invoiceId, bypassAiCache), cancellationToken);
             var elapsed = (long)Stopwatch.GetElapsedTime(started).TotalMilliseconds;
             if (result.IsFailure)
             {
