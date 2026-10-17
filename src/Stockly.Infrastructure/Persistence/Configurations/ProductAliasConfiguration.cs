@@ -8,6 +8,8 @@ namespace Stockly.Infrastructure.Persistence.Configurations;
 
 internal sealed class ProductAliasConfiguration : IEntityTypeConfiguration<ProductAlias>
 {
+    public const string ProductUnitForeignKey = "fk_product_aliases_product_units_product_unit_id";
+
     public void Configure(EntityTypeBuilder<ProductAlias> builder)
     {
         builder.ToTable("product_aliases", table =>
@@ -26,7 +28,8 @@ internal sealed class ProductAliasConfiguration : IEntityTypeConfiguration<Produ
         builder.HasOne<Shop>().WithMany().HasForeignKey(a => a.ShopId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Product>().WithMany().HasForeignKey(a => a.ProductId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Supplier>().WithMany().HasForeignKey(a => a.SupplierId).OnDelete(DeleteBehavior.Restrict);
-        builder.HasOne<ProductUnit>().WithMany().HasForeignKey(a => a.ProductUnitId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<ProductUnit>().WithMany().HasForeignKey(a => a.ProductUnitId).OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName(ProductUnitForeignKey);
 
         // Exact alias match during matching (step 2b); upsert on confirm. A null supplier conflicts too (PG 15+).
         builder.HasIndex(a => new { a.ShopId, a.SupplierId, a.NormalizedAlias })

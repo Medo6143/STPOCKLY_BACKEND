@@ -16,6 +16,12 @@ public interface IProductQueries
 
     /// <summary>A page of the product's movements, newest first (contract P11).</summary>
     Task<PagedResponse<StockMovementDto>> ListMovementsAsync(Guid productId, int page, int pageSize, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// P12: the non-archived product whose unit or product barcode is exactly <paramref name="barcode"/>, with the unit
+    /// whose barcode matched (a unit barcode is checked first) or the base unit; <c>null</c> when none.
+    /// </summary>
+    Task<ProductLookupResponse?> FindByBarcodeAsync(string barcode, CancellationToken cancellationToken);
 }
 
 /// <summary>

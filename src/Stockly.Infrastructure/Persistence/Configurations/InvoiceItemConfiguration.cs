@@ -9,6 +9,8 @@ namespace Stockly.Infrastructure.Persistence.Configurations;
 /// <summary>invoice_items with the nine CHECK constraints of docs/design/backend.md §10.3.</summary>
 internal sealed class InvoiceItemConfiguration : IEntityTypeConfiguration<InvoiceItem>
 {
+    public const string ProductUnitForeignKey = "fk_invoice_items_product_units_product_unit_id";
+
     public void Configure(EntityTypeBuilder<InvoiceItem> builder)
     {
         builder.ToTable("invoice_items", table =>
@@ -50,7 +52,8 @@ internal sealed class InvoiceItemConfiguration : IEntityTypeConfiguration<Invoic
 
         builder.HasOne<Shop>().WithMany().HasForeignKey(i => i.ShopId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Product>().WithMany().HasForeignKey(i => i.ProductId).OnDelete(DeleteBehavior.Restrict);
-        builder.HasOne<ProductUnit>().WithMany().HasForeignKey(i => i.ProductUnitId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<ProductUnit>().WithMany().HasForeignKey(i => i.ProductUnitId).OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName(ProductUnitForeignKey);
         builder.HasOne<Product>().WithMany().HasForeignKey(i => i.CreatedProductId).OnDelete(DeleteBehavior.Restrict);
 
         // Review screen ordered by line; stable edits. Also serves loading the lines of an invoice.
