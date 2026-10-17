@@ -109,17 +109,17 @@ Every error response is `application/problem+json`:
 | P9 | POST | /api/products/{id}/adjustments | owner | 201, 400, 401, 403, 404 | 1.6 | implemented |
 | P10 | POST | /api/products/{id}/stock-counts | owner | 200, 400, 401, 403, 404 | 1.6 | implemented |
 | P11 | GET | /api/products/{id}/movements | user | 200, 400, 401, 403, 404 | 1.6 | implemented |
-| P12 | GET | /api/products/lookup | user | 200, 400, 401, 403, 404 | 4 | planned |
+| P12 | GET | /api/products/lookup | user | 200, 400, 401, 403, 404 | 4 | implemented |
 | I1 | POST | /api/invoices/scan | user | 200, 202, 400, 401, 403, 413, 429 | 2 | implemented |
 | I2 | GET | /api/invoices | user | 200, 400, 401, 403 | 2 | implemented |
 | I3 | GET | /api/invoices/{id} | user | 200, 401, 403, 404 | 2 | implemented |
 | I4 | PUT | /api/invoices/{id}/items | user | 200, 400, 401, 403, 404, 409 | 2 | implemented |
-| I5 | POST | /api/invoices/{id}/confirm | user | 200, 400, 401, 403, 404, 409 | 4 | planned |
-| S1 | POST | /api/sales | user | 200, 201, 400, 401, 403, 404 | 4 | planned |
-| S2 | GET | /api/sales | user | 200, 400, 401, 403 | 4 | planned |
-| S3 | GET | /api/sales/{id} | user | 200, 401, 403, 404 | 4 | planned |
-| D1 | GET | /api/dashboard/summary | user | 200, 401, 403 | 4 | planned |
-| D2 | GET | /api/dashboard/expiring-soon | user | 200, 400, 401, 403 | 4 | planned |
+| I5 | POST | /api/invoices/{id}/confirm | user | 200, 400, 401, 403, 404, 409 | 4 | implemented |
+| S1 | POST | /api/sales | user | 200, 201, 400, 401, 403, 404 | 4 | implemented |
+| S2 | GET | /api/sales | user | 200, 400, 401, 403 | 4 | implemented |
+| S3 | GET | /api/sales/{id} | user | 200, 401, 403, 404 | 4 | implemented |
+| D1 | GET | /api/dashboard/summary | user | 200, 401, 403 | 4 | implemented |
+| D2 | GET | /api/dashboard/expiring-soon | user | 200, 400, 401, 403 | 4 | implemented |
 | AD1 | POST | /api/admin/auth/login | anonymous | 200, 400, 401, 403, 423, 429 | 5 | planned |
 | AD2 | POST | /api/admin/auth/refresh | anonymous | 200, 400, 401 | 5 | planned |
 | AD3 | POST | /api/admin/auth/logout | admin | 204, 400, 401 | 5 | planned |

@@ -11,7 +11,7 @@ namespace Stockly.Domain.Suppliers;
 public sealed class ProductAlias : Entity, ITenantEntity
 {
     private ProductAlias(
-        Guid shopId, Guid productId, Guid? supplierId, Guid productUnitId, string aliasText, DateTimeOffset lastUsedAt)
+        Guid shopId, Guid productId, Guid? supplierId, Guid productUnitId, string aliasText, int timesConfirmed, DateTimeOffset lastUsedAt)
     {
         ShopId = shopId;
         ProductId = productId;
@@ -19,7 +19,7 @@ public sealed class ProductAlias : Entity, ITenantEntity
         ProductUnitId = productUnitId;
         AliasText = aliasText;
         NormalizedAlias = ArabicTextNormalizer.Normalize(aliasText);
-        TimesConfirmed = 1;
+        TimesConfirmed = timesConfirmed;
         LastUsedAt = lastUsedAt;
     }
 
@@ -40,9 +40,12 @@ public sealed class ProductAlias : Entity, ITenantEntity
 
     public DateTimeOffset LastUsedAt { get; private set; }
 
-    /// <summary>The first confirmation of this text.</summary>
+    /// <summary>
+    /// The first confirmation of this text. <paramref name="timesConfirmed"/> counts the confirmed lines that taught it at
+    /// once (one invoice can list the same text on several lines); at least 1.
+    /// </summary>
     public static Result<ProductAlias> Learn(
-        Guid shopId, Guid productId, Guid? supplierId, Guid productUnitId, string aliasText, DateTimeOffset now)
+        Guid shopId, Guid productId, Guid? supplierId, Guid productUnitId, string aliasText, DateTimeOffset now, int timesConfirmed = 1)
     {
         if (shopId == Guid.Empty)
         {
@@ -54,6 +57,11 @@ public sealed class ProductAlias : Entity, ITenantEntity
             return SupplierErrors.AliasTextRequired;
         }
 
-        return new ProductAlias(shopId, productId, supplierId, productUnitId, aliasText.Trim(), now);
+        if (timesConfirmed < 1)
+        {
+            return SupplierErrors.TimesConfirmedNotPositive;
+        }
+
+        return new ProductAlias(shopId, productId, supplierId, productUnitId, aliasText.Trim(), timesConfirmed, now);
     }
 }

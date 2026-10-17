@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Stockly.Domain.Invoices;
 using Stockly.Domain.Products;
+using Stockly.Domain.Sales;
 using Stockly.Domain.Shops;
 using Stockly.Domain.Stock;
 using Stockly.Infrastructure.Identity;
@@ -10,6 +11,8 @@ namespace Stockly.Infrastructure.Persistence.Configurations;
 
 internal sealed class StockMovementConfiguration : IEntityTypeConfiguration<StockMovement>
 {
+    public const string InvoiceItemReasonIndex = "ux_stock_movements_invoice_item_id_reason";
+
     public void Configure(EntityTypeBuilder<StockMovement> builder)
     {
         builder.ToTable("stock_movements", table =>
@@ -35,22 +38,23 @@ internal sealed class StockMovementConfiguration : IEntityTypeConfiguration<Stoc
         builder.Property(m => m.BalanceAfter).HasPrecision(14, 3);
         builder.Property(m => m.Reason).HasConversion<short>();
 
-        // sale_id and sale_item_id are plain columns until their target tables exist; see "Deferred foreign keys" in
-        // docs/erd.md. created_by_user_id became a real FK in migration Identity (1.5), invoice_id and invoice_item_id
-        // in migration InvoiceScan (Sprint 2).
+        // created_by_user_id became a real FK in migration Identity (1.5), invoice_id and invoice_item_id in migration
+        // InvoiceScan (Sprint 2), sale_id and sale_item_id in migration Sales (Sprint 4); see docs/erd.md §3.7.
         builder.HasOne<Shop>().WithMany().HasForeignKey(m => m.ShopId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Product>().WithMany().HasForeignKey(m => m.ProductId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<ApplicationUser>().WithMany().HasForeignKey(m => m.CreatedByUserId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Invoice>().WithMany().HasForeignKey(m => m.InvoiceId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<InvoiceItem>().WithMany().HasForeignKey(m => m.InvoiceItemId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Sale>().WithMany().HasForeignKey(m => m.SaleId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<SaleItem>().WithMany().HasForeignKey(m => m.SaleItemId).OnDelete(DeleteBehavior.Restrict);
 
         // Idempotent confirm; one terminal reversal per line (erd.md §3.5, ADR-0001).
         builder.HasIndex(m => new { m.InvoiceItemId, m.Reason })
             .IsUnique()
             .HasFilter("invoice_item_id IS NOT NULL")
-            .HasDatabaseName("ux_stock_movements_invoice_item_id_reason");
+            .HasDatabaseName(InvoiceItemReasonIndex);
 
-        // Idempotent sale.
+        // Idempotent sale; SaleQueries reads a line's balance_after through it.
         builder.HasIndex(m => m.SaleItemId)
             .IsUnique()
             .HasFilter("sale_item_id IS NOT NULL")

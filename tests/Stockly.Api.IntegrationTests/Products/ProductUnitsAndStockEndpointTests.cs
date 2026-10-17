@@ -110,6 +110,32 @@ public sealed class ProductUnitsAndStockEndpointTests(ApiFixture fixture)
     }
 
     [Fact]
+    public async Task RemoveUnit_UsedByAnInvoiceOrASaleLine_409InUse_Unused_204()
+    {
+        await using var factory = fixture.CreateFactory();
+        using var client = factory.CreateClient();
+        var owner = await AuthApi.RegisterAsync(client);
+        var stranger = await AuthApi.RegisterAsync(client);
+        var (id, _) = await StockFlowApi.ProductAsync(client, owner.AccessToken, "بنادول", openingQuantity: "10.000");
+        var onInvoice = await StockFlowApi.UnitAsync(client, owner.AccessToken, id, "علبة", "3", "40.00");
+        var onSale = await StockFlowApi.UnitAsync(client, owner.AccessToken, id, "كرتونة", "30", "400.00");
+        var unused = await StockFlowApi.UnitAsync(client, owner.AccessToken, id, "نصف شريط", "0.5", "8.00");
+        await StockFlowApi.ReviewedInvoiceAsync(fixture, owner, null, new ReviewLine(1, "بنادول علبة", "1", "30.00", id, onInvoice));
+        await StockFlowApi.SellOkAsync(client, owner.AccessToken, StockFlowApi.Line(id, onSale, "0.1"));
+
+        var invoiceLine = await ProductApi.DeleteAsync(client, ProductApi.Unit(id, onInvoice), owner.AccessToken);
+        var saleLine = await ProductApi.DeleteAsync(client, ProductApi.Unit(id, onSale), owner.AccessToken);
+        var wrongTenant = await ProductApi.DeleteAsync(client, ProductApi.Unit(id, unused), stranger.AccessToken);
+        var free = await ProductApi.DeleteAsync(client, ProductApi.Unit(id, unused), owner.AccessToken);
+
+        Expect(invoiceLine, HttpStatusCode.Conflict, "ProductUnit.InUse");
+        Expect(saleLine, HttpStatusCode.Conflict, "ProductUnit.InUse");
+        Expect(wrongTenant, HttpStatusCode.NotFound, "Product.NotFound");
+        free.Status.Should().Be(HttpStatusCode.NoContent);
+        (await fixture.ScalarAsync<long>("SELECT count(*) FROM product_units WHERE product_id = @p0", id)).Should().Be(3);
+    }
+
+    [Fact]
     public async Task Adjust_InAnotherUnit_Returns201MovementInBaseUnits()
     {
         await using var factory = fixture.CreateFactory();

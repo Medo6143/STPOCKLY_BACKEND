@@ -162,6 +162,13 @@ public sealed class InvoiceItem : Entity, ITenantEntity
         return item;
     }
 
+    /// <summary>Set by <see cref="Invoice.Confirm"/> on every line, in the confirm transaction (backend.md §10.4).</summary>
+    internal void MarkConfirmed(DateTimeOffset confirmedAt, Guid? createdProductId)
+    {
+        ConfirmedAt = confirmedAt;
+        CreatedProductId = createdProductId;
+    }
+
     private static Result<InvoiceItem> Create(
         Guid shopId, Guid invoiceId, int lineNo, string rawName, decimal quantity, decimal unitPrice, DateOnly? expiryDate, string? batchNo)
     {

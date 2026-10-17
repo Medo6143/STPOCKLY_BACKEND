@@ -55,6 +55,12 @@ public sealed class MigrationTests(PostgresFixture fixture)
         "ix_ai_usage_records_shop_id_created_at",
         "ix_ai_usage_records_created_at",
         "ix_ai_usage_records_invoice_id",
+
+        // Sales (erd.md §3.4, Sprint 4)
+        "ux_sales_shop_id_client_request_id",
+        "ix_sales_shop_id_created_at",
+        "ux_sale_items_sale_id_line_no",
+        "ix_sale_items_shop_id_product_id",
     ];
 
     private static readonly string[] ExpectedChecks =
@@ -75,6 +81,9 @@ public sealed class MigrationTests(PostgresFixture fixture)
         "ck_invoice_items_line_no",
         "ck_invoice_items_match_confidence",
         "ck_ai_usage_records_non_negative",
+        "ck_sales_total_amount",
+        "ck_sale_items_amounts",
+        "ck_sale_items_line_no",
     ];
 
     [Fact]
@@ -128,7 +137,9 @@ public sealed class MigrationTests(PostgresFixture fixture)
             "product_aliases",
             "invoices",
             "invoice_items",
-            "ai_usage_records");
+            "ai_usage_records",
+            "sales",
+            "sale_items");
     }
 
     [Fact]
@@ -180,7 +191,9 @@ public sealed class MigrationTests(PostgresFixture fixture)
     [Theory]
     [InlineData("fk_stock_movements_invoices_invoice_id", "invoices")]
     [InlineData("fk_stock_movements_invoice_items_invoice_item_id", "invoice_items")]
-    public async Task Migrate_StockMovementInvoiceColumns_AreNowForeignKeys(string constraint, string target)
+    [InlineData("fk_stock_movements_sales_sale_id", "sales")]
+    [InlineData("fk_stock_movements_sale_items_sale_item_id", "sale_items")]
+    public async Task Migrate_StockMovementSourceColumns_AreNowForeignKeys(string constraint, string target)
     {
         var table = await fixture.ScalarAsync<string>(
             "SELECT confrelid::regclass::text FROM pg_constraint WHERE conname = @p0 AND contype = 'f'", constraint);

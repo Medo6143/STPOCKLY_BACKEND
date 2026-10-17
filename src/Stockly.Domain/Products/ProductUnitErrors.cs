@@ -19,6 +19,10 @@ public static class ProductUnitErrors
     public static readonly Error BaseUnitCannotBeRemoved =
         Error.Validation("ProductUnit.BaseUnitCannotBeRemoved", "The base unit cannot be removed.");
 
+    /// <summary>The unit is referenced by invoice or sale lines; deleting it would break their history (contract P8).</summary>
+    public static readonly Error InUse =
+        Error.Conflict("ProductUnit.InUse", "This unit is used by invoice or sale lines and cannot be removed.");
+
     public static readonly Error BaseUnitFactorFixed =
         Error.Validation("ProductUnit.BaseUnitFactorFixed", "The base unit factor is always 1.");
 }

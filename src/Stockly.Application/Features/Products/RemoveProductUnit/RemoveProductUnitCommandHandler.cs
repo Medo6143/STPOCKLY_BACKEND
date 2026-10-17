@@ -6,10 +6,12 @@ using Stockly.Domain.Products;
 namespace Stockly.Application.Features.Products.RemoveProductUnit;
 
 /// <summary>
-/// <c>ProductUnit.InUse</c> (409) needs invoice and sale lines, which do not exist before Sprint 2; until then a unit
-/// can always be removed unless the product is archived or the unit is the base unit.
+/// P8. A unit referenced by an invoice or sale line cannot be deleted: <c>409 ProductUnit.InUse</c> (contract §10 item 16)
+/// from one tenant-filtered <c>EXISTS</c> per line table. The restrict FKs stay the last safety net: a line added by a
+/// concurrent request between this check and the save is mapped to the same error by the unit of work.
 /// </summary>
-public sealed class RemoveProductUnitCommandHandler(IProductRepository products, IUnitOfWork unitOfWork)
+public sealed class RemoveProductUnitCommandHandler(
+    IProductRepository products, IProductUnitUsageQueries usage, IUnitOfWork unitOfWork)
     : IRequestHandler<RemoveProductUnitCommand, Result>
 {
     public async Task<Result> Handle(RemoveProductUnitCommand request, CancellationToken cancellationToken)
@@ -22,13 +24,21 @@ public sealed class RemoveProductUnitCommandHandler(IProductRepository products,
             return ProductErrors.NotFound;
         }
 
+        // Archived product, unknown unit and base unit are the Domain's answers; only a removable unit is checked for use.
+        var removable = !product.IsArchived && product.Units.Any(unit => unit.Id == request.UnitId && !unit.IsBase);
+        if (removable
+            && (await usage.IsUsedByInvoiceLinesAsync(request.UnitId, cancellationToken)
+                || await usage.IsUsedBySaleLinesAsync(request.UnitId, cancellationToken)))
+        {
+            return ProductUnitErrors.InUse;
+        }
+
         var removed = product.RemoveUnit(request.UnitId);
         if (removed.IsFailure)
         {
             return removed;
         }
 
-        await unitOfWork.SaveChangesAsync(cancellationToken);
-        return Result.Success();
+        return await unitOfWork.TrySaveChangesAsync(cancellationToken);
     }
 }

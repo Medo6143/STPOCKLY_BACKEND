@@ -210,6 +210,40 @@ public sealed class Invoice : Entity, ITenantEntity
         return Result.Success();
     }
 
+    /// <summary>Whether a line has neither an existing product nor a new one (confirm refuses it, contract I5).</summary>
+    public bool HasUnresolvedLine => _items.Exists(item => item.ProductId is null && item.NewProductName is null);
+
+    /// <summary>
+    /// Confirm (contract I5, docs/design/backend.md §11 step 9, §10): status <see cref="InvoiceStatus.Confirmed"/>, the
+    /// confirmation time and user, the supplier, and on every line <c>confirmed_at</c> and, for a new-product line, the
+    /// product created from it (<paramref name="createdProductIdByLineId"/>, keyed by line id, exactly the new-product
+    /// lines). Stock is received by <c>IStockService</c> in the same transaction, not here. On failure nothing changes.
+    /// </summary>
+    public Result Confirm(Guid userId, Guid? supplierId, IReadOnlyDictionary<Guid, Guid> createdProductIdByLineId, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(createdProductIdByLineId);
+
+        var error = (Status == InvoiceStatus.NeedsReview ? null : InvoiceErrors.NotConfirmable)
+            ?? (userId == Guid.Empty ? InvoiceErrors.UserRequired : null)
+            ?? (HasUnresolvedLine ? InvoiceErrors.LineProductRequired : null)
+            ?? (CreatedProductsMatch(createdProductIdByLineId) ? null : InvoiceErrors.CreatedProductsMismatch);
+        if (error is not null)
+        {
+            return error;
+        }
+
+        foreach (var item in _items)
+        {
+            item.MarkConfirmed(now, createdProductIdByLineId.TryGetValue(item.Id, out var created) ? created : null);
+        }
+
+        SupplierId = supplierId;
+        ConfirmedByUserId = userId;
+        ConfirmedAt = now;
+        Status = InvoiceStatus.Confirmed;
+        return Result.Success();
+    }
+
     /// <summary>Whether the current line <paramref name="lineNo"/> references <paramref name="productId"/> (unchanged product).</summary>
     public bool HasProductOnLine(int lineNo, Guid productId) =>
         _items.Any(item => item.LineNo == lineNo && item.ProductId == productId);
@@ -237,6 +271,13 @@ public sealed class Invoice : Entity, ITenantEntity
         && before.ProductUnitId == product.ProductUnitId
             ? before.MatchConfidence
             : null;
+
+    private bool CreatedProductsMatch(IReadOnlyDictionary<Guid, Guid> createdProductIdByLineId)
+    {
+        var newProductLines = _items.Where(item => item.NewProductName is not null).Select(item => item.Id).ToHashSet();
+        return newProductLines.SetEquals(createdProductIdByLineId.Keys)
+            && createdProductIdByLineId.Values.All(productId => productId != Guid.Empty);
+    }
 
     private static bool IsSha256Hex(string? value) =>
         value is { Length: InvoiceLimits.ImageSha256Length } && value.All(c => char.IsAsciiDigit(c) || c is >= 'a' and <= 'f');

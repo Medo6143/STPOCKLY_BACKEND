@@ -18,13 +18,22 @@ public sealed class RoundTripTests(PostgresFixture fixture)
         var (invoiceId, itemId) = await fixture.CreateInvoiceLineAsync(shop.Id);
         var receipt = product.RecordMovement(
             99_999_999_999.999m, MovementReason.InvoiceReceipt, MovementSource.FromInvoiceItem(invoiceId, itemId), Catalog.UserId, null, TestTime.T1).Value;
-        var sale = product.RecordMovement(
-            -0.001m, MovementReason.Sale, MovementSource.FromSaleItem(Guid.NewGuid(), Guid.NewGuid()), Catalog.UserId, null, TestTime.T2).Value;
 
         await using (var writer = fixture.CreateContext(shop.Id))
         {
             writer.Products.Add(product);
-            writer.StockMovements.AddRange(receipt, sale);
+            writer.StockMovements.Add(receipt);
+            await writer.SaveChangesAsync();
+        }
+
+        // The sale line references the saved product (sale_items.product_id is a FK since migration Sales).
+        var (saleId, saleItemId) = await fixture.CreateSaleLineAsync(shop.Id, product.Id, product.BaseUnit.Id);
+        var sale = product.RecordMovement(
+            -0.001m, MovementReason.Sale, MovementSource.FromSaleItem(saleId, saleItemId), Catalog.UserId, null, TestTime.T2).Value;
+        await using (var writer = fixture.CreateContext(shop.Id))
+        {
+            writer.StockMovements.Add(sale);
+            await writer.Database.ExecuteSqlRawAsync("UPDATE products SET quantity = {0} WHERE id = {1}", product.Quantity, product.Id);
             await writer.SaveChangesAsync();
         }
 

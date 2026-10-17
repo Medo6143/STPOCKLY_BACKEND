@@ -24,6 +24,26 @@ public interface IStockService
     /// nothing to lock. Zero records nothing.
     /// </summary>
     Result<StockCountOutcome> RecordOpeningStock(Product newProduct, decimal openingQuantity, Guid userId);
+
+    /// <summary>
+    /// Locks the current shop's products with these ids in one statement, <c>SELECT ... WHERE id = ANY(@ids) ORDER BY id
+    /// FOR UPDATE</c>, so every path takes product locks in the same (PostgreSQL uuid) order (AGENTS.md rule 4), then
+    /// loads them tracked with their units. Call it after locking the invoice or the sale, inside the transaction. Missing
+    /// and other shops' ids are absent from the result. Quantities come from these rows, never from cache (rule 24).
+    /// </summary>
+    Task<IReadOnlyDictionary<Guid, Product>> LockProductsAsync(IReadOnlyCollection<Guid> productIds, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// An <c>InvoiceReceipt</c> of <paramref name="baseQuantity"/> (base unit, &gt; 0) into a product locked by
+    /// <see cref="LockProductsAsync"/> or created in this transaction, from one invoice line (confirm, I5).
+    /// </summary>
+    Result<StockMovement> ReceiveFromInvoice(Product product, decimal baseQuantity, Guid invoiceId, Guid invoiceItemId, Guid userId);
+
+    /// <summary>
+    /// A <c>Sale</c> movement of <c>-<paramref name="baseQuantity"/></c> (base unit) from a product locked by
+    /// <see cref="LockProductsAsync"/>, for one sale line (S1). Negative stock is allowed (contract §7).
+    /// </summary>
+    Result<StockMovement> RecordSale(Product product, decimal baseQuantity, Guid saleId, Guid saleItemId, Guid userId);
 }
 
 /// <summary>A count's outcome and the product quantity after it (base unit).</summary>

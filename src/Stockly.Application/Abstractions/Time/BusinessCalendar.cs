@@ -16,6 +16,13 @@ public static class BusinessCalendar
     /// <summary>The UTC instant today's Cairo day started (the daily scan quota fallback counts from here).</summary>
     public static DateTimeOffset CairoDayStartUtc(this IClock clock) => StartOfDayUtc(clock.Today());
 
+    /// <summary>The UTC instants today's Cairo day starts (inclusive) and ends (exclusive): "today" on the dashboard (D1).</summary>
+    public static (DateTimeOffset Start, DateTimeOffset End) CairoDayRangeUtc(this IClock clock)
+    {
+        var today = clock.Today();
+        return (StartOfDayUtc(today), StartOfDayUtc(today.AddDays(1)));
+    }
+
     /// <summary>Time until the next Cairo midnight, when the daily scan quota resets (contract I1 <c>Retry-After</c>).</summary>
     public static TimeSpan UntilNextCairoMidnight(this IClock clock)
     {

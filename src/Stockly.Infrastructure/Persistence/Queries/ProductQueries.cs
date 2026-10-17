@@ -3,6 +3,7 @@ using Stockly.Application.Abstractions.Persistence;
 using Stockly.Application.Features.Products;
 using Stockly.Contracts.Common;
 using Stockly.Contracts.Products;
+using Stockly.Domain.Products;
 
 namespace Stockly.Infrastructure.Persistence.Queries;
 
@@ -166,6 +167,58 @@ internal sealed class ProductQueries(StocklyDbContext db) : IProductQueries
                 row.CreatedAt.UtcDateTime))
             .ToList();
         return new PagedResponse<StockMovementDto>(items, page, pageSize, totalCount);
+    }
+
+    // P12. ux_product_units_shop_id_barcode first (the unit that was scanned), then ux_products_shop_id_barcode (the base
+    // unit); the product row and its unit by primary key. Archived products are never found.
+    public async Task<ProductLookupResponse?> FindByBarcodeAsync(string barcode, CancellationToken cancellationToken)
+    {
+        var match = await db.Set<ProductUnit>().AsNoTracking()
+            .Where(unit => unit.Barcode == barcode)
+            .Join(db.Products.AsNoTracking().Where(product => !product.IsArchived), unit => unit.ProductId, product => product.Id, (unit, _) => new { unit.ProductId, UnitId = unit.Id })
+            .FirstOrDefaultAsync(cancellationToken)
+            ?? await db.Products.AsNoTracking()
+                .Where(product => product.Barcode == barcode && !product.IsArchived)
+                .Select(product => new { ProductId = product.Id, UnitId = product.Units.Where(unit => unit.IsBase).Select(unit => unit.Id).First() })
+                .FirstOrDefaultAsync(cancellationToken);
+        if (match is null)
+        {
+            return null;
+        }
+
+        var row = await db.Products.AsNoTracking()
+            .Where(product => product.Id == match.ProductId)
+            .Select(product => new
+            {
+                product.Id,
+                product.Name,
+                product.Quantity,
+                product.LowStockThreshold,
+                product.IsArchived,
+                BaseUnit = product.Units.Where(unit => unit.IsBase).Select(unit => new { unit.Id, unit.Name, unit.SellPrice }).First(),
+                Unit = product.Units
+                    .Where(unit => unit.Id == match.UnitId)
+                    .Select(unit => new { unit.Id, unit.Name, unit.Factor, unit.SellPrice, unit.Barcode, unit.IsBase })
+                    .First(),
+            })
+            .SingleAsync(cancellationToken);
+
+        return new ProductLookupResponse(
+            new ProductListItem(
+                row.Id,
+                row.Name,
+                ProductMapping.Quantity(row.Quantity),
+                new BaseUnitSummary(row.BaseUnit.Id, row.BaseUnit.Name, ProductMapping.Money(row.BaseUnit.SellPrice)),
+                ProductMapping.Quantity(row.LowStockThreshold),
+                row.Quantity <= row.LowStockThreshold,
+                row.IsArchived),
+            new UnitDto(
+                row.Unit.Id,
+                row.Unit.Name,
+                ProductMapping.Factor(row.Unit.Factor),
+                ProductMapping.Money(row.Unit.SellPrice),
+                row.Unit.Barcode,
+                row.Unit.IsBase));
     }
 
     // The term is matched literally: LIKE wildcards and the escape character itself are escaped.

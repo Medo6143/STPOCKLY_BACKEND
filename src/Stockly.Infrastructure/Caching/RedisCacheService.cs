@@ -85,6 +85,18 @@ internal sealed partial class RedisCacheService(
         }
     }
 
+    public async Task RemoveAsync(string key, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await cache.RemoveAsync(key, cancellationToken);
+        }
+        catch (Exception exception) when (IsRedisFailure(exception))
+        {
+            Warn(nameof(RemoveAsync), exception);
+        }
+    }
+
     // RedisTimeoutException derives from TimeoutException, not RedisException.
     private static bool IsRedisFailure(Exception exception) => exception is RedisException or TimeoutException;
 

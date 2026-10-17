@@ -274,4 +274,34 @@
   <data name="Invoice.UnitNotOfProduct.Detail" xml:space="preserve">
     <value>الوحدة المختارة تخص منتجاً آخر.</value>
   </data>
+  <data name="Invoice.NotConfirmable.Title" xml:space="preserve">
+    <value>لا يمكن تأكيد الفاتورة</value>
+  </data>
+  <data name="Invoice.NotConfirmable.Detail" xml:space="preserve">
+    <value>يمكن تأكيد الفاتورة فقط وهي بانتظار المراجعة.</value>
+  </data>
+  <data name="Sale.NotFound.Title" xml:space="preserve">
+    <value>عملية البيع غير موجودة</value>
+  </data>
+  <data name="Sale.NotFound.Detail" xml:space="preserve">
+    <value>لم يتم العثور على عملية البيع.</value>
+  </data>
+  <data name="Sale.ArchivedProduct.Title" xml:space="preserve">
+    <value>منتج مؤرشف</value>
+  </data>
+  <data name="Sale.ArchivedProduct.Detail" xml:space="preserve">
+    <value>لا يمكن بيع منتج مؤرشف.</value>
+  </data>
+  <data name="Sale.UnitNotOfProduct.Title" xml:space="preserve">
+    <value>الوحدة لا تخص المنتج</value>
+  </data>
+  <data name="Sale.UnitNotOfProduct.Detail" xml:space="preserve">
+    <value>الوحدة المختارة تخص منتجاً آخر.</value>
+  </data>
+  <data name="ProductUnit.InUse.Title" xml:space="preserve">
+    <value>الوحدة مستخدمة</value>
+  </data>
+  <data name="ProductUnit.InUse.Detail" xml:space="preserve">
+    <value>هذه الوحدة مستخدمة في بنود فواتير أو مبيعات ولا يمكن حذفها.</value>
+  </data>
 </root>

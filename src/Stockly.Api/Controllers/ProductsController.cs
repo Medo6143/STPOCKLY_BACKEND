@@ -13,6 +13,7 @@ using Stockly.Application.Features.Products.GetLowStock;
 using Stockly.Application.Features.Products.GetProductById;
 using Stockly.Application.Features.Products.GetProductMovements;
 using Stockly.Application.Features.Products.GetProducts;
+using Stockly.Application.Features.Products.LookupProduct;
 using Stockly.Application.Features.Products.RemoveProductUnit;
 using Stockly.Application.Features.Products.UpdateProduct;
 using Stockly.Application.Features.Products.UpdateProductUnit;
@@ -24,7 +25,7 @@ using Stockly.Domain.Common;
 namespace Stockly.Api.Controllers;
 
 /// <summary>
-/// Contract rows P1–P11. Maps HTTP to MediatR and back; no business decisions here (AGENTS.md rule 26). Owner-only
+/// Contract rows P1–P12. Maps HTTP to MediatR and back; no business decisions here (AGENTS.md rule 26). Owner-only
 /// rows use the <see cref="AuthPolicies.Owner"/> policy; the shop always comes from the token (ADR-0002).
 /// </summary>
 [ApiController]
@@ -52,6 +53,19 @@ public sealed class ProductsController(ISender sender) : ControllerBase
             ? new GetLowStockQuery(search, includeArchived, page, pageSize)
             : new GetProductsQuery(search, includeArchived, page, pageSize);
         var result = await sender.Send(query, cancellationToken);
+        return result.ToActionResult(this, Ok);
+    }
+
+    /// <summary>P12: the non-archived product with this product or unit barcode, and the unit it names (quick sale).</summary>
+    [HttpGet("lookup")]
+    [ProducesResponseType<ProductLookupResponse>(StatusCodes.Status200OK, Json)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest, StocklyProblems.ContentType)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, StocklyProblems.ContentType)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, StocklyProblems.ContentType)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, StocklyProblems.ContentType)]
+    public async Task<IActionResult> LookupAsync([FromQuery] string? barcode = null, CancellationToken cancellationToken = default)
+    {
+        var result = await sender.Send(new LookupProductQuery(barcode), cancellationToken);
         return result.ToActionResult(this, Ok);
     }
 

@@ -79,4 +79,19 @@ public static class InvoiceErrors
     /// <summary>Internal guard (the request validator rejects it first): a new product needs a name and a base unit name.</summary>
     public static readonly Error NewProductIncomplete =
         Error.Validation("Invoice.NewProductIncomplete", "A new product needs a name and a base unit name.");
+
+    /// <summary>Confirm (I5) needs an invoice waiting for review; a processing or failed invoice cannot be confirmed.</summary>
+    public static readonly Error NotConfirmable =
+        Error.Conflict("Invoice.NotConfirmable", "Only an invoice waiting for review can be confirmed.");
+
+    /// <summary>
+    /// Internal, never returned: the unique index on (invoice_item_id, reason) refused a second receipt, so a concurrent
+    /// confirm already received this invoice (the last safety net, docs/design/backend.md §11 step 10).
+    /// </summary>
+    public static readonly Error AlreadyConfirmed =
+        Error.Conflict("Invoice.AlreadyConfirmed", "The invoice was already confirmed.");
+
+    /// <summary>Internal guard: confirm names a created product for exactly the new-product lines.</summary>
+    public static readonly Error CreatedProductsMismatch =
+        Error.Validation("Invoice.CreatedProductsMismatch", "Every new-product line, and only those, needs its created product.");
 }

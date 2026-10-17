@@ -20,4 +20,7 @@ public interface ICacheService
 
     /// <summary>Bumps a version counter, so every key built from the old version becomes unreachable (rule 23).</summary>
     Task IncrementVersionAsync(string key, CancellationToken cancellationToken);
+
+    /// <summary>Deletes one key (never a pattern, rule 23), e.g. a list whose writes are rare.</summary>
+    Task RemoveAsync(string key, CancellationToken cancellationToken);
 }

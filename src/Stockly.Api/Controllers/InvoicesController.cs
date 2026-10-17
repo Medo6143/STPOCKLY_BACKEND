@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Stockly.Api.Errors;
 using Stockly.Api.Extensions;
 using Stockly.Application.Features.Invoices;
+using Stockly.Application.Features.Invoices.ConfirmInvoice;
 using Stockly.Application.Features.Invoices.GetInvoice;
 using Stockly.Application.Features.Invoices.GetInvoices;
 using Stockly.Application.Features.Invoices.ScanInvoice;
@@ -15,7 +16,7 @@ using Stockly.Contracts.Invoices;
 namespace Stockly.Api.Controllers;
 
 /// <summary>
-/// Contract §6: I1 (step 2a), I2, I3 and I4 (step 2b). Maps HTTP to MediatR and back; no business decisions here
+/// Contract §6: I1 (step 2a), I2, I3 and I4 (step 2b), I5 (Sprint 4). Maps HTTP to MediatR and back; no business decisions here
 /// (AGENTS.md rule 26). The shop always comes from the token (ADR-0002).
 /// </summary>
 [ApiController]
@@ -94,6 +95,23 @@ public sealed class InvoicesController(ISender sender) : ControllerBase
         var command = new UpdateInvoiceItemsCommand(
             id, request.Items, request.SupplierName, request.InvoiceNumber, request.InvoiceDate, request.TotalAmount);
         var result = await sender.Send(command, cancellationToken);
+        return result.ToActionResult(this, Ok);
+    }
+
+    /// <summary>
+    /// I5: receive the stock of every line in one transaction, create the new products and learn the aliases. A repeat
+    /// returns the confirmed invoice unchanged.
+    /// </summary>
+    [HttpPost("{id:guid}/confirm")]
+    [ProducesResponseType<InvoiceDetail>(StatusCodes.Status200OK, Json)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest, StocklyProblems.ContentType)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, StocklyProblems.ContentType)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, StocklyProblems.ContentType)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, StocklyProblems.ContentType)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict, StocklyProblems.ContentType)]
+    public async Task<IActionResult> ConfirmAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new ConfirmInvoiceCommand(id), cancellationToken);
         return result.ToActionResult(this, Ok);
     }
 

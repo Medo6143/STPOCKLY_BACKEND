@@ -277,4 +277,34 @@
   <data name="Invoice.UnitNotOfProduct.Detail" xml:space="preserve">
     <value>The chosen unit belongs to another product.</value>
   </data>
+  <data name="Invoice.NotConfirmable.Title" xml:space="preserve">
+    <value>Invoice cannot be confirmed</value>
+  </data>
+  <data name="Invoice.NotConfirmable.Detail" xml:space="preserve">
+    <value>Only an invoice waiting for review can be confirmed.</value>
+  </data>
+  <data name="Sale.NotFound.Title" xml:space="preserve">
+    <value>Sale not found</value>
+  </data>
+  <data name="Sale.NotFound.Detail" xml:space="preserve">
+    <value>The sale was not found.</value>
+  </data>
+  <data name="Sale.ArchivedProduct.Title" xml:space="preserve">
+    <value>Archived product</value>
+  </data>
+  <data name="Sale.ArchivedProduct.Detail" xml:space="preserve">
+    <value>An archived product cannot be sold.</value>
+  </data>
+  <data name="Sale.UnitNotOfProduct.Title" xml:space="preserve">
+    <value>Unit does not match product</value>
+  </data>
+  <data name="Sale.UnitNotOfProduct.Detail" xml:space="preserve">
+    <value>The chosen unit belongs to another product.</value>
+  </data>
+  <data name="ProductUnit.InUse.Title" xml:space="preserve">
+    <value>Unit in use</value>
+  </data>
+  <data name="ProductUnit.InUse.Detail" xml:space="preserve">
+    <value>This unit is used by invoice or sale lines and cannot be removed.</value>
+  </data>
 </root>

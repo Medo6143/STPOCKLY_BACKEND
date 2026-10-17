@@ -83,6 +83,10 @@ public static class DependencyInjection
         services.AddScoped<IProductAliasRepository, ProductAliasRepository>();
         services.AddScoped<IAiUsageRecordRepository, AiUsageRecordRepository>();
         services.AddScoped<IShopPlanQueries, ShopPlanQueries>();
+        services.AddScoped<ISaleRepository, SaleRepository>();
+        services.AddScoped<ISaleQueries, SaleQueries>();
+        services.AddScoped<IDashboardQueries, DashboardQueries>();
+        services.AddScoped<IProductUnitUsageQueries, ProductUnitUsageQueries>();
 
         return services;
     }

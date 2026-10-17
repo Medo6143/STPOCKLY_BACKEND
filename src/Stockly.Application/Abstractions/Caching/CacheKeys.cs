@@ -14,6 +14,9 @@ public static class CacheKeys
     /// <summary><c>products:lowstock</c> entries live 5 minutes.</summary>
     public static readonly TimeSpan LowStockTimeToLive = TimeSpan.FromMinutes(5);
 
+    /// <summary><c>dashboard:summary</c> entries live 2 minutes (contract D1).</summary>
+    public static readonly TimeSpan DashboardSummaryTimeToLive = TimeSpan.FromMinutes(2);
+
     /// <summary><c>ai:invoice</c> entries live 7 days (content-addressed, never invalidated).</summary>
     public static readonly TimeSpan AiResultTimeToLive = TimeSpan.FromDays(7);
 
@@ -37,6 +40,17 @@ public static class CacheKeys
     /// <summary>A page of <c>GET /api/products?lowStock=true</c> (paged, so the key carries the query hash).</summary>
     public static string LowStock(Guid shopId, long version, string queryHash) =>
         string.Create(CultureInfo.InvariantCulture, $"stockly:{shopId:D}:products:lowstock:v{version}:{queryHash}");
+
+    /// <summary>
+    /// The D1 dashboard of one Africa/Cairo day (<c>yyyyMMdd</c>): the day in the key makes a value cached just before
+    /// midnight unreachable just after it.
+    /// </summary>
+    public static string DashboardSummary(Guid shopId, long version, DateOnly cairoDate) =>
+        string.Create(CultureInfo.InvariantCulture, $"stockly:{shopId:D}:dashboard:summary:v{version}:{cairoDate:yyyyMMdd}");
+
+    /// <summary>The shop's supplier list; deleted when confirm creates a supplier.</summary>
+    public static string SuppliersList(Guid shopId) =>
+        string.Create(CultureInfo.InvariantCulture, $"stockly:{shopId:D}:suppliers:list");
 
     /// <summary>The validated AI extraction of an image (lower-case hex SHA-256), per shop.</summary>
     public static string AiInvoice(Guid shopId, string imageSha256) =>

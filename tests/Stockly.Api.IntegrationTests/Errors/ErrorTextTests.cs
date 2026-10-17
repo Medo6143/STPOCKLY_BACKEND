@@ -7,12 +7,13 @@ using Stockly.Application.Features.Products;
 using Stockly.Domain.Common;
 using Stockly.Domain.Invoices;
 using Stockly.Domain.Products;
+using Stockly.Domain.Sales;
 using Stockly.Domain.Shops;
 using Stockly.Domain.Stock;
 
 namespace Stockly.Api.IntegrationTests.Errors;
 
-/// <summary>Every code the API can return (steps 1.5, 1.6, 2a and 2b) has a title and detail in Arabic and English (contract §1.5, §9).</summary>
+/// <summary>Every code the API can return (steps 1.5, 1.6, 2a, 2b and Sprint 4) has a title and detail in Arabic and English (contract §1.5, §9).</summary>
 public sealed class ErrorTextTests
 {
     public static TheoryData<string> Codes()
@@ -40,6 +41,7 @@ public sealed class ErrorTextTests
             ProductUnitErrors.DuplicateBarcode.Code,
             ProductUnitErrors.BaseUnitCannotBeRemoved.Code,
             ProductUnitErrors.BaseUnitFactorFixed.Code,
+            ProductUnitErrors.InUse.Code,
             PrecisionErrors.TooManyDecimals("x", 2).Code,
             PrecisionErrors.Negative("x").Code,
             PrecisionErrors.NotPositive("x").Code,
@@ -53,6 +55,10 @@ public sealed class ErrorTextTests
             InvoiceErrors.NotEditable.Code,
             InvoiceErrors.LineProductRequired.Code,
             InvoiceErrors.UnitNotOfProduct.Code,
+            InvoiceErrors.NotConfirmable.Code,
+            SaleErrors.NotFound.Code,
+            SaleErrors.ArchivedProduct.Code,
+            SaleErrors.UnitNotOfProduct.Code,
             ScanErrors.RateLimitedCode,
             ScanErrors.DailyQuotaExceededCode,
         ];
