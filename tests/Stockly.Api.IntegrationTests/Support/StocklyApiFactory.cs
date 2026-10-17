@@ -17,7 +17,8 @@ namespace Stockly.Api.IntegrationTests.Support;
 /// register many times are not throttled; <c>null</c> keeps the Api's default (10 per minute), as the rate-limit tests
 /// need. <c>clock</c>, when given, replaces the system clock (and with it Identity's lockout time).
 /// OpenRouter is never called: its base URL points nowhere, and the extractor is replaced by <see cref="FakeExtractor"/>.
-/// The in-process Hangfire server runs only with <see cref="JobMode.Run"/>.
+/// The in-process Hangfire server runs only with <see cref="JobMode.Run"/>. With <c>seedAdmin</c> the start-up seed creates
+/// the test platform admin (<see cref="AdminApi"/>) once per database.
 /// </summary>
 public sealed class StocklyApiFactory(
     string postgres,
@@ -27,7 +28,8 @@ public sealed class StocklyApiFactory(
     string? authPermitLimit = StocklyApiFactory.RaisedAuthPermitLimit,
     IClock? clock = null,
     StorageSettings? storage = null,
-    StocklyApiFactory.JobMode jobs = StocklyApiFactory.JobMode.Off)
+    StocklyApiFactory.JobMode jobs = StocklyApiFactory.JobMode.Off,
+    bool seedAdmin = false)
     : WebApplicationFactory<Program>
 {
     public const string TestEnvironment = "Testing";
@@ -57,6 +59,13 @@ public sealed class StocklyApiFactory(
         builder.UseSetting("Storage:Bucket", storageSettings.Bucket);
         builder.UseSetting("OpenRouter:ApiKey", "test-only-openrouter-key");
         builder.UseSetting("OpenRouter:BaseUrl", "http://127.0.0.1:1/");
+        if (seedAdmin)
+        {
+            builder.UseSetting("Admin:Email", AdminApi.Email);
+            builder.UseSetting("Admin:Password", AdminApi.Password);
+            builder.UseSetting("Admin:FullName", AdminApi.FullName);
+        }
+
         if (authPermitLimit is not null)
         {
             builder.UseSetting("RateLimiting:Auth:PermitLimit", authPermitLimit);

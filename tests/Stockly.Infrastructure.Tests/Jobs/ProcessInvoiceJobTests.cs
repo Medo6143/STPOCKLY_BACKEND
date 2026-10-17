@@ -283,6 +283,9 @@ public sealed class ProcessInvoiceJobTests(PostgresFixture fixture) : IAsyncDisp
         public Task<StoredFile?> GetAsync(string key, CancellationToken cancellationToken) =>
             Task.FromResult(_files.GetValueOrDefault(key));
 
+        public Task<string?> GetDownloadUrlAsync(string key, TimeSpan validFor, CancellationToken cancellationToken) =>
+            Task.FromResult(_files.ContainsKey(key) ? $"memory://{key}" : null);
+
         public Task DeleteAsync(string key, CancellationToken cancellationToken)
         {
             _files.Remove(key);

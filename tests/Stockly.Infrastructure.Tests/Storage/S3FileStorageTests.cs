@@ -66,5 +66,29 @@ public sealed class S3FileStorageTests(MinioFixture fixture)
         await act.Should().ThrowAsync<AmazonS3Exception>("a storage failure is not a missing object: the scan returns 500 and releases the quota");
     }
 
+    [Fact]
+    public async Task GetDownloadUrl_StoredObject_IsAPresignedGetThatServesTheBytes()
+    {
+        var storage = fixture.CreateStorage();
+        var key = NewKey();
+        await storage.PutAsync(key, Png, "image/png", CancellationToken.None);
+
+        var url = await storage.GetDownloadUrlAsync(key, TimeSpan.FromMinutes(5), CancellationToken.None);
+
+        url.Should().NotBeNull().And.StartWith("http://").And.Contain("X-Amz-Signature");
+        url.Should().MatchRegex("X-Amz-Expires=(29[89]|30[01])&", "valid five minutes, give or take the SDK's own rounding");
+        using var http = new HttpClient();
+        var bytes = await http.GetByteArrayAsync(new Uri(url!));
+        bytes.Should().Equal(Png);
+    }
+
+    [Fact]
+    public async Task GetDownloadUrl_MissingObject_IsNull()
+    {
+        var storage = fixture.CreateStorage();
+
+        (await storage.GetDownloadUrlAsync(NewKey(), TimeSpan.FromMinutes(5), CancellationToken.None)).Should().BeNull();
+    }
+
     private static string NewKey() => $"invoices/{Guid.CreateVersion7()}/2026/10/{Guid.CreateVersion7()}.jpg";
 }

@@ -61,6 +61,14 @@ public sealed class MigrationTests(PostgresFixture fixture)
         "ix_sales_shop_id_created_at",
         "ux_sale_items_sale_id_line_no",
         "ix_sale_items_shop_id_product_id",
+
+        // Platform admin (erd.md §3.1, §3.6, Sprint 5)
+        "ix_shops_created_at",
+        "ix_shops_normalized_name_trgm",
+        "ix_users_normalized_email_pattern",
+        "ix_admin_audit_logs_target_type_target_id_created_at",
+        "ix_admin_audit_logs_admin_user_id_created_at",
+        "ix_admin_audit_logs_created_at",
     ];
 
     private static readonly string[] ExpectedChecks =
@@ -84,6 +92,7 @@ public sealed class MigrationTests(PostgresFixture fixture)
         "ck_sales_total_amount",
         "ck_sale_items_amounts",
         "ck_sale_items_line_no",
+        "ck_shop_subscriptions_daily_scan_quota_override",
     ];
 
     [Fact]
@@ -139,7 +148,8 @@ public sealed class MigrationTests(PostgresFixture fixture)
             "invoice_items",
             "ai_usage_records",
             "sales",
-            "sale_items");
+            "sale_items",
+            "admin_audit_logs");
     }
 
     [Fact]
