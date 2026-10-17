@@ -1021,3 +1021,23 @@ HTTP logging middleware is not enabled for the OpenRouter client; `System.Net.Ht
 13. **Plans in Sprint 2.** The quota comes from `plans`/`shop_subscriptions`, which arrive with step 1.5 (register creates the default plan). If they are not there when Sprint 2 starts, a temporary `Scan:DefaultDailyQuota` is needed.
 14. **`failure_reason` values.** Contract types `failureReason` as `string|null` without listing values. This design writes `ImageMissing`, `AiUnavailable`, `AiOutputInvalid`, `AiNoItems`, `Unexpected`. The app should show a generic message and not switch on them unless the contract lists them.
 15. **Small additions outside `invoice_items`.** §12 adds `CHECK (times_confirmed > 0)` on `product_aliases`, a non-negative CHECK on `ai_usage_records`, makes `product_aliases.product_unit_id` NOT NULL and fixes `ai_usage_records.cost_usd` as `numeric(14,8)`. These tables' ERD sections were outside this task's edit scope; `docs/erd.md` §3.2 and §3.6 need the same lines when approved.
+
+### 17.1 Resolutions (orchestrator, 2026-10-17)
+
+The product owner asked for the remaining sprints to run without pauses, so the orchestrator decided every question above by accepting the proposal as written:
+
+1. Accepted: `ErrorType.PayloadTooLarge`, `ErrorType.TooManyRequests` and `Error.Metadata` in Domain (public behaviour unchanged).
+2. Accepted: `Scan:RateLimitPerMinute = 10` per shop.
+3. Already done in contract v1.2 (`newProduct` on `InvoiceItemDto`). A confirmed new-product line returns the created product's `productId`/`productName` (§9.2).
+4. Accepted: `(shop_id, status, created_at DESC)` replaces the partial `(shop_id, status)` index; `docs/erd.md` updated in the same change.
+5. Accepted: the status cache holds `{status, updatedAt, clientRequestId, createdAt}` and is written by scan, job, confirm and read-through `GetInvoice`; `docs/design/redis.md` §1 updated in the same change.
+6. Accepted: `line_total` rounds to 2 decimals `AwayFromZero` (invoice and sale lines); added to `docs/erd.md` §1.
+7. Accepted as configuration defaults: `google/gemini-2.5-flash` (primary), `openai/gpt-4.1-mini` (fallback). Availability and price must be checked with a real key before production; tests never call OpenRouter.
+8. Accepted: the EF migration creates the `hangfire` schema; Hangfire's installer creates its tables. Documented exception to rule 31.
+9. Accepted: keep `.jpg` keys, store the real `Content-Type` on the object.
+10. Accepted: reuse an earlier extraction with the same `image_sha256` before the Redis AI cache and OpenRouter.
+11. Accepted: I4 keeps an archived product only if unchanged from the previous line; confirm receives stock into it.
+12. Accepted: confirm does not change `cost_price` in v1.
+13. Plans exist since step 1.5; no temporary quota setting needed.
+14. Accepted: `failureReason` values as listed; the app shows a generic message.
+15. Accepted: the four small constraints; `docs/erd.md` §3.2 and §3.6 updated in the same change.
