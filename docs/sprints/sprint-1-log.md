@@ -233,3 +233,27 @@ Totals on `main` after 1.6: Domain 260, Application 232, Architecture 23, Infras
 - No shop switching, no member management, no `PATCH /api/auth/me` (backlog).
 - `ProductUnit.InUse` (P8) arrives with invoice/sale lines (Sprint 2+).
 - Docker's disk image stays on C: (product-owner decision); C: free space is monitored.
+
+---
+
+# Sprint 2: AI scan pipeline
+
+## Orchestrator decisions (2026-10-17)
+
+- The product owner asked for the remaining sprints to run without pauses. The 15 open questions of `docs/design/backend.md` §17 were resolved by accepting each proposal (§17.1).
+- Branch names no longer contain "sprint" (product owner request): `feature/sprint-2-scan` → `feature/invoice-scan`, `feature/sprint-1-review` → `feature/catalog-review`, `docs/sprint2-backend-design` → `docs/backend-design`.
+- Contract v1.5 (admin API, AD1–AD20) merged ahead of Sprint 5 so its briefs could be written while workers run.
+
+## Integration check on the emulator (2026-10-17)
+
+- API from `main` on `http://127.0.0.1:5000` (Development, dev stack), app from mobile `main` (debug, real backend, `http://10.0.2.2:5000`, debug-only cleartext config) on QA_Pixel_7.
+- From the app: register → `201`, product list → `200`, create product with opening stock 24 → `201`, product detail shows quantity, prices, low-stock level and barcode from the database. English UI.
+
+## Step 2a: scan pipeline
+
+- Brief: `docs/agents/briefs/backend-2a-scan-pipeline.md`. Branch `feature/invoice-scan`. Worker: general-purpose agent (background).
+- Report: "AGENTS.md read: yes". One blocker: `ContractConformanceTests` failed because I1 was live but marked `planned`; the orchestrator marked I1 `implemented` (shape and statuses already matched).
+- Orchestrator verification: `dotnet build -warnaserror` 0 warnings; `dotnet test` 1,133 passed (Domain 303, Application 346, Architecture 23, Infrastructure 209, Api integration 252). Read the I1 controller against contract I1; grep for `IgnoreQueryFilters`, `DateTime.Now/UtcNow`, `new HttpClient`, `TODO`, `NotImplementedException` in `src`: none.
+- Migration `20261017180927_InvoiceScan`: `hangfire` schema; `suppliers`, `product_aliases`, `invoices`, `invoice_items`, `ai_usage_records` with §12.2 indexes and CHECKs; real FKs from `stock_movements` to invoices and invoice items.
+- Decisions accepted: `Newtonsoft.Json` 13.0.4 pinned (security fix of a Hangfire transitive dependency, not a new library); `Testcontainers.Minio` 4.15.0 (4.16.0 does not exist); Hangfire without static global configuration (lazy storage, server host waits for Postgres); `ErrorType.PayloadTooLarge` = 9 and `Retry-After` through the existing `Error.RetryAfter`; `[ScanUploadLimit]` resource filter for the 413; logging of scan and job in Infrastructure; lines saved unmatched until 2b; `.env.example` model overrides commented out (an empty value fails start-up).
+- Process note: the worker's output was committed as one `wip:` commit (`bbf2f13`) so `main` (contract v1.5) could be merged in before the contract fix; it is not split per concern.
