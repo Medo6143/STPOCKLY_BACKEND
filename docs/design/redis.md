@@ -19,11 +19,11 @@ Prefix rule: tenant data is always `stockly:{shopId}:...`. Platform-wide data us
 
 | Key | Value | TTL | Written by | Invalidated by |
 |---|---|---|---|---|
-| `stockly:{shopId}:ver:catalog` | integer version | none (tiny) | — | `INCR` on any product/stock write |
+| `stockly:{shopId}:ver:catalog` | integer version | none (tiny) | — | `INCR` on any product/stock write, after commit: P3–P10 (`CatalogCacheInvalidationBehavior`), I5 confirm and S1 sale (their handlers, after their own commit, only when they wrote) |
 | `stockly:{shopId}:products:list:v{ver}:{queryHash}` | paged product DTOs | 10 min | `GetProductsQueryHandler` | version bump |
 | `stockly:{shopId}:products:lowstock:v{ver}:{queryHash}` | low-stock page DTOs (paged, rule 30; `queryHash` covers search and paging) | 5 min | `GetLowStockQueryHandler` | version bump |
-| `stockly:{shopId}:dashboard:summary:v{ver}` | dashboard DTO | 2 min | `GetDashboardQueryHandler` | version bump |
-| `stockly:{shopId}:suppliers:list` | supplier DTOs | 30 min | `GetSuppliersQueryHandler` | `DEL` on supplier write |
+| `stockly:{shopId}:dashboard:summary:v{ver}:{yyyyMMdd}` | D1 `DashboardSummary` DTO; `{yyyyMMdd}` is the Africa/Cairo date, so a value cached before local midnight is not served after it | 2 min | `GetDashboardSummaryQueryHandler` (D1, Sprint 4; cache skipped when the version cannot be read) | version bump (every product, unit, stock, confirm and sale write, after commit); the next Cairo day |
+| `stockly:{shopId}:suppliers:list` | supplier DTOs | 30 min | `GetSuppliersQueryHandler` (not built yet) | `DEL` on supplier write: `ConfirmInvoiceCommandHandler` after its commit when it created a supplier (`ICacheService.RemoveAsync`, one key, never a pattern) |
 | `stockly:{shopId}:ai:invoice:{sha256}` | `{promptVersion, model, extraction}`: the validated extraction, the model that made it and the prompt version (`invoice-extraction-v1`); another version is a miss | 7 days | `ProcessInvoiceCommandHandler` (job), right after a valid OpenRouter output and before the database save | never (content-addressed); a prompt change makes old values misses |
 | `stockly:{shopId}:invoice:{id}:status` | `{invoiceId, status, updatedAt, clientRequestId, createdAt}` (backend.md §17.1 item 5) | 10 min | scan (after commit), job (after commit), job failure, confirm (Sprint 4), read-through `GetInvoiceQueryHandler` (step 2b: a cache miss whose PostgreSQL row is `Processing`) | overwritten on change. Read by `GetInvoiceQueryHandler` (I3): only a `Processing` value answers without PostgreSQL; any other status reads PostgreSQL |
 | `stockly:{shopId}:rl:scan:{yyyyMMddHHmm}` | counter (UTC minute) | 120 s | scan endpoint (`RedisScanLimiter`, Lua `INCR` + `EXPIRE` on the first hit) | expires |

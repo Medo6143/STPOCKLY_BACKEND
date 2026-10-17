@@ -16,7 +16,7 @@ A shop owner keeps a catalog of the products they buy and sell, each with the un
 8. **أرشفة** (Archive, Owner): hides the product from the list; history stays and late corrections are still allowed (P5).
 
 ## 3. Endpoints
-Contract v1.4 rows P1–P11 (`docs/api/contract.md` §5); machine-readable in `docs/api/openapi.json`. Money, quantities and factors are **decimal strings** in requests and responses (contract §1.2): responses use exactly 2 (money), 3 (quantity) and 6 (factor) decimals; a JSON number in their place is `400 Validation.Failed`.
+Contract v1.4 rows P1–P11 (`docs/api/contract.md` §5; P12 in Sprint 4, section "P12 barcode lookup" below); machine-readable in `docs/api/openapi.json`. Money, quantities and factors are **decimal strings** in requests and responses (contract §1.2): responses use exactly 2 (money), 3 (quantity) and 6 (factor) decimals; a JSON number in their place is `400 Validation.Failed`.
 
 | # | Method | Path | Auth / role | Request | Response | Status codes |
 |---|---|---|---|---|---|---|
@@ -196,6 +196,7 @@ No Hangfire, MinIO or OpenRouter in this feature.
 | Unit name already on the product | `ProductUnit.DuplicateName` | 409 | هذا المنتج لديه وحدة بنفس الاسم بالفعل. / This product already has a unit with this name. |
 | Unit barcode already used in the shop | `ProductUnit.DuplicateBarcode` | 409 | توجد وحدة في هذا المتجر تستخدم هذا الباركود بالفعل. / A unit in this shop already uses this barcode. |
 | Delete the base unit | `ProductUnit.BaseUnitCannotBeRemoved` | 400 | لا يمكن حذف الوحدة الأساسية. / The base unit cannot be removed. |
+| Delete a unit referenced by an invoice or sale line (P8) | `ProductUnit.InUse` | 409 | هذه الوحدة مستخدمة في بنود فواتير أو مبيعات ولا يمكن حذفها. / This unit is used by invoice or sale lines and cannot be removed. |
 | Change the base unit factor | `ProductUnit.BaseUnitFactorFixed` | 400 | معامل الوحدة الأساسية دائماً 1. / The base unit factor is always 1. |
 | Too many decimal places | `Precision.TooManyDecimals` | 400 | القيمة بها أرقام عشرية أكثر من المسموح (المبالغ 2، الكميات 3، المعامل 6). / The value has too many decimal places (money 2, quantity 3, factor 6). |
 | Negative money, threshold, count or opening stock | `Precision.Negative` | 400 | يجب ألا تكون القيمة سالبة. / The value must not be negative. |
@@ -241,7 +242,28 @@ Sprint 3 (stockly-mobile): product list with search and low-stock filter, produc
 
 ## 12. Known limitations
 - No lot tracking; expiry is informational (ADR-0004).
-- `ProductUnit.InUse` is not implemented until invoice and sale lines exist (Sprint 2+).
 - The low-stock partial index serves the default `lowStock=true` list; `lowStock=true&includeArchived=true` reads archived rows without it (rare admin-style query).
 - Reversal amount matching is not in the Domain (Application rule, no endpoint scheduled yet).
 - Product and unit names have no maximum length (the contract sets none).
+
+## P12 barcode lookup (Sprint 4)
+
+`GET /api/products/lookup?barcode=…` (user) → `200 { product: ProductListItem, unit: UnitDto }`; `400 Validation.Failed` when `barcode` is missing, blank or longer than 64; `404 Product.NotFound` when no **non-archived** product of the shop has it (another shop's barcode is never found, rule 10). Code: `ProductsController.LookupAsync` → `Features/Products/LookupProduct/{LookupProductQuery,Handler,Validator}` → `IProductQueries.FindByBarcodeAsync`.
+
+Rules (contract §5 P12, §10 item 12):
+- Exact match on the trimmed input (barcodes are stored trimmed).
+- A **unit** barcode is checked first and returns that unit (e.g. the box); a **product** barcode returns the base unit.
+- Archived products are never returned, even when a unit barcode matches (unit barcodes stay unique for archived products too).
+
+Queries and indexes (erd §3.2): `product_units WHERE shop_id = @shop AND barcode = @b` joined to the non-archived product by primary key (`ux_product_units_shop_id_barcode`); else `products WHERE shop_id = @shop AND barcode = @b AND NOT is_archived` (`ux_products_shop_id_barcode`); then the product row and the unit by primary key. At most three small indexed statements, no cache (the screen needs the live quantity).
+
+Tests: `Application.Tests` `Dashboard/DashboardAndLookupHandlerTests` (trim, not found, validator); `Api.IntegrationTests` `Sales/LookupAndDashboardEndpointTests` (product barcode → base unit, unit barcode → that unit, archived / other shop / unknown → 404, missing → 400).
+
+## P8 `ProductUnit.InUse` (Sprint 4)
+
+`DELETE /api/products/{id}/units/{unitId}` returns `409 ProductUnit.InUse` when any invoice line or sale line of the shop references the unit (contract §5 P8, §10 item 16): deleting it would break the history of those lines.
+
+- `RemoveProductUnitCommandHandler` loads the product (missing or another shop's → `404 Product.NotFound`); an archived product, an unknown unit and the base unit keep their Domain answers (`409 Product.Archived`, `404 ProductUnit.NotFound`, `400 ProductUnit.BaseUnitCannotBeRemoved`). Only a removable unit is checked: `IProductUnitUsageQueries.IsUsedByInvoiceLinesAsync` then `IsUsedBySaleLinesAsync`, one tenant-filtered `EXISTS` each (`Infrastructure/Persistence/Queries/ProductUnitUsageQueries`), served by the FK-support indexes `ix_invoice_items_product_unit_id` and `ix_sale_items_product_unit_id`.
+- Last safety net: the FKs `invoice_items`, `sale_items` and `product_aliases.product_unit_id → product_units` stay `RESTRICT`. A line added by a concurrent request between the check and the save makes the delete fail with SqlState 23503 on one of those three constraints; `UnitOfWork.TrySaveChangesAsync` maps exactly those to `409 ProductUnit.InUse` (like the barcode unique indexes). Any other FK violation stays `500`.
+
+Tests: `Application.Tests` `Features/Products/ProductUnitHandlerTests` (invoice line → InUse, sale line → InUse with nothing saved, FK safety net → InUse, unused → removed and saved, base/unknown/archived, wrong tenant → `Product.NotFound`); `Infrastructure.Tests` `Persistence/Sprint4PersistenceTests` (the two `EXISTS` queries, tenant-filtered; a delete racing a new sale line → `ProductUnit.InUse`, unit kept); `Api.IntegrationTests` `Products/ProductUnitsAndStockEndpointTests.RemoveUnit_UsedByAnInvoiceOrASaleLine_409InUse_Unused_204` (real endpoint: invoice line 409, sale line 409, wrong tenant 404, unused 204); `Errors/ErrorTextTests` (ar and en text).

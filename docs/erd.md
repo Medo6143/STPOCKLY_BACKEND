@@ -214,6 +214,7 @@ erDiagram
         uuid id PK
         uuid shop_id FK
         uuid sale_id FK
+        int line_no
         uuid product_id FK
         uuid product_unit_id FK
         numeric quantity
@@ -321,11 +322,11 @@ Implementation notes for the identity and tenancy tables (migration `Identity`, 
 | Index / constraint | Serves |
 |---|---|
 | `CHECK (low_stock_threshold >= 0)` | data integrity |
-| `UNIQUE (shop_id, barcode) WHERE barcode IS NOT NULL AND NOT is_archived` (`ux_products_shop_id_barcode`) | P3/P4 duplicate check `ProductRepository.IsBarcodeUsedAsync`: `WHERE shop_id = @shop AND barcode = @b AND NOT is_archived AND id <> @self`; barcode scan in the sale screen (Sprint 4) |
-| `(shop_id, normalized_name) WHERE NOT is_archived` (`ix_products_shop_id_normalized_name`) | P1 `GetProductsQuery`: `WHERE shop_id = @shop AND NOT is_archived ORDER BY normalized_name, id OFFSET … LIMIT …` (product list sorted by name, paging); matching v1 `ExactNameMatchStrategy` → `ProductRepository.FindByNormalizedNamesAsync`: `WHERE shop_id = @shop AND normalized_name = ANY(@names) AND NOT is_archived`, one statement for all lines of an invoice, units joined in the same statement (step 2b) |
+| `UNIQUE (shop_id, barcode) WHERE barcode IS NOT NULL AND NOT is_archived` (`ux_products_shop_id_barcode`) | P3/P4 duplicate check `ProductRepository.IsBarcodeUsedAsync`: `WHERE shop_id = @shop AND barcode = @b AND NOT is_archived AND id <> @self`; P12 barcode lookup `ProductQueries.FindByBarcodeAsync` (product barcode, after the unit barcode): `WHERE shop_id = @shop AND barcode = @b AND NOT is_archived` (Sprint 4) |
+| `(shop_id, normalized_name) WHERE NOT is_archived` (`ix_products_shop_id_normalized_name`) | D1 `productCount` (`DashboardQueries.GetCountsAsync`: `WHERE shop_id = @shop AND NOT is_archived`, count, Sprint 4); P1 `GetProductsQuery`: `WHERE shop_id = @shop AND NOT is_archived ORDER BY normalized_name, id OFFSET … LIMIT …` (product list sorted by name, paging); matching v1 `ExactNameMatchStrategy` → `ProductRepository.FindByNormalizedNamesAsync`: `WHERE shop_id = @shop AND normalized_name = ANY(@names) AND NOT is_archived`, one statement for all lines of an invoice, units joined in the same statement (step 2b) |
 | `GIN (normalized_name gin_trgm_ops)` (`ix_products_normalized_name_trgm`) | P1 `search`: `normalized_name ILIKE '%' \|\| @term \|\| '%' ESCAPE '\'` (wildcards in the term escaped), the term Arabic-normalized first; fuzzy match (Sprint 6) |
-| `(shop_id) WHERE quantity <= low_stock_threshold AND NOT is_archived` (`ix_products_low_stock`) | P1 `lowStock=true` → `GetLowStockQuery`: `WHERE shop_id = @shop AND quantity <= low_stock_threshold AND NOT is_archived ORDER BY normalized_name, id` — tiny partial index, only low items live in it |
-| primary key | P2/P4–P10 load by id; `StockService` row lock `SELECT 1 FROM products WHERE id = @id AND shop_id = @shop FOR UPDATE`; I4 product checks `ProductRepository.FindUnitsInfoAsync` (`WHERE shop_id = @shop AND id = ANY(@ids)`, units in the same statement); I3 product name of a line (`InvoiceQueries.FindDetailAsync`) |
+| `(shop_id) WHERE quantity <= low_stock_threshold AND NOT is_archived` (`ix_products_low_stock`) | P1 `lowStock=true` → `GetLowStockQuery`: `WHERE shop_id = @shop AND quantity <= low_stock_threshold AND NOT is_archived ORDER BY normalized_name, id` — tiny partial index, only low items live in it; D1 `lowStockCount` (same predicate, count) and `negativeStockCount` (`… AND quantity < 0`: the index predicate is repeated so the partial index applies; thresholds are >= 0, so a negative product is always low) (Sprint 4) |
+| primary key | P2/P4–P10 load by id; `StockService` row lock `SELECT 1 FROM products WHERE id = @id AND shop_id = @shop FOR UPDATE`; confirm and sale lock all their products in one statement, `StockService.LockProductsAsync`: `SELECT 1 FROM products WHERE id = ANY(@ids) AND shop_id = @shop ORDER BY id FOR UPDATE` (rule 4, Sprint 4); D2 product of a line (join on `COALESCE(product_id, created_product_id)`); I4 product checks `ProductRepository.FindUnitsInfoAsync` (`WHERE shop_id = @shop AND id = ANY(@ids)`, units in the same statement); I3 product name of a line (`InvoiceQueries.FindDetailAsync`) |
 
 Quantity is allowed to go negative (a sale recorded before the invoice was scanned is real life). Negative stock raises a warning on the dashboard, it does not block the cashier.
 
@@ -337,14 +338,14 @@ Quantity is allowed to go negative (a sale recorded before the invoice was scann
 | `UNIQUE (product_id, name)` | no duplicate unit names |
 | `UNIQUE (product_id) WHERE is_base` | exactly one base unit |
 | `(product_id)` covered by the unique above | load units with product (P2 detail, every product edit; matching and the I4 checks, step 2b) |
-| primary key | I4 `ProductRepository.UnitExistsAsync` (`WHERE shop_id = @shop AND id = @unit`, only when a unit is not one of the line's product); I3 unit name of a line |
-| `UNIQUE (shop_id, barcode) WHERE barcode IS NOT NULL` | a box and a strip can have different barcodes; P6/P7 duplicate check `ProductRepository.IsUnitBarcodeUsedAsync`: `WHERE shop_id = @shop AND barcode = @b AND id <> @self` (archived products' units included) |
+| primary key | I4 `ProductRepository.UnitExistsAsync` (`WHERE shop_id = @shop AND id = @unit`, only when a unit is not one of the line's product; also S1 for a unit that is not the line product's); I3 and S1/S3 unit name of a line; D2 unit factor of a line |
+| `UNIQUE (shop_id, barcode) WHERE barcode IS NOT NULL` | a box and a strip can have different barcodes; P6/P7 duplicate check `ProductRepository.IsUnitBarcodeUsedAsync`: `WHERE shop_id = @shop AND barcode = @b AND id <> @self` (archived products' units included); P12 barcode lookup (unit barcode first): `WHERE shop_id = @shop AND barcode = @b`, joined to the non-archived product by primary key (Sprint 4) |
 
 **product_aliases** — learned on every invoice confirmation: "the supplier wrote X, the user mapped it to product P in unit U". Next scan from the same supplier auto-matches with confidence 1.0. `product_unit_id` is `NOT NULL` (aliases are learned only from confirmed lines, which always have a unit); `times_confirmed integer NOT NULL DEFAULT 1`.
 
 | Index / constraint | Serves |
 |---|---|
-| `UNIQUE NULLS NOT DISTINCT (shop_id, supplier_id, normalized_alias)` (PG 15+, `ux_product_aliases_shop_id_supplier_id_normalized_alias`) | matching v1 `ExactAliasMatchStrategy` → `ProductAliasRepository.FindExactAsync`: `WHERE shop_id = @shop AND supplier_id = @supplier` (`supplier_id IS NULL` when the invoice supplier is unknown) `AND normalized_alias = ANY(@names)`, joined to `products` by primary key `AND NOT is_archived`; one statement for all lines (step 2b); upsert on confirm |
+| `UNIQUE NULLS NOT DISTINCT (shop_id, supplier_id, normalized_alias)` (PG 15+, `ux_product_aliases_shop_id_supplier_id_normalized_alias`) | matching v1 `ExactAliasMatchStrategy` → `ProductAliasRepository.FindExactAsync`: `WHERE shop_id = @shop AND supplier_id = @supplier` (`supplier_id IS NULL` when the invoice supplier is unknown) `AND normalized_alias = ANY(@names)`, joined to `products` by primary key `AND NOT is_archived`; one statement for all lines (step 2b); arbiter of the confirm upsert `ProductAliasRepository.UpsertAsync`: one `INSERT … SELECT … FROM unnest(…) ON CONFLICT (shop_id, supplier_id, normalized_alias) DO UPDATE SET product_id, product_unit_id, times_confirmed = times_confirmed + EXCLUDED.times_confirmed, last_used_at` (Sprint 4) |
 | `GIN (normalized_alias gin_trgm_ops)` (`ix_product_aliases_normalized_alias_trgm`) | fuzzy match fallback |
 | `CHECK (times_confirmed > 0)` (`ck_product_aliases_times_confirmed`) | integrity (backend.md §17.1 item 15) |
 
@@ -352,7 +353,7 @@ Quantity is allowed to go negative (a sale recorded before the invoice was scann
 
 | Index / constraint | Serves |
 |---|---|
-| `UNIQUE (shop_id, normalized_name) WHERE NOT is_archived` (`ux_suppliers_shop_id_normalized_name`) | `SupplierRepository.FindIdByNormalizedNameAsync` (scan job: `WHERE shop_id = @shop AND normalized_name = @n AND NOT is_archived`); dedupe on confirm |
+| `UNIQUE (shop_id, normalized_name) WHERE NOT is_archived` (`ux_suppliers_shop_id_normalized_name`) | `SupplierRepository.FindIdByNormalizedNameAsync` (scan job: `WHERE shop_id = @shop AND normalized_name = @n AND NOT is_archived`); dedupe on confirm, `SupplierRepository.FindOrCreateAsync`: `INSERT … ON CONFLICT (shop_id, normalized_name) WHERE NOT is_archived DO NOTHING`, then the select above (Sprint 4) |
 | `GIN (normalized_name gin_trgm_ops)` (`ix_suppliers_normalized_name_trgm`) | supplier fuzzy match |
 
 ### 3.3 Invoices
@@ -363,11 +364,11 @@ Quantity is allowed to go negative (a sale recorded before the invoice was scann
 |---|---|
 | `UNIQUE (shop_id, client_request_id)` (`ux_invoices_shop_id_client_request_id`) | offline queue retries never create two invoices (ADR-0006): `InvoiceQueries.FindListItemByClientRequestIdAsync` (`WHERE shop_id = @shop AND client_request_id = @id`); a concurrent repeat loses on this index and gets the winner |
 | `(shop_id, created_at DESC)` (`ix_invoices_shop_id_created_at`) | invoice history list I2 without a status, `InvoiceQueries.ListAsync` (`WHERE shop_id = @shop ORDER BY created_at DESC OFFSET … LIMIT …`, plus `count(*)` with the same filter; `itemCount` is a correlated count in the page statement); daily scan quota fallback count when Redis is down: `InvoiceRepository.CountCreatedSinceAsync` (`WHERE shop_id = @shop AND created_at >= @cairoDayStart`, `docs/design/redis.md` §4) |
-| `(shop_id, status, created_at DESC)` (`ix_invoices_shop_id_status_created_at`) | I2 with a status filter, newest first, `InvoiceQueries.ListAsync` (`WHERE shop_id = @shop AND status = @status ORDER BY created_at DESC OFFSET … LIMIT …`, plus the count); "waiting for review" badge. Replaces the planned partial `(shop_id, status) WHERE status IN (1, 2)` (backend.md §17.1 item 4) |
+| `(shop_id, status, created_at DESC)` (`ix_invoices_shop_id_status_created_at`) | I2 with a status filter, newest first, `InvoiceQueries.ListAsync` (`WHERE shop_id = @shop AND status = @status ORDER BY created_at DESC OFFSET … LIMIT …`, plus the count); "waiting for review" badge, D1 `invoicesAwaitingReview` (`WHERE shop_id = @shop AND status = 2`, count, Sprint 4). Replaces the planned partial `(shop_id, status) WHERE status IN (1, 2)` (backend.md §17.1 item 4) |
 | `(shop_id, image_sha256)` (`ix_invoices_shop_id_image_sha256`) | duplicate photo detection, DB side of the AI cache: `InvoiceRepository.FindReusableExtractionAsync` (`WHERE shop_id = @shop AND image_sha256 = @sha AND id <> @self AND status IN (2, 3) AND raw_ai_json IS NOT NULL ORDER BY created_at DESC LIMIT 1`) |
 | `(shop_id, supplier_id, invoice_number) WHERE invoice_number IS NOT NULL` (`ix_invoices_shop_id_supplier_id_invoice_number`) | duplicate invoice warning: `InvoiceRepository.ExistsOtherWithNumberAsync` (`WHERE shop_id = @shop AND invoice_number = @n AND supplier_id IS NOT DISTINCT FROM @supplier AND id <> @self AND status <> 4`) |
 | `(status, created_at DESC) WHERE status = Failed` (`ix_invoices_status_created_at_failed`) | admin "failed scans" screen |
-| primary key | the job's lookup (`FindProcessingInfoAsync`) and the row lock `SELECT 1 FROM invoices WHERE id = @id AND shop_id = @shop FOR UPDATE` (`InvoiceRepository.FindForUpdateAsync`, also the I4 lock); I3 `InvoiceQueries.FindDetailAsync` (one statement with the lines and their product/unit names) |
+| primary key | the job's lookup (`FindProcessingInfoAsync`) and the row lock `SELECT 1 FROM invoices WHERE id = @id AND shop_id = @shop FOR UPDATE` (`InvoiceRepository.FindForUpdateAsync`, also the I4 lock and step 1 of the I5 confirm, Sprint 4); I3 `InvoiceQueries.FindDetailAsync` (one statement with the lines and their product/unit names) |
 | `CHECK (confirmed_at IS NULL OR status = Confirmed)` (`ck_invoices_confirmed_at`) | integrity |
 
 Other column details (migration `InvoiceScan`): `image_sha256 character(64)` (lower-case hex), `warnings jsonb NOT NULL DEFAULT '[]'` (array of warning names, e.g. `["TotalMismatch"]`), `raw_ai_json jsonb NULL` (model output that is not JSON is stored as a JSON string literal; at most 256 KB), `failure_reason text NULL` (`ImageMissing`, `AiUnavailable`, `AiOutputInvalid`, `AiNoItems`, `Unexpected`), `status smallint` (Processing 1, NeedsReview 2, Confirmed 3, Failed 4).
@@ -383,7 +384,7 @@ Other types: `quantity numeric(14,3)` (in the line's unit), `unit_price`/`line_t
 | `UNIQUE (invoice_id, line_no)` (`ux_invoice_items_invoice_id_line_no`) | ordered review screen, stable edits; loading the lines of an invoice (`FindForUpdateAsync`, I3 lines `ORDER BY line_no`, the item count of I2 and `FindListItemByClientRequestIdAsync`); FK support for `invoice_id`. I4 deletes the old rows and inserts the new ones in one save (EF orders the deletes first, so reused line numbers do not collide) |
 | `(shop_id, product_id)` | product purchase history |
 | `(created_product_id) WHERE created_product_id IS NOT NULL` | product purchase history for products created from an invoice (`product_id = @p OR created_product_id = @p`); FK support |
-| `(shop_id, expiry_date) WHERE expiry_date IS NOT NULL` | "expiring soon" dashboard card (product = `COALESCE(product_id, created_product_id)`, confirmed lines only) |
+| `(shop_id, expiry_date) WHERE expiry_date IS NOT NULL` (`ix_invoice_items_shop_id_expiry_date`) | D1 `expiringSoonCount` and D2 `DashboardQueries.ListExpiringAsync` (Sprint 4): `WHERE shop_id = @shop AND confirmed_at IS NOT NULL AND expiry_date <= @until`, joined to `products` on `COALESCE(product_id, created_product_id)` `AND NOT is_archived AND quantity > 0`, `ORDER BY expiry_date, product name, id OFFSET … LIMIT …` plus the count |
 | `CHECK (quantity > 0 AND unit_price >= 0 AND line_total >= 0)` | integrity |
 | `CHECK (line_no BETWEEN 1 AND 100)` | 100-line cap (AGENTS.md rule 15, contract I4) |
 | `CHECK (match_confidence IS NULL OR match_confidence BETWEEN 0 AND 1)` | contract confidence range |
@@ -400,14 +401,21 @@ Other types: `quantity numeric(14,3)` (in the line's unit), `unit_price`/`line_t
 
 **sales / sale_items** — quick-sale screen. Same idempotency pattern as invoices.
 
-`sale_items.list_unit_price` (`numeric(18,2) NOT NULL`) is the unit's sell price at sale time; `unit_price` (`numeric(18,2) NOT NULL`) is the price charged; `line_total = quantity × unit_price`. A line is "price overridden" when they differ (contract v1.1, S1/D1). Constraint: `CHECK (quantity > 0 AND unit_price >= 0 AND list_unit_price >= 0)`.
+`sale_items.list_unit_price` (`numeric(18,2) NOT NULL`) is the unit's sell price at sale time; `unit_price` (`numeric(18,2) NOT NULL`) is the price charged; `line_total = round(quantity × unit_price, 2)` (§1). A line is "price overridden" when they differ (contract v1.1, S1/D1). `quantity numeric(14,3)` is in the line's unit; the movement holds the base-unit change. `sale_items.line_no int` (1..100) keeps request order (UUIDv7 ids do not order inside one millisecond; Sprint 4 addition). `sales.total_amount numeric(18,2)` = sum of line totals; `sales.note text NULL` (max 500). Migration `Sales` (Sprint 4), `docs/features/sales.md`.
+
+Concurrency (AGENTS.md rules 3, 4): S1 inserts the sale header first; a concurrent request with the same `client_request_id` blocks on the unique index until the first commits, then loses and returns the existing sale. Then the products are locked with the same ordered statement as confirm (§3.2 primary key).
 
 | Index / constraint | Serves |
 |---|---|
-| `sales UNIQUE (shop_id, client_request_id)` | double-tap / retry safety |
-| `sales (shop_id, created_at DESC)` | today's sales, dashboard |
-| `sale_items (sale_id)` | load sale |
-| `sale_items (shop_id, product_id)` | top sellers |
+| `sales UNIQUE (shop_id, client_request_id)` (`ux_sales_shop_id_client_request_id`) | double-tap / retry safety (ADR-0006): `SaleQueries.FindByClientRequestIdAsync` (`WHERE shop_id = @shop AND client_request_id = @id`); serializes concurrent repeats |
+| `sales (shop_id, created_at DESC)` (`ix_sales_shop_id_created_at`) | S2 `SaleQueries.ListAsync`: `WHERE shop_id = @shop [AND created_at >= @from] [AND created_at < @to] ORDER BY created_at DESC, id DESC OFFSET … LIMIT …` plus the count; D1 today's sales `WHERE shop_id = @shop AND created_at >= @cairoDayStart AND created_at < @nextCairoDayStart` (count, sum, overridden count) |
+| `sale_items UNIQUE (sale_id, line_no)` (`ux_sale_items_sale_id_line_no`) | load a sale's lines in order (S1 response, S3); S2 item count (correlated count); D1 "has an overridden line"; FK support for `sale_id`. Replaces the planned plain `sale_items (sale_id)` |
+| `sale_items (shop_id, product_id)` (`ix_sale_items_shop_id_product_id`) | top sellers (no endpoint yet) |
+| `sales CHECK (total_amount >= 0)` (`ck_sales_total_amount`) | integrity |
+| `sale_items CHECK (quantity > 0 AND list_unit_price >= 0 AND unit_price >= 0 AND line_total >= 0)` (`ck_sale_items_amounts`) | integrity |
+| `sale_items CHECK (line_no BETWEEN 1 AND 100)` (`ck_sale_items_line_no`) | 100-line cap (contract S1) |
+
+FK-support indexes created by EF (no named query): `ix_sales_created_by_user_id`, `ix_sale_items_product_id` (also `ProductUnit.InUse` once implemented), `ix_sale_items_product_unit_id`, `ix_stock_movements_sale_id`.
 
 ### 3.5 Stock ledger
 
@@ -428,7 +436,7 @@ Rules per reason (enforced in `Domain/Stock/StockMovement`; created only through
 | Index / constraint | Serves |
 |---|---|
 | `UNIQUE (invoice_item_id, reason) WHERE invoice_item_id IS NOT NULL` | **idempotent confirm** — the DB refuses a second receipt for the same line; also allows exactly one (terminal) reversal per line |
-| `UNIQUE (sale_item_id) WHERE sale_item_id IS NOT NULL` | idempotent sale |
+| `UNIQUE (sale_item_id) WHERE sale_item_id IS NOT NULL` | idempotent sale; a sale line's `balance_after` in `SaleQueries` (`WHERE sale_item_id = @line`, Sprint 4) |
 | `(shop_id, product_id, created_at DESC)` | product movement history: P11 `WHERE shop_id = @shop AND product_id = @p ORDER BY created_at DESC, id DESC OFFSET … LIMIT …` and its `COUNT` |
 | `(shop_id, created_at DESC)` | dashboard activity feed |
 | `CHECK (quantity_change <> 0)` | no empty movements |
@@ -465,6 +473,7 @@ Growth note: when this table passes ~10M rows, partition by month on `created_at
 | `InitialCatalog` (step 1.4a) | `shops`, `products`, `product_units`, `stock_movements` | `pg_trgm`; every index and check listed above for these tables |
 | `Identity` (step 1.5) | `users`, `user_claims`, `user_logins`, `user_tokens`, `refresh_tokens`, `shop_members`, `plans`, `shop_subscriptions` | every index and constraint listed in §3.1 (including `refresh_tokens.family_id` and its index); default plan seeded; FK `stock_movements.created_by_user_id` → `users` added |
 | `ProductsCatalog` (step 1.6) | — | `products.barcode text NULL`, `products.category text NULL`, `UNIQUE (shop_id, barcode) WHERE barcode IS NOT NULL AND NOT is_archived` (`ux_products_shop_id_barcode`) |
+| `Sales` (Sprint 4) | `sales`, `sale_items` | every index and check listed in §3.4; FKs `stock_movements.sale_id` → `sales`, `stock_movements.sale_item_id` → `sale_items` (restrict). Confirm, P12 and the dashboard add no index (their queries are listed next to existing indexes above) |
 | `InvoiceScan` (Sprint 2, step 2a) | `suppliers`, `product_aliases`, `invoices`, `invoice_items`, `ai_usage_records`; schema `hangfire` | every index and check listed above for these tables; FKs `stock_movements.invoice_id` → `invoices`, `stock_movements.invoice_item_id` → `invoice_items` (restrict); Hangfire tables are created in schema `hangfire` by `Hangfire.PostgreSql` at startup (backend.md §17.1 item 8, documented exception to rule 31). Design: `docs/design/backend.md` §12 |
 
 Step 2b (matching, I2–I4) adds no migration: every filter and sort it uses is served by an index of `InitialCatalog` or `InvoiceScan` (the queries are listed next to those indexes above).
@@ -483,8 +492,8 @@ Implementation notes for the `InitialCatalog` tables:
 | `stock_movements.created_by_user_id` | NOT NULL | `users` | 1.5 (**done**, migration `Identity`) |
 | `stock_movements.invoice_id` | NULL | `invoices` | Sprint 2 (**done**, migration `InvoiceScan`) |
 | `stock_movements.invoice_item_id` | NULL | `invoice_items` | Sprint 2 (**done**, migration `InvoiceScan`) |
-| `stock_movements.sale_id` | NULL | `sales` | Sprint 4 |
-| `stock_movements.sale_item_id` | NULL | `sale_items` | Sprint 4 |
+| `stock_movements.sale_id` | NULL | `sales` | Sprint 4 (**done**, migration `Sales`) |
+| `stock_movements.sale_item_id` | NULL | `sale_items` | Sprint 4 (**done**, migration `Sales`) |
 
 **FK-support indexes of `InvoiceScan`.** EF creates a plain index for every foreign key that no listed index starts with; none serves a named query: `ix_invoices_supplier_id`, `ix_invoices_created_by_user_id`, `ix_invoices_confirmed_by_user_id`, `ix_invoice_items_product_id`, `ix_invoice_items_product_unit_id` (also serves `ProductUnit.InUse`, P8, once invoice lines reference units), `ix_product_aliases_product_id`, `ix_product_aliases_supplier_id`, `ix_product_aliases_product_unit_id`, `ix_stock_movements_invoice_id`.
 
@@ -496,15 +505,18 @@ Implementation notes for the `InitialCatalog` tables:
 BEGIN (READ COMMITTED)
   SELECT invoice ... WHERE id = @id AND shop_id = @tenant FOR UPDATE   -- serialize confirms
   if status = Confirmed → COMMIT, return existing result (idempotent)
-  for each line:
-     create product + base unit if product_id is null
-     SELECT product ... FOR UPDATE                                    -- fresh quantity, never from cache
+  find or create the supplier (INSERT ... ON CONFLICT DO NOTHING, then SELECT)
+  SELECT 1 FROM products WHERE id = ANY(@ids) ORDER BY id FOR UPDATE  -- one statement, fresh quantities, never from cache
+  create the new products + base units (new rows need no lock)
+  for each line by line_no:
      INSERT stock_movement(invoice_item_id = line.id, ...)            -- unique index = last safety net
      UPDATE product SET quantity = balance_after
-     UPSERT product_alias
-  UPDATE invoice SET status = Confirmed, confirmed_at = now
+  UPDATE invoice SET status = Confirmed, confirmed_at = now; every line's confirmed_at / created_product_id
+  UPSERT product_aliases (one statement, after the products exist)
 COMMIT
-→ after commit: bump Redis version keys (products, lowstock, dashboard)
+→ after commit: INCR stockly:{shopId}:ver:catalog (product lists, low stock, dashboard), status cache, supplier list
+(Implemented in Sprint 4: docs/design/backend.md §11, docs/features/confirm-invoice.md. A sale follows the same
+pattern with the sale header insert in place of the invoice lock: docs/features/sales.md.)
 ```
 
 Lock order is always invoice → products ordered by `id`, so two concurrent operations cannot deadlock.
