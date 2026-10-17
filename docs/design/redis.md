@@ -24,10 +24,10 @@ Prefix rule: tenant data is always `stockly:{shopId}:...`. Platform-wide data us
 | `stockly:{shopId}:products:lowstock:v{ver}:{queryHash}` | low-stock page DTOs (paged, rule 30; `queryHash` covers search and paging) | 5 min | `GetLowStockQueryHandler` | version bump |
 | `stockly:{shopId}:dashboard:summary:v{ver}` | dashboard DTO | 2 min | `GetDashboardQueryHandler` | version bump |
 | `stockly:{shopId}:suppliers:list` | supplier DTOs | 30 min | `GetSuppliersQueryHandler` | `DEL` on supplier write |
-| `stockly:{shopId}:ai:invoice:{sha256}` | validated extraction JSON | 7 days | `ProcessInvoiceJob` | never (content-addressed) |
-| `stockly:{shopId}:invoice:{id}:status` | `{status, updatedAt}` | 10 min | `ProcessInvoiceJob`, confirm | overwritten on change |
-| `stockly:{shopId}:rl:scan:{yyyyMMddHHmm}` | counter | 120 s | scan endpoint | expires |
-| `stockly:{shopId}:quota:scan:{yyyyMMdd}` | counter | 26 h | scan endpoint | expires |
+| `stockly:{shopId}:ai:invoice:{sha256}` | `{promptVersion, model, extraction}`: the validated extraction, the model that made it and the prompt version (`invoice-extraction-v1`); another version is a miss | 7 days | `ProcessInvoiceCommandHandler` (job), right after a valid OpenRouter output and before the database save | never (content-addressed); a prompt change makes old values misses |
+| `stockly:{shopId}:invoice:{id}:status` | `{invoiceId, status, updatedAt, clientRequestId, createdAt}` (backend.md §17.1 item 5) | 10 min | scan (after commit), job (after commit), job failure, confirm (Sprint 4), read-through `GetInvoice` (step 2b) | overwritten on change |
+| `stockly:{shopId}:rl:scan:{yyyyMMddHHmm}` | counter (UTC minute) | 120 s | scan endpoint (`RedisScanLimiter`, Lua `INCR` + `EXPIRE` on the first hit) | expires |
+| `stockly:{shopId}:quota:scan:{yyyyMMdd}` | counter (Cairo date) | 26 h | scan endpoint (`RedisScanLimiter`, Lua: refuse at the quota, else `INCR` + `EXPIRE` on the first hit; release = `DECR` only when > 0) | expires |
 | `stockly:platform:admin:stats` | admin KPIs | 5 min | admin query | expires |
 
 `{yyyyMMdd}` is computed in **Africa/Cairo** time through `IClock`, so the quota resets at local midnight, not UTC.
@@ -49,10 +49,12 @@ Deleting `stockly:{shopId}:products:*` needs `SCAN`, which is slow and not atomi
 | Job | Behaviour | Log |
 |---|---|---|
 | Read cache | Skip cache, read from Postgres | Warning, throttled to once per minute |
-| AI result cache | Treat as miss, call OpenRouter (costs money, still correct) | Warning |
+| AI result cache | Treat as miss. The job first reuses an earlier extraction of the same photo from `invoices` (`image_sha256`, backend.md §17.1 item 10), and only then calls OpenRouter (costs money, still correct) | Warning (throttled, shared with the limiter and the status cache) |
 | Rate limit | **Fail open**: allow the request | Warning |
 | Daily quota | Fall back to `COUNT(*)` on `invoices` created today, where "today" starts at Africa/Cairo midnight from `IClock` (index `invoices (shop_id, created_at DESC)`). Not `ai_usage_records`: it has one row per AI call, including retries and cache hits, so it would over-count scans. | Warning |
-| Invoice status | Read from `invoices` table | none |
+| Invoice status | Read from `invoices` table; writes skipped | Warning (throttled) |
+
+Every cache write of the scan and the job happens after the database commit, and a Redis failure there only logs: a scan or a job never fails because of Redis.
 
 Redis connection uses `AbortOnConnectFail = false` and a 250 ms operation timeout, so a dead Redis costs at most 250 ms per request and never crashes startup. Health check `/health/ready` reports Redis as *Degraded* (HTTP 200), not *Unhealthy*; the health check itself times out after 1 s, because it is not on a request path and a cold connection can take longer than 250 ms. Connection strings use `127.0.0.1`, not `localhost`: compose binds IPv4 only and `localhost` can resolve to `::1` first.
 

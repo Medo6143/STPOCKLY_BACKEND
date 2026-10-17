@@ -14,6 +14,32 @@ public static class ResultExtensions
         return result.IsSuccess ? onSuccess(result.Value) : controller.Problem(result.Error);
     }
 
+    /// <summary>
+    /// For idempotent creates (ADR-0006): a value this request created is <c>202 Accepted</c> with <c>Location</c>; a
+    /// repeat that found the existing resource is <c>200 OK</c>. HTTP mapping only; the handler decides <paramref name="isNew"/>.
+    /// </summary>
+    public static IActionResult ToAcceptedOrOk<T>(
+        this Result<T> result,
+        ControllerBase controller,
+        Func<T, bool> isNew,
+        Func<T, object> body,
+        Func<T, string> location)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        ArgumentNullException.ThrowIfNull(controller);
+        ArgumentNullException.ThrowIfNull(isNew);
+        ArgumentNullException.ThrowIfNull(body);
+        ArgumentNullException.ThrowIfNull(location);
+
+        if (result.IsFailure)
+        {
+            return controller.Problem(result.Error);
+        }
+
+        var value = result.Value;
+        return isNew(value) ? controller.Accepted(location(value), body(value)) : controller.Ok(body(value));
+    }
+
     public static IActionResult ToActionResult(this Result result, ControllerBase controller, Func<IActionResult> onSuccess)
     {
         ArgumentNullException.ThrowIfNull(result);

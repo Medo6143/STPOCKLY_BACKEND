@@ -27,6 +27,16 @@ public sealed partial class GuardTests
     }
 
     [Fact]
+    public void MinioImage_MatchesDockerCompose()
+    {
+        var compose = File.ReadAllText(FindRepoFile("docker-compose.yml"));
+
+        var composeImage = MinioImageLine().Match(compose).Groups["image"].Value;
+
+        composeImage.Should().Be(MinioFixture.MinioImage, "tests must run against the same pinned image as development");
+    }
+
+    [Fact]
     public void SystemClock_UtcNow_HasZeroOffset()
     {
         var clock = new SystemClock();
@@ -63,4 +73,7 @@ public sealed partial class GuardTests
 
     [GeneratedRegex(@"image:\s*(?<image>redis:\S+)")]
     private static partial Regex RedisImageLine();
+
+    [GeneratedRegex(@"image:\s*(?<image>pgsty/minio:\S+)")]
+    private static partial Regex MinioImageLine();
 }

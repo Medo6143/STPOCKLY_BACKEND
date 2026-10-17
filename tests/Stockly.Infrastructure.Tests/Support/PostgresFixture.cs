@@ -112,6 +112,30 @@ public sealed class PostgresFixture : IAsyncLifetime
         return shop;
     }
 
+    /// <summary>
+    /// Inserts a NeedsReview invoice of the shop with one line (raw SQL) and returns their ids, so an invoice receipt
+    /// movement can reference a real line (stock_movements.invoice_id and invoice_item_id are FKs since InvoiceScan).
+    /// </summary>
+    public async Task<(Guid InvoiceId, Guid ItemId)> CreateInvoiceLineAsync(Guid shopId)
+    {
+        var invoiceId = Guid.CreateVersion7();
+        var itemId = Guid.CreateVersion7();
+        await ExecuteAsync(
+            "INSERT INTO invoices (id, shop_id, client_request_id, created_by_user_id, status, image_object_key, image_sha256, created_at) " +
+            "VALUES (@p0, @p1, @p2, @p3, 2, 'invoices/test.jpg', repeat('a', 64), now())",
+            invoiceId,
+            shopId,
+            Guid.CreateVersion7(),
+            Catalog.UserId);
+        await ExecuteAsync(
+            "INSERT INTO invoice_items (id, shop_id, invoice_id, line_no, raw_name, quantity, unit_price, line_total) " +
+            "VALUES (@p0, @p1, @p2, 1, 'test line', 1, 1, 1)",
+            itemId,
+            shopId,
+            invoiceId);
+        return (invoiceId, itemId);
+    }
+
     public async Task<int> ExecuteAsync(string sql, params object[] parameters)
     {
         await using var connection = new NpgsqlConnection(ConnectionString);

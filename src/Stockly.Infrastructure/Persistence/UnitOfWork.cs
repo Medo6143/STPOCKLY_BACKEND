@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Stockly.Application.Abstractions.Persistence;
 using Stockly.Domain.Common;
+using Stockly.Domain.Invoices;
 using Stockly.Domain.Products;
 using Stockly.Infrastructure.Persistence.Configurations;
 
@@ -12,12 +13,14 @@ internal sealed class UnitOfWork(StocklyDbContext db) : IUnitOfWork
 {
     /// <summary>
     /// Unique indexes whose violation is an expected conflict: the handler checked first, but a concurrent request took
-    /// the value between that check and this save. Every other unique violation stays an unexpected error (500).
+    /// the value between that check and this save (a barcode, or a scan's client request id). Every other unique
+    /// violation stays an unexpected error (500).
     /// </summary>
     private static readonly Dictionary<string, Error> ConflictByConstraint = new(StringComparer.Ordinal)
     {
         [ProductConfiguration.BarcodeIndex] = ProductErrors.DuplicateBarcode,
         [ProductUnitConfiguration.BarcodeIndex] = ProductUnitErrors.DuplicateBarcode,
+        [InvoiceConfiguration.ClientRequestIndex] = InvoiceErrors.DuplicateClientRequest,
     };
 
     public Task<TResult> ExecuteInTransactionAsync<TResult>(

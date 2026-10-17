@@ -1,3 +1,5 @@
+using Amazon.Runtime;
+using Amazon.S3;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
@@ -5,12 +7,16 @@ using Stockly.Application.Abstractions.Identity;
 using Stockly.Application.Abstractions.Time;
 using Stockly.Infrastructure;
 using Stockly.Infrastructure.Persistence;
+using Testcontainers.Minio;
 using Testcontainers.PostgreSql;
 using Testcontainers.Redis;
 
 namespace Stockly.Api.IntegrationTests.Support;
 
-/// <summary>Real PostgreSQL (migrated with the production migrations) and Redis (the docker-compose images) shared by the Api tests.</summary>
+/// <summary>
+/// Real PostgreSQL (migrated with the production migrations), Redis and MinIO (the docker-compose images) shared by the
+/// Api tests. MinIO has a private bucket for invoice images.
+/// </summary>
 public sealed class ApiFixture : IAsyncLifetime
 {
     /// <summary>Nothing listens on port 1, so connections fail fast.</summary>
@@ -20,14 +26,23 @@ public sealed class ApiFixture : IAsyncLifetime
 
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder(ComposeImages.Postgres).Build();
     private readonly RedisContainer _redis = new RedisBuilder(ComposeImages.Redis).Build();
+    private readonly MinioContainer _minio = new MinioBuilder(ComposeImages.Minio).Build();
 
     public string PostgresConnectionString => _postgres.GetConnectionString();
 
     public string RedisConnectionString => _redis.GetConnectionString();
 
+    public StorageSettings Storage => new(_minio.GetConnectionString(), _minio.GetAccessKey(), _minio.GetSecretKey(), StorageSettings.TestBucket);
+
     public async Task InitializeAsync()
     {
-        await Task.WhenAll(_postgres.StartAsync(), _redis.StartAsync());
+        await Task.WhenAll(_postgres.StartAsync(), _redis.StartAsync(), _minio.StartAsync());
+        using (var s3 = new AmazonS3Client(
+            new BasicAWSCredentials(Storage.AccessKey, Storage.SecretKey),
+            new AmazonS3Config { ServiceURL = Storage.Endpoint, ForcePathStyle = true, AuthenticationRegion = "us-east-1" }))
+        {
+            await s3.PutBucketAsync(StorageSettings.TestBucket);
+        }
 
         var services = new ServiceCollection();
         services.AddPersistence(PostgresConnectionString);
@@ -41,6 +56,7 @@ public sealed class ApiFixture : IAsyncLifetime
     {
         await _postgres.DisposeAsync();
         await _redis.DisposeAsync();
+        await _minio.DisposeAsync();
     }
 
     public StocklyApiFactory CreateFactory(
@@ -49,8 +65,9 @@ public sealed class ApiFixture : IAsyncLifetime
         bool includeTestEndpoints = false,
         string jwtSigningKey = TestJwt.SigningKey,
         string? authPermitLimit = StocklyApiFactory.RaisedAuthPermitLimit,
-        IClock? clock = null) =>
-        new(postgres ?? PostgresConnectionString, redis ?? RedisConnectionString, includeTestEndpoints, jwtSigningKey, authPermitLimit, clock);
+        IClock? clock = null,
+        StocklyApiFactory.JobMode jobs = StocklyApiFactory.JobMode.Off) =>
+        new(postgres ?? PostgresConnectionString, redis ?? RedisConnectionString, includeTestEndpoints, jwtSigningKey, authPermitLimit, clock, Storage, jobs);
 
     /// <summary>Raw SQL for arranging states the API cannot create yet (suspended shop, staff membership...).</summary>
     public async Task<int> ExecuteAsync(string sql, params object[] parameters)

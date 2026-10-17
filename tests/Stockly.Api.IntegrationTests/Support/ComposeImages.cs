@@ -11,6 +11,8 @@ internal static partial class ComposeImages
 
     public static string Redis => Find(RedisImage());
 
+    public static string Minio => Find(MinioImage());
+
     public static string RepoFile(string relativePath)
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
@@ -37,4 +39,7 @@ internal static partial class ComposeImages
 
     [GeneratedRegex(@"image:\s*(?<image>redis:\S+)")]
     private static partial Regex RedisImage();
+
+    [GeneratedRegex(@"image:\s*(?<image>pgsty/minio:\S+)")]
+    private static partial Regex MinioImage();
 }

@@ -11,11 +11,12 @@ internal static class Catalog
     public static Product NewProduct(Guid shopId, string name = "بنادول اكسترا") =>
         Product.Create(shopId, name, "شريط", 12.50m, 15m, 5m, TestTime.T0).Value;
 
-    public static StockMovement Receive(Product product, decimal quantity) =>
+    /// <summary>An invoice receipt into <paramref name="product"/> from a real invoice line (<c>PostgresFixture.CreateInvoiceLineAsync</c>).</summary>
+    public static StockMovement Receive(Product product, decimal quantity, (Guid InvoiceId, Guid ItemId) line) =>
         product.RecordMovement(
             quantity,
             MovementReason.InvoiceReceipt,
-            MovementSource.FromInvoiceItem(Guid.NewGuid(), Guid.NewGuid()),
+            MovementSource.FromInvoiceItem(line.InvoiceId, line.ItemId),
             UserId,
             note: null,
             TestTime.T1).Value;

@@ -16,4 +16,7 @@ public enum ErrorType
 
     /// <summary>The caller sent too many requests (429).</summary>
     TooManyRequests = 8,
+
+    /// <summary>The request body is larger than allowed, e.g. an invoice image over 8 MB (413).</summary>
+    PayloadTooLarge = 9,
 }

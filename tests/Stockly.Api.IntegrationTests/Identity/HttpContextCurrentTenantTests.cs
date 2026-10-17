@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Stockly.Api.Identity;
 using Stockly.Application.Abstractions.Identity;
+using Stockly.Infrastructure.Jobs;
 
 namespace Stockly.Api.IntegrationTests.Identity;
 
@@ -42,7 +43,7 @@ public sealed class HttpContextCurrentTenantTests
     [Fact]
     public void ShopId_NoHttpContext_ReturnsNull()
     {
-        new HttpContextCurrentTenant(new HttpContextAccessor(), new RequestTenantScope()).ShopId.Should().BeNull();
+        new HttpContextCurrentTenant(new HttpContextAccessor(), new RequestTenantScope(), new JobTenantContext()).ShopId.Should().BeNull();
     }
 
     [Fact]
@@ -68,7 +69,7 @@ public sealed class HttpContextCurrentTenantTests
         var shopId = Guid.CreateVersion7();
         using var open = scope.BeginForNewShop(shopId);
 
-        new HttpContextCurrentTenant(new HttpContextAccessor(), scope).ShopId.Should().Be(shopId);
+        new HttpContextCurrentTenant(new HttpContextAccessor(), scope, new JobTenantContext()).ShopId.Should().Be(shopId);
     }
 
     [Fact]
@@ -90,11 +91,32 @@ public sealed class HttpContextCurrentTenantTests
         act.Should().Throw<ArgumentException>();
     }
 
+    [Fact]
+    public void ShopId_JobTenantWithoutHttpContext_ReturnsJobShop()
+    {
+        var job = new JobTenantContext();
+        var shopId = Guid.CreateVersion7();
+        job.Set(shopId);
+
+        new HttpContextCurrentTenant(new HttpContextAccessor(), new RequestTenantScope(), job).ShopId.Should().Be(shopId);
+    }
+
+    [Fact]
+    public void JobTenantSet_AnotherShop_Throws()
+    {
+        var job = new JobTenantContext();
+        job.Set(Guid.CreateVersion7());
+
+        var act = () => job.Set(Guid.CreateVersion7());
+
+        act.Should().Throw<InvalidOperationException>("a job runs for one shop only");
+    }
+
     private static HttpContextCurrentTenant Tenant(params Claim[] claims) => Tenant(new RequestTenantScope(), claims);
 
     private static HttpContextCurrentTenant Tenant(RequestTenantScope scope, params Claim[] claims)
     {
         var context = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(claims, "test")) };
-        return new HttpContextCurrentTenant(new HttpContextAccessor { HttpContext = context }, scope);
+        return new HttpContextCurrentTenant(new HttpContextAccessor { HttpContext = context }, scope, new JobTenantContext());
     }
 }
