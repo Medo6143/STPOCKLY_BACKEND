@@ -18,6 +18,8 @@ internal sealed class InvoiceRepository(StocklyDbContext db, ICurrentTenant curr
 
     public void Add(Invoice invoice) => db.Set<Invoice>().Add(invoice);
 
+    public void RemoveItems(IReadOnlyCollection<InvoiceItem> items) => db.Set<InvoiceItem>().RemoveRange(items);
+
     // Primary key.
     public Task<InvoiceProcessingInfo?> FindProcessingInfoAsync(Guid invoiceId, CancellationToken cancellationToken) =>
         db.Set<Invoice>().AsNoTracking()

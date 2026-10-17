@@ -1,4 +1,5 @@
 using Stockly.Application.Abstractions.Ai;
+using Stockly.Application.Features.Invoices.Matching;
 using Stockly.Application.Features.Invoices.ProcessInvoice;
 using Stockly.Domain.Invoices;
 
@@ -92,6 +93,21 @@ public sealed class ExtractedInvoiceNormalizerTests
 
         normalized.Lines.Select(line => line.RawName).Should().Equal("أول", "ثالث");
         normalized.UnreadableLineCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void Normalize_ReadableLines_MatchInputsNumberedLikeTheLinesWithNormalizedNameAndUnit()
+    {
+        var normalized = ExtractedInvoiceNormalizer.Normalize(Invoice(lines:
+        [
+            Line("بنادول إكسترا", "1", "1.00") with { Unit = " عُلبة " },
+            new ExtractedInvoiceLine(null, null, null, null, null, null, null),
+            Line("Panadol  Extra", "2", "3.00") with { Unit = "  " },
+        ]));
+
+        normalized.MatchInputs.Should().Equal(
+            new MatchInput(1, "بنادول اكسترا", "علبه"),
+            new MatchInput(2, "panadol extra", null));
     }
 
     private static ExtractedInvoice Invoice(string? header = null, params ExtractedInvoiceLine[] lines) =>

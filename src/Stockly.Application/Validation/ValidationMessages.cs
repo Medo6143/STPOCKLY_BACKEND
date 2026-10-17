@@ -22,6 +22,16 @@ public static class ValidationMessages
 
     public static string DecimalFormat => Get(nameof(DecimalFormat));
 
+    public static string MustBePositive => Get(nameof(MustBePositive));
+
+    public static string TextRequired => Get(nameof(TextRequired));
+
+    public static string LineNumbersUnique => Get(nameof(LineNumbersUnique));
+
+    public static string ProductOrNewProduct => Get(nameof(ProductOrNewProduct));
+
+    public static string ProductAndUnitTogether => Get(nameof(ProductAndUnitTogether));
+
     private static string Get(string key) =>
         Resources.GetString(key, CultureInfo.CurrentUICulture)
         ?? throw new InvalidOperationException($"Validation message '{key}' is missing.");

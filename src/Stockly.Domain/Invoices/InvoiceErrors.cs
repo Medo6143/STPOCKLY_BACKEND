@@ -51,4 +51,32 @@ public static class InvoiceErrors
 
     public static readonly Error LineQuantityNotPositive =
         Error.Validation("Invoice.LineQuantityNotPositive", "The quantity of an invoice line must be greater than zero.");
+
+    /// <summary>The review edit (I4) needs an invoice waiting for review.</summary>
+    public static readonly Error NotEditable =
+        Error.Conflict("Invoice.NotEditable", "Only an invoice waiting for review can be edited.");
+
+    /// <summary>A reviewed line has neither an existing product nor a new one (I4, I5).</summary>
+    public static readonly Error LineProductRequired =
+        Error.Validation("Invoice.LineProductRequired", "Every invoice line needs a product or a new product.");
+
+    /// <summary>The line's unit belongs to another product (I4).</summary>
+    public static readonly Error UnitNotOfProduct =
+        Error.Validation("Invoice.UnitNotOfProduct", "The unit does not belong to the line's product.");
+
+    /// <summary>Internal guard (the request validator rejects it first): a line has both a product and a new product.</summary>
+    public static readonly Error LineProductConflict =
+        Error.Validation("Invoice.LineProductConflict", "An invoice line has either a product or a new product, not both.");
+
+    /// <summary>Internal guard (the request validator rejects it first): line numbers are 1..100 and unique.</summary>
+    public static readonly Error LineNumberInvalid =
+        Error.Validation("Invoice.LineNumberInvalid", $"Line numbers are unique and between 1 and {InvoiceLimits.MaxLines}.");
+
+    /// <summary>Internal guard: a match confidence is 0.00–1.00 with at most 2 decimals.</summary>
+    public static readonly Error MatchConfidenceInvalid =
+        Error.Validation("Invoice.MatchConfidenceInvalid", "A match confidence is between 0 and 1 with at most 2 decimals.");
+
+    /// <summary>Internal guard (the request validator rejects it first): a new product needs a name and a base unit name.</summary>
+    public static readonly Error NewProductIncomplete =
+        Error.Validation("Invoice.NewProductIncomplete", "A new product needs a name and a base unit name.");
 }

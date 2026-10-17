@@ -8,6 +8,7 @@ using Stockly.Application.Abstractions.Identity;
 using Stockly.Application.Abstractions.Persistence;
 using Stockly.Application.Abstractions.Storage;
 using Stockly.Application.Abstractions.Time;
+using Stockly.Application.Features.Invoices.Matching;
 using Stockly.Application.Features.Invoices.Validation;
 using Stockly.Domain.Common;
 using Stockly.Domain.Invoices;
@@ -18,8 +19,8 @@ namespace Stockly.Application.Features.Invoices.ProcessInvoice;
 
 /// <summary>
 /// docs/design/backend.md §4.2 with the §17.1 order: image → earlier extraction of the same photo (database) → AI result
-/// cache (Redis) → OpenRouter → normalize → supplier → warnings → one locked save. Every AI call and every cache hit
-/// becomes an <see cref="AiUsageRecord"/> (rule 18). Nothing here changes stock (rule 19).
+/// cache (Redis) → OpenRouter → normalize → supplier → product matching (§8) → warnings → one locked save. Every AI call
+/// and every cache hit becomes an <see cref="AiUsageRecord"/> (rule 18). Nothing here changes stock (rule 19).
 /// </summary>
 public sealed class ProcessInvoiceCommandHandler(
     ICurrentTenant currentTenant,
@@ -30,6 +31,7 @@ public sealed class ProcessInvoiceCommandHandler(
     IAiResultCache aiCache,
     IAiInvoiceExtractor extractor,
     IValidator<ExtractedInvoice> outputValidator,
+    IProductMatcher matcher,
     InvoiceValidator invoiceValidator,
     IInvoiceStatusCache statusCache,
     IUnitOfWork unitOfWork,
@@ -86,6 +88,8 @@ public sealed class ProcessInvoiceCommandHandler(
         var supplierId = header.SupplierName is { } supplierName
             ? await suppliers.FindIdByNormalizedNameAsync(ArabicTextNormalizer.Normalize(supplierName), cancellationToken)
             : null;
+        var matches = await matcher.MatchAsync(supplierId, normalized.MatchInputs, cancellationToken);
+        var lines = WithMatches(normalized.Lines, matches);
         var warnings = await invoiceValidator.ValidateAsync(
             new InvoiceValidationContext(
                 InvoiceValidationStage.Extraction,
@@ -105,7 +109,7 @@ public sealed class ProcessInvoiceCommandHandler(
             extracted.Usage,
             invoice =>
             {
-                var completed = invoice.CompleteExtraction(header, normalized.Lines, warnings, extracted.RawJson, supplierId, clock.UtcNow);
+                var completed = invoice.CompleteExtraction(header, lines, warnings, extracted.RawJson, supplierId, clock.UtcNow);
 
                 // A guard of the aggregate refused values the normalizer let through: the output is not usable.
                 return completed.IsFailure && completed.Error != InvoiceErrors.NotProcessing
@@ -113,6 +117,15 @@ public sealed class ProcessInvoiceCommandHandler(
                     : completed;
             },
             cancellationToken);
+    }
+
+    // Line numbers count the readable lines from 1, in order (ExtractedInvoiceNormalizer).
+    private static List<InvoiceLineDraft> WithMatches(IReadOnlyList<InvoiceLineDraft> lines, IReadOnlyList<LineMatch> matches)
+    {
+        var byLine = matches.Where(match => match.IsMatched).ToDictionary(match => match.LineNo);
+        return [.. lines.Select((line, index) => byLine.TryGetValue(index + 1, out var match)
+            ? line with { Match = new InvoiceLineMatch(match.ProductId!.Value, match.ProductUnitId!.Value, match.Confidence!.Value) }
+            : line)];
     }
 
     private async Task<Extracted> ExtractAsync(

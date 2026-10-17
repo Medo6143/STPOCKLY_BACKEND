@@ -28,4 +28,19 @@
   <data name="DecimalFormat" xml:space="preserve">
     <value>يجب أن تكون القيمة رقماً عشرياً مكتوباً كنص، مثل "12.50".</value>
   </data>
+  <data name="MustBePositive" xml:space="preserve">
+    <value>يجب أن تكون القيمة أكبر من صفر.</value>
+  </data>
+  <data name="TextRequired" xml:space="preserve">
+    <value>يجب ألا يكون الحقل فارغاً.</value>
+  </data>
+  <data name="LineNumbersUnique" xml:space="preserve">
+    <value>يجب ألا تتكرر أرقام البنود.</value>
+  </data>
+  <data name="ProductOrNewProduct" xml:space="preserve">
+    <value>حدد منتجاً موجوداً مع وحدته أو منتجاً جديداً، وليس الاثنين معاً.</value>
+  </data>
+  <data name="ProductAndUnitTogether" xml:space="preserve">
+    <value>يجب إرسال المنتج ووحدته معاً.</value>
+  </data>
 </root>

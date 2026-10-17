@@ -28,4 +28,19 @@
   <data name="DecimalFormat" xml:space="preserve">
     <value>Must be a decimal number written as a string, e.g. "12.50".</value>
   </data>
+  <data name="MustBePositive" xml:space="preserve">
+    <value>Must be greater than zero.</value>
+  </data>
+  <data name="TextRequired" xml:space="preserve">
+    <value>Must not be empty.</value>
+  </data>
+  <data name="LineNumbersUnique" xml:space="preserve">
+    <value>Line numbers must be unique.</value>
+  </data>
+  <data name="ProductOrNewProduct" xml:space="preserve">
+    <value>Give either productId and productUnitId, or newProduct, not both.</value>
+  </data>
+  <data name="ProductAndUnitTogether" xml:space="preserve">
+    <value>productId and productUnitId must be given together.</value>
+  </data>
 </root>

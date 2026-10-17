@@ -256,4 +256,22 @@
   <data name="Scan.DailyQuotaExceeded.Detail" xml:space="preserve">
     <value>انتهت عمليات مسح الفواتير المتاحة في باقتك اليوم. يتجدد الحد عند منتصف الليل بتوقيت القاهرة.</value>
   </data>
+  <data name="Invoice.NotEditable.Title" xml:space="preserve">
+    <value>لا يمكن تعديل الفاتورة</value>
+  </data>
+  <data name="Invoice.NotEditable.Detail" xml:space="preserve">
+    <value>يمكن تعديل الفاتورة فقط وهي بانتظار المراجعة.</value>
+  </data>
+  <data name="Invoice.LineProductRequired.Title" xml:space="preserve">
+    <value>المنتج مطلوب</value>
+  </data>
+  <data name="Invoice.LineProductRequired.Detail" xml:space="preserve">
+    <value>اختر منتجاً موجوداً أو أدخل بيانات منتج جديد لكل بند.</value>
+  </data>
+  <data name="Invoice.UnitNotOfProduct.Title" xml:space="preserve">
+    <value>وحدة غير صحيحة</value>
+  </data>
+  <data name="Invoice.UnitNotOfProduct.Detail" xml:space="preserve">
+    <value>الوحدة المختارة تخص منتجاً آخر.</value>
+  </data>
 </root>

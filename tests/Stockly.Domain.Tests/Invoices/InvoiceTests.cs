@@ -168,6 +168,144 @@ public sealed class InvoiceTests
     }
 
     [Fact]
+    public void CompleteExtraction_MatchedLine_StoresProductUnitAndConfidence()
+    {
+        var invoice = NewInvoice();
+        var (product, unit) = (Guid.CreateVersion7(), Guid.CreateVersion7());
+
+        invoice.CompleteExtraction(
+            InvoiceHeader.Empty, [Line("x", 1m, 1m) with { Match = new InvoiceLineMatch(product, unit, 0.70m) }, Line("y", 1m, 1m)], [], null, null, Later);
+
+        invoice.Items.Select(item => (item.ProductId, item.ProductUnitId, item.MatchConfidence))
+            .Should().Equal((product, unit, 0.70m), (null, null, null));
+    }
+
+    [Theory]
+    [InlineData("1.01")]
+    [InlineData("-0.10")]
+    [InlineData("0.905")]
+    public void CompleteExtraction_InvalidConfidence_Fails(string confidence)
+    {
+        var invoice = NewInvoice();
+        var match = new InvoiceLineMatch(Guid.CreateVersion7(), Guid.CreateVersion7(), decimal.Parse(confidence, System.Globalization.CultureInfo.InvariantCulture));
+
+        var result = invoice.CompleteExtraction(InvoiceHeader.Empty, [Line("x", 1m, 1m) with { Match = match }], [], null, null, Later);
+
+        result.Error.Should().Be(InvoiceErrors.MatchConfidenceInvalid);
+    }
+
+    [Fact]
+    public void ReplaceLines_NeedsReview_ReplacesHeaderLinesTotalsAndWarnings()
+    {
+        var invoice = ReviewInvoice(out var product, out var unit);
+        var supplierId = Guid.CreateVersion7();
+        var header = new InvoiceHeader("مورد", "INV-2", new DateOnly(2026, 10, 11), 50.00m);
+
+        var result = invoice.ReplaceLines(
+            header,
+            [NewLine(2, "جديد"), Existing(1, product, unit, 3m, 10m)],
+            supplierId,
+            [InvoiceWarning.TotalMismatch, InvoiceWarning.TotalMismatch]);
+
+        result.IsSuccess.Should().BeTrue();
+        invoice.Items.Select(item => item.LineNo).Should().Equal(1, 2);
+        var newLine = invoice.Items.Single(item => item.LineNo == 2);
+        newLine.Should().BeEquivalentTo(new
+        {
+            ProductId = (Guid?)null,
+            ProductUnitId = (Guid?)null,
+            NewProductName = "جديد",
+            NewProductBaseUnitName = "علبة",
+            NewProductSellPrice = 5.00m,
+            MatchConfidence = (decimal?)null,
+        });
+        invoice.ComputedTotal.Should().Be(32.00m);
+        invoice.SupplierId.Should().Be(supplierId);
+        invoice.SupplierNameRaw.Should().Be("مورد");
+        invoice.InvoiceNumber.Should().Be("INV-2");
+        invoice.TotalAmount.Should().Be(50.00m);
+        invoice.Warnings.Should().Equal(InvoiceWarning.TotalMismatch);
+        invoice.Status.Should().Be(InvoiceStatus.NeedsReview);
+    }
+
+    [Fact]
+    public void ReplaceLines_SameProductAndUnitOnSameLine_KeepsConfidence_OtherwiseNull()
+    {
+        var invoice = ReviewInvoice(out var product, out var unit);
+
+        invoice.ReplaceLines(InvoiceHeader.Empty, [Existing(1, product, unit, 1m, 1m), Existing(2, product, unit, 1m, 1m)], null, []);
+
+        invoice.Items.Select(item => item.MatchConfidence).Should().Equal(0.90m, null);
+    }
+
+    [Fact]
+    public void ReplaceLines_OtherUnitOnSameLine_ClearsConfidence()
+    {
+        var invoice = ReviewInvoice(out var product, out _);
+
+        invoice.ReplaceLines(InvoiceHeader.Empty, [Existing(1, product, Guid.CreateVersion7(), 1m, 1m)], null, []);
+
+        invoice.Items.Single().MatchConfidence.Should().BeNull();
+    }
+
+    public static TheoryData<string, string> InvalidReviews() => new()
+    {
+        { "neither", nameof(InvoiceErrors.LineProductRequired) },
+        { "both", nameof(InvoiceErrors.LineProductConflict) },
+        { "duplicate", nameof(InvoiceErrors.LineNumberInvalid) },
+        { "lineNo0", nameof(InvoiceErrors.LineNumberInvalid) },
+        { "empty", nameof(InvoiceErrors.LinesRequired) },
+        { "tooMany", nameof(InvoiceErrors.TooManyLines) },
+        { "blankNewProduct", nameof(InvoiceErrors.NewProductIncomplete) },
+    };
+
+    [Theory]
+    [MemberData(nameof(InvalidReviews))]
+    public void ReplaceLines_InvalidLines_FailsAndChangesNothing(string kind, string errorName)
+    {
+        var invoice = ReviewInvoice(out var product, out var unit);
+        var existing = Existing(1, product, unit, 1m, 1m);
+        IReadOnlyList<InvoiceReviewLine> lines = kind switch
+        {
+            "neither" => [existing with { Product = null }],
+            "both" => [existing with { NewProduct = new InvoiceNewProduct("x", "y", 1m) }],
+            "duplicate" => [existing, existing],
+            "lineNo0" => [existing with { LineNo = 0 }],
+            "empty" => [],
+            "tooMany" => [.. Enumerable.Range(1, InvoiceLimits.MaxLines + 1).Select(i => existing with { LineNo = i })],
+            _ => [NewLine(1, " ")],
+        };
+        var before = invoice.Items.ToList();
+
+        var result = invoice.ReplaceLines(InvoiceHeader.Empty, lines, null, []);
+
+        result.Error.Should().Be(typeof(InvoiceErrors).GetField(errorName)!.GetValue(null));
+        invoice.Items.Should().Equal(before);
+    }
+
+    [Fact]
+    public void ReplaceLines_NotNeedsReview_NotEditable()
+    {
+        var processing = NewInvoice();
+        var failed = NewInvoice();
+        failed.MarkFailed(InvoiceFailureReason.AiNoItems, null, Later);
+        var line = NewLine(1, "x");
+
+        processing.ReplaceLines(InvoiceHeader.Empty, [line], null, []).Error.Should().Be(InvoiceErrors.NotEditable);
+        failed.ReplaceLines(InvoiceHeader.Empty, [line], null, []).Error.Should().Be(InvoiceErrors.NotEditable);
+    }
+
+    [Fact]
+    public void HasProductOnLine_OnlyForTheSameLineAndProduct()
+    {
+        var invoice = ReviewInvoice(out var product, out _);
+
+        invoice.HasProductOnLine(1, product).Should().BeTrue();
+        invoice.HasProductOnLine(2, product).Should().BeFalse();
+        invoice.HasProductOnLine(1, Guid.CreateVersion7()).Should().BeFalse();
+    }
+
+    [Fact]
     public void Enums_StoredValues_NeverChange()
     {
         ((int)InvoiceStatus.Processing).Should().Be(1);
@@ -183,4 +321,21 @@ public sealed class InvoiceTests
 
     private static InvoiceLineDraft Line(string name, decimal quantity, decimal unitPrice) =>
         new(name, quantity, unitPrice, ExpiryDate: null, BatchNo: null);
+
+    // NeedsReview with line 1 matched at 0.90.
+    private static Invoice ReviewInvoice(out Guid product, out Guid unit)
+    {
+        product = Guid.CreateVersion7();
+        unit = Guid.CreateVersion7();
+        var invoice = NewInvoice();
+        invoice.CompleteExtraction(
+            InvoiceHeader.Empty, [Line("x", 1m, 1m) with { Match = new InvoiceLineMatch(product, unit, 0.90m) }], [], null, null, Later);
+        return invoice;
+    }
+
+    private static InvoiceReviewLine Existing(int lineNo, Guid product, Guid unit, decimal quantity, decimal unitPrice) =>
+        new(lineNo, "بنادول", quantity, unitPrice, null, null, new InvoiceLineProduct(product, unit), null);
+
+    private static InvoiceReviewLine NewLine(int lineNo, string name) =>
+        new(lineNo, "سطر", 1m, 2m, null, " B1 ", null, new InvoiceNewProduct(name, " علبة ", 5.00m));
 }

@@ -25,7 +25,7 @@ Prefix rule: tenant data is always `stockly:{shopId}:...`. Platform-wide data us
 | `stockly:{shopId}:dashboard:summary:v{ver}` | dashboard DTO | 2 min | `GetDashboardQueryHandler` | version bump |
 | `stockly:{shopId}:suppliers:list` | supplier DTOs | 30 min | `GetSuppliersQueryHandler` | `DEL` on supplier write |
 | `stockly:{shopId}:ai:invoice:{sha256}` | `{promptVersion, model, extraction}`: the validated extraction, the model that made it and the prompt version (`invoice-extraction-v1`); another version is a miss | 7 days | `ProcessInvoiceCommandHandler` (job), right after a valid OpenRouter output and before the database save | never (content-addressed); a prompt change makes old values misses |
-| `stockly:{shopId}:invoice:{id}:status` | `{invoiceId, status, updatedAt, clientRequestId, createdAt}` (backend.md §17.1 item 5) | 10 min | scan (after commit), job (after commit), job failure, confirm (Sprint 4), read-through `GetInvoice` (step 2b) | overwritten on change |
+| `stockly:{shopId}:invoice:{id}:status` | `{invoiceId, status, updatedAt, clientRequestId, createdAt}` (backend.md §17.1 item 5) | 10 min | scan (after commit), job (after commit), job failure, confirm (Sprint 4), read-through `GetInvoiceQueryHandler` (step 2b: a cache miss whose PostgreSQL row is `Processing`) | overwritten on change. Read by `GetInvoiceQueryHandler` (I3): only a `Processing` value answers without PostgreSQL; any other status reads PostgreSQL |
 | `stockly:{shopId}:rl:scan:{yyyyMMddHHmm}` | counter (UTC minute) | 120 s | scan endpoint (`RedisScanLimiter`, Lua `INCR` + `EXPIRE` on the first hit) | expires |
 | `stockly:{shopId}:quota:scan:{yyyyMMdd}` | counter (Cairo date) | 26 h | scan endpoint (`RedisScanLimiter`, Lua: refuse at the quota, else `INCR` + `EXPIRE` on the first hit; release = `DECR` only when > 0) | expires |
 | `stockly:platform:admin:stats` | admin KPIs | 5 min | admin query | expires |
@@ -60,4 +60,4 @@ Redis connection uses `AbortOnConnectFail = false` and a 250 ms operation timeou
 
 ## 5. Polling budget
 
-The app polls `GET /api/invoices/{id}` every 2 s for up to 60 s while status is `Processing`. With the status key, one polling scan costs ~30 Redis GETs and zero Postgres queries until the status changes.
+The app polls `GET /api/invoices/{id}` every 2 s for up to 60 s while status is `Processing`. With the status key, one polling scan costs ~30 Redis GETs and zero Postgres queries until the status changes. `GetInvoiceQueryHandler` builds the `Processing` response (no lines, no header) from the cached value alone; once the job has written another status, the next poll reads the full invoice from PostgreSQL. With Redis down every poll reads PostgreSQL (rule 25).

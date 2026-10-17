@@ -181,6 +181,35 @@ public sealed class ProcessInvoiceCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_LinesMatchProducts_SavesProductUnitAndConfidencePerLine()
+    {
+        var invoice = _context.ProcessingInvoice();
+        var supplierId = Guid.CreateVersion7();
+        var (panadol, box, strip) = (Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7());
+        var (congestal, congestalUnit) = (Guid.CreateVersion7(), Guid.CreateVersion7());
+        _context.Suppliers.FindIdByNormalizedNameAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(supplierId);
+        _context.Aliases.FindExactAsync(supplierId, Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
+            .Returns(new List<AliasMatch> { new(ArabicTextNormalizer.Normalize("كونجستال"), congestal, congestalUnit) });
+        _context.Products.FindByNormalizedNamesAsync(Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
+            .Returns(new List<NamedProduct>
+            {
+                new(panadol, ArabicTextNormalizer.Normalize("بنادول اكسترا"), [new(strip, "شريط", true), new(box, "علبة", false)]),
+            });
+        GivenAiReturns(Extraction(
+            total: null,
+            Line("بنادول إكسترا", "2", "30.00") with { Unit = "عُلبة" },
+            Line("كونجستال", "1", "10.00"),
+            Line("فيتامين سي", "1", "5.00")) with { SupplierName = "شركة" });
+
+        await Handle(invoice.Id);
+
+        invoice.Items.OrderBy(item => item.LineNo).Select(item => (item.ProductId, item.ProductUnitId, item.MatchConfidence))
+            .Should().Equal((panadol, box, 0.90m), (congestal, congestalUnit, 1.00m), (null, null, null));
+        await _context.Products.Received(1).FindByNormalizedNamesAsync(
+            Arg.Is<IReadOnlyCollection<string>>(names => names.Count == 2), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task Handle_ImageMissing_FailedWithoutAnyAiCallOrUsageRow()
     {
         var invoice = _context.ProcessingInvoice();
@@ -269,6 +298,7 @@ public sealed class ProcessInvoiceCommandHandlerTests
                 _context.AiCache,
                 _context.Extractor,
                 _context.OutputValidator,
+                _context.Matcher(),
                 _context.InvoiceValidator(),
                 _context.StatusCache,
                 _context.UnitOfWork,

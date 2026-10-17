@@ -2,6 +2,7 @@ using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using Stockly.Application.Behaviors;
 using Stockly.Application.Features.Auth;
+using Stockly.Application.Features.Invoices.Matching;
 using Stockly.Application.Features.Invoices.Validation;
 using Stockly.Application.Features.Products;
 
@@ -12,8 +13,8 @@ public static class DependencyInjection
     /// <summary>
     /// MediatR handlers with the pipeline Validation → catalog cache invalidation (catalog writes only, after commit) →
     /// Transaction (commands only) → handler, FluentValidation validators, the auth session issuer and the catalog list
-    /// cache, and the invoice warning rules (one class per rule, SOLID O). Infrastructure registers the interfaces these
-    /// depend on.
+    /// cache, the invoice warning rules and the product match strategies (one class each, SOLID O). Infrastructure
+    /// registers the interfaces these depend on.
     /// </summary>
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
@@ -34,6 +35,9 @@ public static class DependencyInjection
         services.AddScoped<IInvoiceValidationRule, UnreadableLinesRule>();
         services.AddScoped<IInvoiceValidationRule, TotalMismatchRule>();
         services.AddScoped<IInvoiceValidationRule, DuplicateInvoiceNumberRule>();
+        services.AddScoped<IProductMatcher, ProductMatcher>();
+        services.AddScoped<IProductMatchStrategy, ExactAliasMatchStrategy>();
+        services.AddScoped<IProductMatchStrategy, ExactNameMatchStrategy>();
 
         return services;
     }

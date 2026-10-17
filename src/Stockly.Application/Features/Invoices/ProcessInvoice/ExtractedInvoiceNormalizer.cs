@@ -1,5 +1,6 @@
 using System.Globalization;
 using Stockly.Application.Abstractions.Ai;
+using Stockly.Application.Features.Invoices.Matching;
 using Stockly.Domain.Common;
 using Stockly.Domain.Invoices;
 using Stockly.Domain.Text;
@@ -28,12 +29,14 @@ public static class ExtractedInvoiceNormalizer
             ParseMoney(extraction.TotalAmount));
 
         var lines = new List<InvoiceLineDraft>();
+        var matchInputs = new List<MatchInput>();
         var unreadable = 0;
         foreach (var line in extraction.Items)
         {
             if (ToDraft(line) is { } draft)
             {
                 lines.Add(draft);
+                matchInputs.Add(new MatchInput(lines.Count, ArabicTextNormalizer.Normalize(draft.RawName), NormalizeUnit(line.Unit)));
             }
             else
             {
@@ -41,8 +44,11 @@ public static class ExtractedInvoiceNormalizer
             }
         }
 
-        return new NormalizedInvoice(header, lines, unreadable, extraction.Truncated);
+        return new NormalizedInvoice(header, lines, matchInputs, unreadable, extraction.Truncated);
     }
+
+    private static string? NormalizeUnit(string? unit) =>
+        OptionalText.Clean(unit) is { } text && ArabicTextNormalizer.Normalize(text) is { Length: > 0 } normalized ? normalized : null;
 
     private static InvoiceLineDraft? ToDraft(ExtractedInvoiceLine line)
     {
@@ -89,9 +95,16 @@ public static class ExtractedInvoiceNormalizer
             : null;
 }
 
-/// <summary>The typed header, the readable lines in order, how many lines were unreadable, and whether the model hit the line cap.</summary>
+/// <summary>
+/// The typed header, the readable lines in order, what matching needs for each of them (line number from 1, normalized
+/// name and unit text), how many lines were unreadable, and whether the model hit the line cap.
+/// </summary>
 public sealed record NormalizedInvoice(
-    InvoiceHeader Header, IReadOnlyList<InvoiceLineDraft> Lines, int UnreadableLineCount, bool Truncated)
+    InvoiceHeader Header,
+    IReadOnlyList<InvoiceLineDraft> Lines,
+    IReadOnlyList<MatchInput> MatchInputs,
+    int UnreadableLineCount,
+    bool Truncated)
 {
     /// <summary>Σ line totals, as the invoice will compute them.</summary>
     public decimal ComputedTotal => Lines.Sum(line => InvoiceItem.ComputeLineTotal(line.Quantity, line.UnitPrice));

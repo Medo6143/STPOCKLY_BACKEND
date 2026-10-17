@@ -12,7 +12,7 @@ using Stockly.Domain.Stock;
 
 namespace Stockly.Api.IntegrationTests.Errors;
 
-/// <summary>Every code the API can return (steps 1.5, 1.6 and 2a) has a title and detail in Arabic and English (contract §1.5, §9).</summary>
+/// <summary>Every code the API can return (steps 1.5, 1.6, 2a and 2b) has a title and detail in Arabic and English (contract §1.5, §9).</summary>
 public sealed class ErrorTextTests
 {
     public static TheoryData<string> Codes()
@@ -50,6 +50,9 @@ public sealed class ErrorTextTests
             InvoiceErrors.ImageRequired.Code,
             InvoiceErrors.UnsupportedImageType.Code,
             InvoiceErrors.ImageTooLarge.Code,
+            InvoiceErrors.NotEditable.Code,
+            InvoiceErrors.LineProductRequired.Code,
+            InvoiceErrors.UnitNotOfProduct.Code,
             ScanErrors.RateLimitedCode,
             ScanErrors.DailyQuotaExceededCode,
         ];
