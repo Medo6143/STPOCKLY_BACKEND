@@ -25,4 +25,46 @@ internal sealed class ProductRepository(StocklyDbContext db) : IProductRepositor
         db.Set<ProductUnit>().AsNoTracking().AnyAsync(
             unit => unit.Barcode == barcode && unit.Id != exceptUnitId,
             cancellationToken);
+
+    // ix_products_shop_id_normalized_name (shop_id, normalized_name) WHERE NOT is_archived, with normalized_name = ANY(@names);
+    // units through the product_units (product_id) index, in the same statement.
+    public async Task<IReadOnlyList<NamedProduct>> FindByNormalizedNamesAsync(
+        IReadOnlyCollection<string> normalizedNames, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(normalizedNames);
+        if (normalizedNames.Count == 0)
+        {
+            return [];
+        }
+
+        var names = normalizedNames.ToArray();
+        return await db.Products.AsNoTracking()
+            .Where(product => names.Contains(product.NormalizedName) && !product.IsArchived)
+            .Select(product => new NamedProduct(
+                product.Id,
+                product.NormalizedName,
+                product.Units.Select(unit => new NamedProductUnit(unit.Id, unit.Name, unit.IsBase)).ToList()))
+            .ToListAsync(cancellationToken);
+    }
+
+    // Primary key = ANY(@ids); units through the product_units (product_id) index, in the same statement.
+    public async Task<IReadOnlyList<ProductUnitsInfo>> FindUnitsInfoAsync(
+        IReadOnlyCollection<Guid> productIds, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(productIds);
+        if (productIds.Count == 0)
+        {
+            return [];
+        }
+
+        var ids = productIds.ToArray();
+        return await db.Products.AsNoTracking()
+            .Where(product => ids.Contains(product.Id))
+            .Select(product => new ProductUnitsInfo(product.Id, product.IsArchived, product.Units.Select(unit => unit.Id).ToList()))
+            .ToListAsync(cancellationToken);
+    }
+
+    // Primary key of product_units.
+    public Task<bool> UnitExistsAsync(Guid unitId, CancellationToken cancellationToken) =>
+        db.Set<ProductUnit>().AsNoTracking().AnyAsync(unit => unit.Id == unitId, cancellationToken);
 }

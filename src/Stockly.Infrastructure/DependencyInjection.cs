@@ -80,6 +80,7 @@ public static class DependencyInjection
         services.AddScoped<IInvoiceRepository, InvoiceRepository>();
         services.AddScoped<IInvoiceQueries, InvoiceQueries>();
         services.AddScoped<ISupplierRepository, SupplierRepository>();
+        services.AddScoped<IProductAliasRepository, ProductAliasRepository>();
         services.AddScoped<IAiUsageRecordRepository, AiUsageRecordRepository>();
         services.AddScoped<IShopPlanQueries, ShopPlanQueries>();
 

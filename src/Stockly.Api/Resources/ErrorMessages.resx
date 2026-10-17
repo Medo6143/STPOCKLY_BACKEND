@@ -259,4 +259,22 @@
   <data name="Scan.DailyQuotaExceeded.Detail" xml:space="preserve">
     <value>Your plan's invoice scans for today are used up. They reset at midnight Cairo time.</value>
   </data>
+  <data name="Invoice.NotEditable.Title" xml:space="preserve">
+    <value>Invoice not editable</value>
+  </data>
+  <data name="Invoice.NotEditable.Detail" xml:space="preserve">
+    <value>Only an invoice waiting for review can be edited.</value>
+  </data>
+  <data name="Invoice.LineProductRequired.Title" xml:space="preserve">
+    <value>Product required</value>
+  </data>
+  <data name="Invoice.LineProductRequired.Detail" xml:space="preserve">
+    <value>Choose an existing product or describe a new product for every line.</value>
+  </data>
+  <data name="Invoice.UnitNotOfProduct.Title" xml:space="preserve">
+    <value>Wrong unit</value>
+  </data>
+  <data name="Invoice.UnitNotOfProduct.Detail" xml:space="preserve">
+    <value>The chosen unit belongs to another product.</value>
+  </data>
 </root>

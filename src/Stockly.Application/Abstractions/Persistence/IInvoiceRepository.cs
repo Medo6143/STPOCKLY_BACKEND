@@ -7,6 +7,12 @@ public interface IInvoiceRepository
 {
     void Add(Invoice invoice);
 
+    /// <summary>
+    /// Deletes these lines on the next save. The review edit replaces every line (docs/design/backend.md §9.1 step 5);
+    /// nothing references a line before confirm.
+    /// </summary>
+    void RemoveItems(IReadOnlyCollection<InvoiceItem> items);
+
     /// <summary>What the job needs before it calls the AI, without tracking; <c>null</c> when missing or another shop's.</summary>
     Task<InvoiceProcessingInfo?> FindProcessingInfoAsync(Guid invoiceId, CancellationToken cancellationToken);
 
