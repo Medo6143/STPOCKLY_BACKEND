@@ -277,3 +277,18 @@ Totals on `main` after 1.6: Domain 260, Application 232, Architecture 23, Infras
 - Migration `20261017202302_Sales`: `sales`, `sale_items` (with `line_no`), indexes, real FKs from `stock_movements` to sales.
 - Decisions accepted: confirm and S1 manage their own transaction (after-commit work, lost-race answered 200); sale header inserted first as the lock; alias upsert after the confirm save in the same transaction; no opening movement for products created by confirm; `sale_items.line_no` added; negative-balance warnings derived from stored movements; S2 `from` inclusive / `to` exclusive; P12 unit barcode before product barcode; D1 key includes the Cairo date; D2 includes already-expired lines while in stock.
 - Known: `invoicesAwaitingReview` on D1 may lag up to 2 minutes (documented); `suppliers:list` key removed but not yet read by any endpoint.
+
+---
+
+# Sprint 5: admin
+
+## Step 5a: admin API
+
+- Brief: `docs/agents/briefs/backend-5a-admin-api.md`. Branch `feature/admin-api`. Worker: general-purpose agent (background).
+- **Blocked before code** on a real conflict: rule 9 put `IgnoreQueryFilters()` in Application, which may not reference EF Core; and admin needs `shop_members` by shop id (ADR-0002 update). Orchestrator decision (`bb644f0`): admin ports in Application, the only cross-tenant implementation folder is `Infrastructure/Persistence/Admin/` (architecture-tested); same folder may read members by shop. ADR-0005 and ADR-0002 got dated updates; AGENTS.md rule 9 reworded with the same intent.
+- Report: contract deviations NONE. The orchestrator flipped AD1–AD20 to `implemented` and bumped the contract to **v1.6**: `403` listed on A4 (admin token) and AD3 (shop token), as §11.1 already required; the worker added the response types and two tests.
+- Found and fixed: `ContractConformanceTests` parsed only one-letter ids, so AD rows were never checked; now `[A-Z]{1,2}`.
+- Orchestrator verification: `dotnet build -warnaserror` 0 warnings; `dotnet test` 1,523 passed (Domain 367, Application 537, Architecture 26, Infrastructure 263, Api integration 330). `IgnoreQueryFilters` appears only in three files under `Infrastructure/Persistence/Admin/`; the admin seeder logs only the outcome and user id.
+- Migration `20261017212807_PlatformAdmin`: `shops.normalized_name` (backfilled), `suspended_at`, `suspended_reason`; `shop_subscriptions.daily_scan_quota_override` (CHECK 0..10000); `admin_audit_logs` with 3 indexes; trigram index on shop names and a pattern index on user emails.
+- Decisions accepted: AD8 inserts the new subscription with one parameterized INSERT in `Persistence/Admin` (no tenant for the stamp); effective quota read from PostgreSQL (no cache to invalidate); AD10/AD19 own their transaction (counter delete and job enqueue after commit); `ProcessInvoiceJob.RerunAsync`; AD8 reason optional; usage field definitions documented; separate AD1 rate-limit policy; seeder retries while PostgreSQL is down; Hangfire session code in memory (single-instance assumption documented).
+- Known limitations (admin.md §12): pre-signed image URL uses `Storage__Endpoint` (a public endpoint is needed outside the server network); suspending a shop signs its members out of every shop.
