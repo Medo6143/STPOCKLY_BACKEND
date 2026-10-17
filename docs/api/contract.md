@@ -1,10 +1,10 @@
 # Stockly API contract
 
-**Version: v1.4** · Status: **Approved** (v1.1 at checkpoint 1, v1.3 at checkpoint 2, v1.4 by the product owner, 2026-10-12; v1.2 clarifications by the orchestrator) · Owner: orchestrator
+**Version: v1.5** · Status: **Approved** (v1.1 at checkpoint 1, v1.3 at checkpoint 2, v1.4 by the product owner, 2026-10-12; v1.2 clarifications and v1.5 admin section by the orchestrator under the product owner's no-pause mandate, 2026-10-17) · Owner: orchestrator
 
-Change log: v1 (2026-10-12) first draft · v1.1 (2026-10-12) opening stock on create (P3), list price and override flag on sales (S1, D1), `newProduct` without category (I4), `GET /api/auth/me` fields made explicit (A5) · v1.2 (2026-10-12) `Http.*` codes for framework errors (§1.8), `newProduct` on `InvoiceItemDto` (§6), logout allowed for suspended shops (A4) · v1.3 (2026-10-12) `Retry-After` on `429 Scan.DailyQuotaExceeded` (I1) · v1.4 (2026-10-12) account lockout (`423 Auth.LockedOut`) and per-IP rate limiting (`429 Auth.TooManyRequests`) on A1/A2.
+Change log: v1 (2026-10-12) first draft · v1.1 (2026-10-12) opening stock on create (P3), list price and override flag on sales (S1, D1), `newProduct` without category (I4), `GET /api/auth/me` fields made explicit (A5) · v1.2 (2026-10-12) `Http.*` codes for framework errors (§1.8), `newProduct` on `InvoiceItemDto` (§6), logout allowed for suspended shops (A4) · v1.3 (2026-10-12) `Retry-After` on `429 Scan.DailyQuotaExceeded` (I1) · v1.4 (2026-10-12) account lockout (`423 Auth.LockedOut`) and per-IP rate limiting (`429 Auth.TooManyRequests`) on A1/A2 · v1.5 (2026-10-17) platform admin API for `Stockly.Admin` (§11, AD1–AD20); no change to A/P/I/S/D endpoints.
 
-This is the binding contract between `stockly-backend` and `stockly-mobile` (and `Stockly.Admin` later) for Sprints 1–4. Field names, types, status codes and error codes here are exact. Only the orchestrator changes this file: every change bumps the version, updates the copy in `stockly-mobile/docs/api/contract.md`, and is announced to the running lanes.
+This is the binding contract between `stockly-backend` and `stockly-mobile` (and `Stockly.Admin` later) for Sprints 1–5. Field names, types, status codes and error codes here are exact. Only the orchestrator changes this file: every change bumps the version, updates the copy in `stockly-mobile/docs/api/contract.md`, and is announced to the running lanes.
 
 The machine-readable spec is `docs/api/openapi.json`. A backend test checks that every **implemented** row of the [endpoint index](#2-endpoint-index) matches `openapi.json` (path, method, status codes), and that `openapi.json` has no operation missing from the index.
 
@@ -45,7 +45,7 @@ The machine-readable spec is `docs/api/openapi.json`. A backend test checks that
 - **Access token**: JWT, lifetime **15 minutes**. Claims: `sub` (user id), `shop_id` (active shop), `role` (`Owner` | `Staff`). The shop comes only from the token, never from a request (ADR-0002).
 - **Refresh token**: opaque random string, lifetime **30 days**, stored hashed. Every refresh **rotates** it (the old one is revoked). Presenting a revoked refresh token **revokes the whole chain** and returns `401 Auth.RefreshTokenReused` (AGENTS.md rule 13).
 - **Client rule:** on `401` from any authenticated endpoint, the client calls `POST /api/auth/refresh` **once**, then retries the original request **once**. Concurrent `401`s share one refresh (request queue). If the refresh fails, the client signs out.
-- Roles: `user` = Owner or Staff of the active shop. `owner` = Owner only. A Staff user calling an owner-only endpoint gets `403 Auth.Forbidden`.
+- Roles: `user` = Owner or Staff of the active shop. `owner` = Owner only. `admin` = platform admin token (§11, v1.5). A Staff user calling an owner-only endpoint gets `403 Auth.Forbidden`.
 - **Account lockout (v1.4):** 5 failed logins in a row on an existing account lock it for **15 minutes**. While locked, login returns `423 Auth.LockedOut` with `Retry-After` (whole seconds until the lockout ends, at least 1), **even with the correct password**. A successful login resets the failure count.
 - **Rate limiting (v1.4):** `POST /api/auth/login` and `POST /api/auth/register` each allow **10 requests per minute per client IP** (fixed window). The 11th returns `429 Auth.TooManyRequests` with `Retry-After` (seconds until the window resets). The client shows the message and does not retry automatically before `Retry-After`.
 - A suspended shop (`ShopStatus.Suspended`) gets `403 Shop.Suspended` on login, refresh and every authenticated call except logout (A4), so the user can always sign out.
@@ -120,6 +120,26 @@ Every error response is `application/problem+json`:
 | S3 | GET | /api/sales/{id} | user | 200, 401, 403, 404 | 4 | planned |
 | D1 | GET | /api/dashboard/summary | user | 200, 401, 403 | 4 | planned |
 | D2 | GET | /api/dashboard/expiring-soon | user | 200, 400, 401, 403 | 4 | planned |
+| AD1 | POST | /api/admin/auth/login | anonymous | 200, 400, 401, 403, 423, 429 | 5 | planned |
+| AD2 | POST | /api/admin/auth/refresh | anonymous | 200, 400, 401 | 5 | planned |
+| AD3 | POST | /api/admin/auth/logout | admin | 204, 400, 401 | 5 | planned |
+| AD4 | GET | /api/admin/shops | admin | 200, 400, 401, 403 | 5 | planned |
+| AD5 | GET | /api/admin/shops/{id} | admin | 200, 401, 403, 404 | 5 | planned |
+| AD6 | POST | /api/admin/shops/{id}/suspend | admin | 204, 400, 401, 403, 404 | 5 | planned |
+| AD7 | POST | /api/admin/shops/{id}/activate | admin | 204, 400, 401, 403, 404 | 5 | planned |
+| AD8 | PUT | /api/admin/shops/{id}/subscription | admin | 200, 400, 401, 403, 404 | 5 | planned |
+| AD9 | PUT | /api/admin/shops/{id}/quota-override | admin | 200, 400, 401, 403, 404 | 5 | planned |
+| AD10 | POST | /api/admin/shops/{id}/quota/reset | admin | 204, 400, 401, 403, 404 | 5 | planned |
+| AD11 | GET | /api/admin/plans | admin | 200, 401, 403 | 5 | planned |
+| AD12 | POST | /api/admin/plans | admin | 201, 400, 401, 403, 409 | 5 | planned |
+| AD13 | PUT | /api/admin/plans/{id} | admin | 200, 400, 401, 403, 404 | 5 | planned |
+| AD14 | GET | /api/admin/ai-usage/daily | admin | 200, 400, 401, 403 | 5 | planned |
+| AD15 | GET | /api/admin/ai-usage/by-shop | admin | 200, 400, 401, 403 | 5 | planned |
+| AD16 | GET | /api/admin/ai-usage/by-model | admin | 200, 400, 401, 403 | 5 | planned |
+| AD17 | GET | /api/admin/invoices/failed | admin | 200, 400, 401, 403 | 5 | planned |
+| AD18 | GET | /api/admin/invoices/{id} | admin | 200, 401, 403, 404 | 5 | planned |
+| AD19 | POST | /api/admin/invoices/{id}/rerun | admin | 202, 400, 401, 403, 404, 409 | 5 | planned |
+| AD20 | GET | /api/admin/audit-logs | admin | 200, 400, 401, 403 | 5 | planned |
 
 Not in the API (by design): `/health/live`, `/health/ready` (operations, not part of the mobile contract) and `/openapi/v1.json`.
 
@@ -508,6 +528,12 @@ ExpiringItem { productId: uuid, productName: string, expiryDate: date, batchNo: 
 | `Sale.ArchivedProduct` | 400 | S1 | Archived products cannot be sold |
 | `Sale.UnitNotOfProduct` | 400 | S1 | Unit belongs to another product |
 | `Stock.NegativeBalance` | — | S1 warnings | Not an error: sale succeeded, stock is negative |
+| `Admin.ReasonRequired` | 400 | AD6, AD7, AD9, AD10, AD19 | Admin writes need a non-blank `reason` (max 500), kept in the audit log |
+| `Shop.NotFound` | 404 | AD5–AD10 | No such shop |
+| `Plan.NotFound` | 404 | AD8, AD13 | No such plan |
+| `Plan.CodeTaken` | 409 | AD12 | Plan code already used |
+| `Plan.Inactive` | 400 | AD8 | An inactive plan cannot be assigned |
+| `Invoice.NotRerunnable` | 409 | AD19 | Only a `Failed` invoice can be re-run |
 
 Domain movement-rule codes (`Stock.InvoiceSourceRequired`, `Stock.SaleSourceRequired`, `Stock.SourceNotAllowed`, `Stock.EmptySourceReference`, `Stock.ChangeMustBePositive`, `Stock.ChangeMustBeNegative`, `Stock.UserRequired`, `Stock.UnknownReason`) protect server-built movements; a client request cannot trigger them. If one ever reaches the API it is a server bug and is returned as `500 Server.Unexpected`.
 
@@ -534,3 +560,82 @@ Domain movement-rule codes (`Stock.InvoiceSourceRequired`, `Stock.SaleSourceRequ
 17. Domain-only movement codes surface as 500 (server bug), never as client errors.
 18. (v1.4) Lockout uses ASP.NET Core Identity lockout: 5 consecutive failures → 15 minutes, for every account. It applies to existing accounts only; an unknown email keeps returning `401 Auth.InvalidCredentials`. This lets a caller who fails 5 times on one email learn that the account exists; the per-IP rate limit bounds how fast that can be probed. Accepted trade-off.
 19. (v1.4) Rate limits are per endpoint and per client IP (`HttpContext.Connection.RemoteIpAddress`), fixed 60-second window, built-in ASP.NET Core rate limiter. Behind a reverse proxy, forwarded headers must be configured at deployment so the client IP is used (release sprint).
+
+---
+
+## 11. Platform admin (Sprint 5, v1.5)
+
+Used only by `Stockly.Admin` (ADR-0005). Conventions §1 apply (decimal strings, PascalCase enums, paging max 100, ProblemDetails with `code`, `Accept-Language`).
+
+### 11.1 Auth and roles
+- Role `admin` = a user with `platform_role = PlatformAdmin`. An admin access token has claim `platform_role=PlatformAdmin` and **no** `shop_id` claim; it is rejected by every non-admin endpoint (`403 Auth.Forbidden`), and a shop token is rejected by every `/api/admin/*` endpoint except AD1/AD2 (`403 Auth.Forbidden`).
+- Admin tokens use the same lifetimes, refresh rotation, token families, lockout (`423 Auth.LockedOut`) and per-IP rate limit (`429 Auth.TooManyRequests`) as A2/A3.
+- The first admin is created at start-up from configuration (`Admin__Email`, `Admin__Password`, `Admin__FullName` in `.env`) when no PlatformAdmin exists. There is no admin registration endpoint.
+- Every admin **write** (AD6–AD10, AD12, AD13, AD19) writes one `admin_audit_logs` row in the same transaction: `admin_user_id`, `action`, `target_type`, `target_id`, `reason`, `before`/`after` JSON of the changed fields, `created_at`.
+- Admin handlers are the only place that calls `IgnoreQueryFilters()` (rule 9).
+
+### 11.2 Schemas
+```text
+AdminAuthResponse {
+  accessToken: string, accessTokenExpiresAt: timestamp,
+  refreshToken: string, refreshTokenExpiresAt: timestamp,
+  user: { id: uuid, email: string, fullName: string }
+}
+AdminShopListItem {
+  id: uuid, name: string, shopType: "Pharmacy"|"Grocery"|"MobileShop"|"Other",
+  status: "Active"|"Suspended", governorate: string|null,
+  ownerEmail: string, planCode: string|null, scansToday: int, createdAt: timestamp
+}
+AdminSubscriptionDto {
+  planId: uuid, planCode: string, planName: string,
+  startsOn: date, endsOn: date|null,
+  planDailyScanQuota: int, dailyScanQuotaOverride: int|null, effectiveDailyScanQuota: int
+}
+AdminShopDetail {
+  id, name, shopType, status, governorate, phone: string|null, address: string|null, createdAt,
+  suspendedAt: timestamp|null, suspendedReason: string|null,
+  members: { userId: uuid, fullName: string, email: string, role: "Owner"|"Staff", isActive: boolean, joinedAt: timestamp }[],
+  subscription: AdminSubscriptionDto|null,
+  counts: { products: int, invoices: int, sales: int },
+  scansToday: int,
+  aiCostLast30DaysUsd: usd-string            // decimal string, 8 decimals
+}
+PlanDto { id: uuid, code: string, name: string, dailyScanQuota: int, maxMembers: int, monthlyPrice: money-string, isActive: boolean }
+AiUsageDay { date: date, calls: int, cacheHits: int, failures: int, inputTokens: int, outputTokens: int, costUsd: usd-string }
+AiUsageByShop { shopId: uuid, shopName: string, calls: int, failures: int, costUsd: usd-string }
+AiUsageByModel { model: string, calls: int, failures: int, costUsd: usd-string, avgLatencyMs: int }
+AdminFailedInvoice { invoiceId: uuid, shopId: uuid, shopName: string, failureReason: string|null, attempts: int, createdAt: timestamp, updatedAt: timestamp }
+AdminInvoiceDetail {
+  invoice: InvoiceDetail,                     // §6 shape
+  shopId: uuid, shopName: string,
+  imageUrl: string|null,                      // pre-signed GET, valid 5 minutes; null when the object is gone
+  rawAiJson: string|null,                     // shown to the admin only; never logged (rule 12)
+  usage: { id: uuid, model: string, isCacheHit: boolean, succeeded: boolean, inputTokens: int, outputTokens: int, costUsd: usd-string, latencyMs: int, createdAt: timestamp }[]
+}
+AuditLogEntry { id: uuid, adminUserId: uuid, adminEmail: string, action: string, targetType: string, targetId: uuid, reason: string|null, before: object|null, after: object|null, createdAt: timestamp }
+```
+`usd-string`: decimal string with exactly 8 decimals (matches `ai_usage_records.cost_usd numeric(14,8)`). Dates in AD14–AD16 are Africa/Cairo calendar days.
+
+### 11.3 Endpoints
+- **AD1** `POST /api/admin/auth/login` `{ email, password }` → `200 AdminAuthResponse`. `401 Auth.InvalidCredentials` (also for a valid non-admin user, so the endpoint does not reveal who is an admin), `423 Auth.LockedOut`, `429 Auth.TooManyRequests`.
+- **AD2** `POST /api/admin/auth/refresh` `{ refreshToken }` → `200 AdminAuthResponse`. `401 Auth.InvalidRefreshToken`, `401 Auth.RefreshTokenReused` (family revoked). A shop refresh token → `401 Auth.InvalidRefreshToken`.
+- **AD3** `POST /api/admin/auth/logout` `{ refreshToken }` → `204`, idempotent.
+- **AD4** `GET /api/admin/shops?search=&status=&page=&pageSize=` → paged `AdminShopListItem`, newest first. `search` matches shop name (Arabic-normalized, contains) or owner email (prefix). Index `shops (status, created_at DESC)`.
+- **AD5** `GET /api/admin/shops/{id}` → `AdminShopDetail`. `404 Shop.NotFound`.
+- **AD6** `POST /api/admin/shops/{id}/suspend` `{ reason }` → `204`. Idempotent (already suspended: `204`, no new audit row). Revokes every active refresh token of the shop's members for that shop; their next call gets `403 Shop.Suspended` (§1.4).
+- **AD7** `POST /api/admin/shops/{id}/activate` `{ reason }` → `204`. Idempotent.
+- **AD8** `PUT /api/admin/shops/{id}/subscription` `{ planId, endsOn: date|null, reason }` → `200 AdminSubscriptionDto`. Ends the active subscription (status `Ended`, `ends_on` = today) and starts a new one from today; the quota override is carried over. `404 Plan.NotFound`, `400 Plan.Inactive`.
+- **AD9** `PUT /api/admin/shops/{id}/quota-override` `{ dailyScanQuota: int|null, reason }` → `200 AdminSubscriptionDto`. `null` removes the override. `0..10000`. Takes effect on the next scan (quota cache key per `docs/design/redis.md`).
+- **AD10** `POST /api/admin/shops/{id}/quota/reset` `{ reason }` → `204`. Resets today's scan counter for the shop.
+- **AD11** `GET /api/admin/plans` → `PlanDto[]` (all plans, active first, then by code; small table, not paged).
+- **AD12** `POST /api/admin/plans` `{ code, name, dailyScanQuota, maxMembers, monthlyPrice, isActive }` → `201 PlanDto`. `code` is `^[a-z0-9-]{2,32}$`. `409 Plan.CodeTaken`.
+- **AD13** `PUT /api/admin/plans/{id}` `{ name, dailyScanQuota, maxMembers, monthlyPrice, isActive }` → `200 PlanDto` (`code` is immutable). `404 Plan.NotFound`.
+- **AD14** `GET /api/admin/ai-usage/daily?from=&to=&shopId=` (dates, inclusive, `to - from <= 92` days, default last 30 days) → `AiUsageDay[]`, one row per day including zero days, oldest first.
+- **AD15** `GET /api/admin/ai-usage/by-shop?from=&to=&page=&pageSize=` → paged `AiUsageByShop`, highest cost first.
+- **AD16** `GET /api/admin/ai-usage/by-model?from=&to=` → `AiUsageByModel[]`, highest cost first.
+- **AD17** `GET /api/admin/invoices/failed?shopId=&page=&pageSize=` → paged `AdminFailedInvoice`, newest first.
+- **AD18** `GET /api/admin/invoices/{id}` → `AdminInvoiceDetail` (any shop). `404 Invoice.NotFound`.
+- **AD19** `POST /api/admin/invoices/{id}/rerun` `{ reason }` → `202` with `InvoiceDetail` (status `Processing`). Enqueues `ProcessInvoiceJob` again; the AI cache is bypassed for this run; quota is not charged. `409 Invoice.NotRerunnable` unless status is `Failed`.
+- **AD20** `GET /api/admin/audit-logs?targetType=&targetId=&adminUserId=&page=&pageSize=` → paged `AuditLogEntry`, newest first (indexes in `docs/erd.md` §3.6).
+
+Hangfire dashboard: served at `/hangfire` only to an admin. Because the browser cannot attach a bearer token to the dashboard's own requests, `Stockly.Admin` opens it with a one-time code: `POST /api/admin/hangfire/session` (admin) → `200 { url }` where `url` is `/hangfire?code=…` valid 60 seconds and single use; the API exchanges it for an HttpOnly, `SameSite=Strict` cookie scoped to `/hangfire`, valid 15 minutes. This operation is not part of the endpoint index (operations, like `/health`).
