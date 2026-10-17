@@ -265,3 +265,15 @@ Totals on `main` after 1.6: Domain 260, Application 232, Architecture 23, Infras
 - Orchestrator verification: `dotnet build -warnaserror` 0 warnings; `dotnet test` 1,239 passed (Domain 319, Application 412, Architecture 23, Infrastructure 219, Api integration 266). Read the I4 handler against design §9.1 (parse → `LineProductRequired` → invoice `FOR UPDATE` only → one product/unit query → replace lines → warnings → projection). Migration: none (indexes already in `InvoiceScan`).
 - Decisions accepted: AI unit text not stored (match input beside drafts); archived product on a new I4 line → `404 Product.NotFound` (in I4's contract list; avoids a contract change); validator vs. parser split; one extra PK query only on the unit-error path; I4 deletes then inserts lines; status cache answers only `Processing`; contract DTO `InvoiceNewProductDto` (schema name only); one query per strategy proven with an EF command counter.
 - Sprint 2 goal met: a photo uploaded to the API becomes a review-ready invoice (end-to-end test with a fake AI handler).
+
+---
+
+# Sprint 4: confirm, sales, dashboard (backend)
+
+- Brief: `docs/agents/briefs/backend-4-confirm-sales-dashboard.md`. Branch `feature/confirm-sales-dashboard`. Worker: general-purpose agent (background); resumed once after a stall.
+- Report: "AGENTS.md read: yes", contract deviations NONE. The orchestrator marked I5, S1–S3, P12, D1, D2 `implemented`.
+- Sent back once: the worker reported that P8 never returned `409 ProductUnit.InUse` (a used unit hit the restrict FK → 500). Fixed in this step: tenant-filtered EXISTS on invoice and sale lines through `IProductUnitUsageQueries`, and the FK 23503 on the three unit FKs mapped to the same 409 as a safety net.
+- Orchestrator verification: `dotnet build -warnaserror` 0 warnings; `dotnet test` 1,341 passed (Domain 337, Application 452, Architecture 23, Infrastructure 231, Api integration 298). Read the lock path: invoice (or sale header) first, then `SELECT 1 FROM products WHERE id = ANY(@ids) AND shop_id = @shop ORDER BY id FOR UPDATE`; cache version bump, status cache and supplier key removal only after commit and only when this request wrote.
+- Migration `20261017202302_Sales`: `sales`, `sale_items` (with `line_no`), indexes, real FKs from `stock_movements` to sales.
+- Decisions accepted: confirm and S1 manage their own transaction (after-commit work, lost-race answered 200); sale header inserted first as the lock; alias upsert after the confirm save in the same transaction; no opening movement for products created by confirm; `sale_items.line_no` added; negative-balance warnings derived from stored movements; S2 `from` inclusive / `to` exclusive; P12 unit barcode before product barcode; D1 key includes the Cairo date; D2 includes already-expired lines while in stock.
+- Known: `invoicesAwaitingReview` on D1 may lag up to 2 minutes (documented); `suppliers:list` key removed but not yet read by any endpoint.
