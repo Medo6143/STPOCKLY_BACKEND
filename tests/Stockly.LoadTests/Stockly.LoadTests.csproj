@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Load test of the hot endpoints (docs/operations/load-test.md). Plain HttpClient through IHttpClientFactory; no
+    project reference, no load-testing package. Run it against an Api started in the LoadTest environment, never
+    against a shared or production deployment.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsTestProject>false</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Http" />
+  </ItemGroup>
+
+</Project>

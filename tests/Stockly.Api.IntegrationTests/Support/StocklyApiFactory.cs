@@ -18,7 +18,9 @@ namespace Stockly.Api.IntegrationTests.Support;
 /// need. <c>clock</c>, when given, replaces the system clock (and with it Identity's lockout time).
 /// OpenRouter is never called: its base URL points nowhere, and the extractor is replaced by <see cref="FakeExtractor"/>.
 /// The in-process Hangfire server runs only with <see cref="JobMode.Run"/>. With <c>seedAdmin</c> the start-up seed creates
-/// the test platform admin (<see cref="AdminApi"/>) once per database.
+/// the test platform admin (<see cref="AdminApi"/>) once per database. <c>environment</c> and <c>settings</c> (extra
+/// configuration, e.g. <c>Cors:AdminOrigins</c>) serve the hardening tests; <c>replaceExtractor: false</c> keeps the real
+/// OpenRouter extractor (only with <c>Ai:UseFake</c>, so still no network call).
 /// </summary>
 public sealed class StocklyApiFactory(
     string postgres,
@@ -29,7 +31,10 @@ public sealed class StocklyApiFactory(
     IClock? clock = null,
     StorageSettings? storage = null,
     StocklyApiFactory.JobMode jobs = StocklyApiFactory.JobMode.Off,
-    bool seedAdmin = false)
+    bool seedAdmin = false,
+    string environment = StocklyApiFactory.TestEnvironment,
+    IReadOnlyDictionary<string, string?>? settings = null,
+    bool replaceExtractor = true)
     : WebApplicationFactory<Program>
 {
     public const string TestEnvironment = "Testing";
@@ -49,7 +54,7 @@ public sealed class StocklyApiFactory(
     {
         var storageSettings = storage ?? StorageSettings.Unused;
 
-        builder.UseEnvironment(TestEnvironment);
+        builder.UseEnvironment(environment);
         builder.UseSetting("ConnectionStrings:Postgres", postgres);
         builder.UseSetting("ConnectionStrings:Redis", redis);
         builder.UseSetting("Jwt:SigningKey", jwtSigningKey);
@@ -66,6 +71,11 @@ public sealed class StocklyApiFactory(
             builder.UseSetting("Admin:FullName", AdminApi.FullName);
         }
 
+        foreach (var (key, value) in settings ?? new Dictionary<string, string?>())
+        {
+            builder.UseSetting(key, value);
+        }
+
         if (authPermitLimit is not null)
         {
             builder.UseSetting("RateLimiting:Auth:PermitLimit", authPermitLimit);
@@ -74,8 +84,11 @@ public sealed class StocklyApiFactory(
         builder.ConfigureTestServices(services =>
         {
             services.AddTransient<IStartupFilter, TestClientIp>();
-            services.RemoveAll<IAiInvoiceExtractor>();
-            services.AddSingleton<IAiInvoiceExtractor>(Extractor);
+            if (replaceExtractor)
+            {
+                services.RemoveAll<IAiInvoiceExtractor>();
+                services.AddSingleton<IAiInvoiceExtractor>(Extractor);
+            }
             if (jobs == JobMode.Off)
             {
                 foreach (var server in services.Where(IsHangfireServer).ToList())

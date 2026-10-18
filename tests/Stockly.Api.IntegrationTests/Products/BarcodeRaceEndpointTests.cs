@@ -24,8 +24,8 @@ public sealed class BarcodeRaceEndpointTests(ApiFixture fixture)
         await using var competitor = await BeginAsync();
         await ExecuteAsync(
             competitor,
-            "INSERT INTO products (id, shop_id, name, normalized_name, barcode, quantity, cost_price, low_stock_threshold, is_archived, created_at, updated_at) " +
-            "VALUES (@p0, @p1, 'competitor', 'competitor', 'RACE-P', 0, 1, 0, false, now(), now())",
+            "INSERT INTO products (id, shop_id, name, normalized_name, latin_key, barcode, quantity, cost_price, low_stock_threshold, is_archived, created_at, updated_at) " +
+            "VALUES (@p0, @p1, 'competitor', 'competitor', 'kmbtr', 'RACE-P', 0, 1, 0, false, now(), now())",
             Guid.CreateVersion7(),
             owner.ShopId);
 

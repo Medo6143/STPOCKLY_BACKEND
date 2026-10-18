@@ -69,6 +69,11 @@ public sealed class MigrationTests(PostgresFixture fixture)
         "ix_admin_audit_logs_target_type_target_id_created_at",
         "ix_admin_audit_logs_admin_user_id_created_at",
         "ix_admin_audit_logs_created_at",
+
+        // MatchingAndImageLifecycle (erd.md §3.2, §3.3, §3.5, Sprint 6)
+        "ix_products_latin_key_trgm",
+        "ix_product_aliases_latin_key_trgm",
+        "ix_invoices_created_at_image_kept",
     ];
 
     private static readonly string[] ExpectedChecks =
@@ -171,6 +176,7 @@ public sealed class MigrationTests(PostgresFixture fixture)
     [InlineData("ux_suppliers_shop_id_normalized_name", "WHERE (NOT is_archived)")]
     [InlineData("ix_invoices_shop_id_supplier_id_invoice_number", "WHERE (invoice_number IS NOT NULL)")]
     [InlineData("ix_invoices_status_created_at_failed", "WHERE (status = 4)")]
+    [InlineData("ix_invoices_created_at_image_kept", "WHERE (image_deleted_at IS NULL)")]
     [InlineData("ix_invoice_items_created_product_id", "WHERE (created_product_id IS NOT NULL)")]
     [InlineData("ix_invoice_items_shop_id_expiry_date", "WHERE (expiry_date IS NOT NULL)")]
     public async Task Migrate_PartialIndexes_HaveTheErdPredicate(string index, string predicate)
@@ -255,6 +261,36 @@ public sealed class MigrationTests(PostgresFixture fixture)
             "WHERE table_name = 'products' AND column_name IN ('barcode', 'category') ORDER BY column_name");
 
         columns.Should().Equal("barcode|text|YES", "category|text|YES");
+    }
+
+    [Fact]
+    public async Task Migrate_LatinKeys_AreRequiredTextWithoutDefault()
+    {
+        var columns = await fixture.ColumnAsync(
+            "SELECT concat_ws('|', table_name, data_type, is_nullable, coalesce(column_default, 'none')) FROM information_schema.columns " +
+            "WHERE column_name = 'latin_key' AND table_schema = 'public' ORDER BY table_name");
+
+        columns.Should().Equal("product_aliases|text|NO|none", "products|text|NO|none");
+    }
+
+    [Theory]
+    [InlineData("ix_products_latin_key_trgm")]
+    [InlineData("ix_product_aliases_latin_key_trgm")]
+    public async Task Migrate_LatinKeyIndexes_AreGinTrigram(string index)
+    {
+        var definition = await fixture.ScalarAsync<string>("SELECT indexdef FROM pg_indexes WHERE indexname = @p0", index);
+
+        definition.Should().Contain("USING gin").And.EndWith("(latin_key gin_trgm_ops)");
+    }
+
+    [Fact]
+    public async Task Migrate_Invoices_HasNullableImageDeletedAt()
+    {
+        var column = await fixture.ScalarAsync<string>(
+            "SELECT concat_ws('|', data_type, is_nullable) FROM information_schema.columns " +
+            "WHERE table_name = 'invoices' AND column_name = 'image_deleted_at'");
+
+        column.Should().Be("timestamp with time zone|YES");
     }
 
     [Fact]
