@@ -44,6 +44,7 @@ builder.Services.AddDataProtection();
 builder.Services.AddStocklyAuthentication(jwt);
 builder.Services.AddStocklyLocalization();
 builder.Services.AddStocklyRateLimiting(authRateLimit);
+builder.Services.AddAdminCors(builder.Configuration);
 
 builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = ProblemDetailsEnricher.Enrich);
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
@@ -58,6 +59,7 @@ app.UseRequestLocalization();
 app.UseSerilogRequestLogging();
 app.UseExceptionHandler();
 app.UseStatusCodePages();
+app.UseCors(AdminCors.PolicyName);
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
