@@ -6,7 +6,7 @@ namespace Stockly.Application.Features.Invoices.Matching;
 /// </summary>
 public interface IProductMatchStrategy
 {
-    /// <summary>Lower runs first: exact alias 10, exact name 20 (trigram, Sprint 6: 30).</summary>
+    /// <summary>Lower runs first: exact alias 10, exact name 20, trigram 30.</summary>
     int Order { get; }
 
     /// <summary>The matches this strategy found, keyed by line number; lines it could not match are absent.</summary>
