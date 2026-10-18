@@ -1,0 +1,9 @@
+@page "/not-found"
+@layout MainLayout
+
+<PageTitle>Not found · Stockly Admin</PageTitle>
+
+<EmptyState Icon="@Icons.Material.Rounded.TravelExplore" Title="Page not found"
+            Text="The address does not match any page of the admin dashboard.">
+    <MudButton Href="@AppRoutes.Overview" Variant="Variant.Filled" Color="Color.Primary">Go to the overview</MudButton>
+</EmptyState>

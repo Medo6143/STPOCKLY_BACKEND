@@ -1,0 +1,61 @@
+@* AD9: set the shop's daily scan quota override (0..10000) or remove it; a reason is required. *@
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Daily scan quota</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mb-4">
+            The plan allows @Display.Count(PlanQuota) scans a day. An override replaces it from the next scan.
+        </MudText>
+        <MudSwitch T="bool" @bind-Value="_useOverride" Color="Color.Primary" Label="Override the plan quota"
+                   data-testid="override-switch" />
+        @if (_useOverride)
+        {
+            <MudNumericField T="int" @bind-Value="_quota" Label="Scans per day" Variant="Variant.Outlined" Class="mt-2"
+                             Min="0" Max="InputLimits.MaxDailyScanQuota" Immediate="true" data-testid="override-value" />
+        }
+        <MudTextField T="string" @bind-Value="_reason" Label="Reason" Variant="Variant.Outlined" Lines="3" Class="mt-4"
+                      MaxLength="InputLimits.ReasonMaxLength" Counter="InputLimits.ReasonMaxLength" Immediate="true"
+                      Required="true" RequiredError="A reason is required." HelperText="Kept in the audit log."
+                      data-testid="reason-input" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="!CanConfirm" OnClick="Confirm"
+                   data-testid="reason-confirm">Save</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private bool _useOverride;
+    private int _quota;
+    private string? _reason;
+
+    [CascadingParameter]
+    private IMudDialogInstance Dialog { get; set; } = default!;
+
+    [Parameter]
+    public int PlanQuota { get; set; }
+
+    [Parameter]
+    public int? CurrentOverride { get; set; }
+
+    private bool CanConfirm =>
+        !string.IsNullOrWhiteSpace(_reason) && (!_useOverride || _quota is >= 0 and <= InputLimits.MaxDailyScanQuota);
+
+    protected override void OnInitialized()
+    {
+        _useOverride = CurrentOverride is not null;
+        _quota = CurrentOverride ?? PlanQuota;
+    }
+
+    private void Confirm()
+    {
+        if (CanConfirm)
+        {
+            Dialog.Close(DialogResult.Ok(new QuotaOverrideRequest(_useOverride ? _quota : null, _reason!.Trim())));
+        }
+    }
+
+    private void Cancel() => Dialog.Cancel();
+}

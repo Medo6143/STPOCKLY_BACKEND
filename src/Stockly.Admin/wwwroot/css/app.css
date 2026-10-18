@@ -1,0 +1,191 @@
+html, body {
+  margin: 0;
+  font-family: Inter, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Boot screen shown while the WebAssembly runtime downloads. */
+.boot {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  background: #f4f6fa;
+  color: #1f2937;
+}
+
+@media (prefers-color-scheme: dark) {
+  .boot {
+    background: #0b1117;
+    color: #e5e7eb;
+  }
+}
+
+.boot-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.boot-bar {
+  width: 160px;
+  height: 4px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: rgba(15, 118, 110, 0.15);
+}
+
+.boot-bar span {
+  display: block;
+  width: 40%;
+  height: 100%;
+  background: #0f766e;
+  border-radius: 4px;
+  animation: boot-slide 1.1s ease-in-out infinite;
+}
+
+@keyframes boot-slide {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(250%); }
+}
+
+/* Brand mark in the app bar and on the login card. */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.brand img {
+  width: 30px;
+  height: 30px;
+}
+
+/* Login page: gradient backdrop with a centered card. */
+.login-backdrop {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(45, 212, 191, 0.25), transparent 60%),
+    radial-gradient(900px 500px at 110% 110%, rgba(251, 191, 36, 0.18), transparent 60%),
+    var(--mud-palette-background);
+}
+
+.login-card {
+  width: 100%;
+  max-width: 420px;
+}
+
+/* KPI cards on the overview and shop pages. */
+.stat-card {
+  height: 100%;
+}
+
+.stat-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stat-icon.primary { background: rgba(var(--mud-palette-primary-rgb), 0.12); color: var(--mud-palette-primary); }
+.stat-icon.secondary { background: rgba(var(--mud-palette-secondary-rgb), 0.14); color: var(--mud-palette-secondary); }
+.stat-icon.tertiary { background: rgba(var(--mud-palette-tertiary-rgb), 0.14); color: var(--mud-palette-tertiary); }
+.stat-icon.error { background: rgba(var(--mud-palette-error-rgb), 0.12); color: var(--mud-palette-error); }
+.stat-icon.success { background: rgba(var(--mud-palette-success-rgb), 0.12); color: var(--mud-palette-success); }
+.stat-icon.info { background: rgba(var(--mud-palette-info-rgb), 0.12); color: var(--mud-palette-info); }
+
+/* Read-only code view for raw AI JSON and audit before/after. */
+.code-view {
+  margin: 0;
+  padding: 16px;
+  max-height: 480px;
+  overflow: auto;
+  border-radius: 8px;
+  font-family: "Cascadia Code", Consolas, "SFMono-Regular", Menlo, monospace;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  white-space: pre;
+  background: var(--mud-palette-background-gray);
+  color: var(--mud-palette-text-primary);
+  border: 1px solid var(--mud-palette-lines-default);
+}
+
+.scan-image {
+  display: block;
+  width: 100%;
+  max-height: 560px;
+  object-fit: contain;
+  border-radius: 8px;
+  background: var(--mud-palette-background-gray);
+}
+
+.mono {
+  font-family: "Cascadia Code", Consolas, "SFMono-Regular", Menlo, monospace;
+  font-size: 0.8125rem;
+}
+
+.clickable-row {
+  cursor: pointer;
+}
+
+.nav-section {
+  padding: 16px 16px 4px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mud-palette-text-secondary);
+}
+
+#blazor-error-ui {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  padding: 12px 20px;
+  z-index: 2000;
+  background: #fef3c7;
+  color: #78350f;
+  box-shadow: 0 -1px 4px rgba(0, 0, 0, 0.2);
+}
+
+#blazor-error-ui .dismiss {
+  cursor: pointer;
+  position: absolute;
+  right: 16px;
+  top: 10px;
+}
+
+.app-bar {
+  border-bottom: 1px solid var(--mud-palette-lines-default);
+}
+
+.app-drawer {
+  border-right: 1px solid var(--mud-palette-lines-default);
+}
+
+.section-card {
+  border: 1px solid var(--mud-palette-lines-default);
+}
+
+/* FocusOnNavigate moves focus to the page title for screen readers; no visible ring on a heading. */
+h1:focus {
+  outline: none;
+}
+
+.stat-value {
+  font-size: 1.3rem !important;
+  font-weight: 700 !important;
+  overflow-wrap: anywhere;
+}

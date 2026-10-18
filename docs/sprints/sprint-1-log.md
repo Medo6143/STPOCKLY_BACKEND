@@ -292,3 +292,12 @@ Totals on `main` after 1.6: Domain 260, Application 232, Architecture 23, Infras
 - Migration `20261017212807_PlatformAdmin`: `shops.normalized_name` (backfilled), `suspended_at`, `suspended_reason`; `shop_subscriptions.daily_scan_quota_override` (CHECK 0..10000); `admin_audit_logs` with 3 indexes; trigram index on shop names and a pattern index on user emails.
 - Decisions accepted: AD8 inserts the new subscription with one parameterized INSERT in `Persistence/Admin` (no tenant for the stamp); effective quota read from PostgreSQL (no cache to invalidate); AD10/AD19 own their transaction (counter delete and job enqueue after commit); `ProcessInvoiceJob.RerunAsync`; AD8 reason optional; usage field definitions documented; separate AD1 rate-limit policy; seeder retries while PostgreSQL is down; Hangfire session code in memory (single-instance assumption documented).
 - Known limitations (admin.md §12): pre-signed image URL uses `Storage__Endpoint` (a public endpoint is needed outside the server network); suspending a shop signs its members out of every shop.
+
+## Step 5b: admin dashboard (Blazor)
+
+- Brief: `docs/agents/briefs/backend-5b-admin-ui.md`. Branch `feature/admin-ui`. Worker: general-purpose agent (background); resumed once after the session ended.
+- Report: contract deviations NONE. New `Stockly.Admin` (Blazor WASM, MudBlazor 9.11.0) and `Stockly.Admin.Tests` (bUnit 2.11.3); Admin references Contracts only (two architecture tests).
+- Orchestrator verification: `dotnet build -warnaserror` 0 warnings; `dotnet test` 1,593 passed (Domain 367, Application 537, Admin 68, Infrastructure 263, Architecture 28, Api integration 330).
+- Decisions accepted: tokens in memory only (reload asks to sign in again); single-flight refresh; English admin UI (`Accept-Language: en`); `MudChart<decimal>`; extra Overview page; client-side 92-day range check; CORS from `Cors__AdminOrigins` only (none by default).
+- Environment note: during its smoke test the worker ran the branch API on port 5001 with `.env.example` admin placeholders, which seeded `admin@example.com` with the example password into the local dev DB. Local only; change it before any shared use.
+- Follow-up for Sprint 6: an API integration test for the CORS policy.

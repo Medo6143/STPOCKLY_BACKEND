@@ -1,0 +1,159 @@
+@page "/"
+@attribute [Authorize]
+@inherits ApiPageBase
+@inject AdminApiClient Api
+@inject TimeProvider Clock
+@inject NavigationManager Navigation
+
+<PageTitle>Overview · Stockly Admin</PageTitle>
+
+<PageHeader Title="Overview" Subtitle="Shops, AI spend and failed scans of the last 30 days." />
+
+<StateView Loading="_loading" Problem="_problem" IsEmpty="IsEmpty" OnRetry="LoadAsync"
+           EmptyIcon="@Icons.Material.Rounded.Storefront" EmptyTitle="No shops yet"
+           EmptyText="Shops appear here as soon as owners register in the mobile app.">
+    <MudGrid Spacing="3">
+        <MudItem xs="12" sm="6" lg="3">
+            <StatCard Icon="@Icons.Material.Rounded.Storefront" Label="Shops" Value="@Display.Count(_shops)"
+                      Caption="@($"{Display.Count(_activeShops)} active · {Display.Count(_suspendedShops)} suspended")"
+                      Tone="@StatCard.Primary" />
+        </MudItem>
+        <MudItem xs="12" sm="6" lg="3">
+            <StatCard Icon="@Icons.Material.Rounded.Payments" Label="AI cost, 30 days" Value="@Display.Usd(_totalCost)"
+                      Caption="USD, from OpenRouter usage" Tone="@StatCard.Secondary" />
+        </MudItem>
+        <MudItem xs="12" sm="6" lg="3">
+            <StatCard Icon="@Icons.Material.Rounded.AutoAwesome" Label="AI calls, 30 days" Value="@Display.Count(_totalCalls)"
+                      Caption="@($"{Display.Count(_totalCacheHits)} cache hits · {Display.Count(_totalFailures)} failures")"
+                      Tone="@StatCard.Tertiary" />
+        </MudItem>
+        <MudItem xs="12" sm="6" lg="3">
+            <StatCard Icon="@Icons.Material.Rounded.ReportGmailerrorred" Label="Failed scans" Value="@Display.Count(_failedCount)"
+                      Caption="Waiting for a look or a re-run" Tone="@StatCard.Error" />
+        </MudItem>
+
+        <MudItem xs="12" lg="8">
+            <MudPaper Elevation="0" Class="section-card pa-5" Style="height: 100%">
+                <div class="d-flex align-center mb-2">
+                    <MudText Typo="Typo.h6">Daily AI cost</MudText>
+                    <MudSpacer />
+                    <MudButton Href="@AppRoutes.AiUsage" Variant="Variant.Text" Color="Color.Primary"
+                               EndIcon="@Icons.Material.Rounded.ArrowForward">Details</MudButton>
+                </div>
+                <UsageChart Days="_days" />
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" lg="4">
+            <MudPaper Elevation="0" Class="section-card pa-5" Style="height: 100%">
+                <MudText Typo="Typo.h6" Class="mb-3">Cost by model</MudText>
+                @if (_models.Count == 0)
+                {
+                    <MudText Class="mud-text-secondary" Typo="Typo.body2">No AI calls in the last 30 days.</MudText>
+                }
+                @foreach (var model in _models)
+                {
+                    <div class="d-flex align-center py-2">
+                        <div style="min-width: 0" class="flex-grow-1">
+                            <MudText Typo="Typo.body2" Class="mono" Style="word-break: break-all">@model.Model</MudText>
+                            <MudText Class="mud-text-secondary" Typo="Typo.caption">
+                                @Display.Count(model.Calls) calls · @Display.Count(model.AvgLatencyMs) ms avg
+                            </MudText>
+                        </div>
+                        <MudText Typo="Typo.body2" Class="mono ml-2">@Display.Usd(model.CostUsd)</MudText>
+                    </div>
+                    <MudDivider />
+                }
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12">
+            <MudPaper Elevation="0" Class="section-card">
+                <div class="d-flex align-center pa-4">
+                    <MudText Typo="Typo.h6">Latest failed scans</MudText>
+                    <MudSpacer />
+                    <MudButton Href="@AppRoutes.FailedScans" Variant="Variant.Text" Color="Color.Primary"
+                               EndIcon="@Icons.Material.Rounded.ArrowForward">All failed scans</MudButton>
+                </div>
+                @if (_failed.Count == 0)
+                {
+                    <EmptyState Icon="@Icons.Material.Rounded.TaskAlt" Title="No failed scans" Text="Every scan was processed." />
+                }
+                else
+                {
+                    <MudSimpleTable Hover="true" Dense="true" Elevation="0">
+                        <thead><tr><th>Shop</th><th>Reason</th><th>Attempts</th><th>When</th></tr></thead>
+                        <tbody>
+                            @foreach (var invoice in _failed)
+                            {
+                                <tr class="clickable-row" @onclick="() => Navigation.NavigateTo(AppRoutes.FailedScan(invoice.InvoiceId))">
+                                    <td>@invoice.ShopName</td>
+                                    <td>@Display.Text(invoice.FailureReason)</td>
+                                    <td>@invoice.Attempts</td>
+                                    <td>@Display.Timestamp(invoice.UpdatedAt)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</StateView>
+
+@code {
+    private const int CountOnly = 1;
+    private const int LatestFailed = 5;
+
+    private bool _loading = true;
+    private ApiProblem? _problem;
+    private int _shops;
+    private int _activeShops;
+    private int _suspendedShops;
+    private int _failedCount;
+    private decimal _totalCost;
+    private int _totalCalls;
+    private int _totalCacheHits;
+    private int _totalFailures;
+    private IReadOnlyList<AiUsageDay> _days = [];
+    private IReadOnlyList<AiUsageByModel> _models = [];
+    private IReadOnlyList<AdminFailedInvoice> _failed = [];
+
+    private bool IsEmpty => _shops == 0 && _totalCalls == 0 && _failedCount == 0;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _problem = null;
+        var range = UsageRange.LastDays(Clock, InputLimits.DefaultUsageRangeDays);
+
+        var all = Api.GetShopsAsync(null, null, 1, CountOnly, PageToken);
+        var active = Api.GetShopsAsync(null, ShopStatus.Active, 1, CountOnly, PageToken);
+        var suspended = Api.GetShopsAsync(null, ShopStatus.Suspended, 1, CountOnly, PageToken);
+        var failed = Api.GetFailedInvoicesAsync(null, 1, LatestFailed, PageToken);
+        var days = Api.GetDailyUsageAsync(range.From, range.To, null, PageToken);
+        var models = Api.GetUsageByModelAsync(range.From, range.To, PageToken);
+        await Task.WhenAll(all, active, suspended, failed, days, models);
+
+        _problem = (await all).Problem ?? (await active).Problem ?? (await suspended).Problem
+            ?? (await failed).Problem ?? (await days).Problem ?? (await models).Problem;
+        if (_problem is null)
+        {
+            _shops = (await all).Value!.TotalCount;
+            _activeShops = (await active).Value!.TotalCount;
+            _suspendedShops = (await suspended).Value!.TotalCount;
+            _failedCount = (await failed).Value!.TotalCount;
+            _failed = (await failed).Value!.Items;
+            _days = (await days).Value!;
+            _models = (await models).Value!;
+            _totalCost = _days.Sum(day => Display.ParseDecimal(day.CostUsd));
+            _totalCalls = _days.Sum(day => day.Calls);
+            _totalCacheHits = _days.Sum(day => day.CacheHits);
+            _totalFailures = _days.Sum(day => day.Failures);
+        }
+
+        _loading = false;
+    }
+}

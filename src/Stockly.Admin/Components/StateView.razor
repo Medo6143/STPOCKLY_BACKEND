@@ -1,0 +1,55 @@
+@*
+    The four states every page shows (brief 5b): loading, error (ProblemDetails detail + trace id), empty, and data.
+    The error wins over everything; while loading the first time a skeleton is shown; an empty result shows a friendly
+    message instead of an empty table.
+*@
+@if (Problem is not null)
+{
+    <ProblemAlert Problem="Problem" OnRetry="OnRetry" />
+}
+else if (Loading)
+{
+    <div data-testid="state-loading">
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" Rounded="true" />
+        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="48px" Class="mb-2" />
+        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="48px" Class="mb-2" />
+        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="48px" />
+    </div>
+}
+else if (IsEmpty)
+{
+    <EmptyState Icon="@EmptyIcon" Title="@EmptyTitle" Text="@EmptyText">@EmptyActions</EmptyState>
+}
+else
+{
+    @ChildContent
+}
+
+@code {
+    [Parameter]
+    public bool Loading { get; set; }
+
+    [Parameter]
+    public ApiProblem? Problem { get; set; }
+
+    [Parameter]
+    public bool IsEmpty { get; set; }
+
+    [Parameter]
+    public string EmptyTitle { get; set; } = "Nothing here yet";
+
+    [Parameter]
+    public string? EmptyText { get; set; }
+
+    [Parameter]
+    public string EmptyIcon { get; set; } = Icons.Material.Rounded.Inbox;
+
+    [Parameter]
+    public RenderFragment? EmptyActions { get; set; }
+
+    [Parameter]
+    public EventCallback OnRetry { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+}

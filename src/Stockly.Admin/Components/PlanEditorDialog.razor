@@ -1,0 +1,124 @@
+@* AD12 (create) and AD13 (edit). The code is fixed after creation. API errors such as 409 Plan.CodeTaken stay in the dialog. *@
+@using System.Text.RegularExpressions
+@inherits ApiPageBase
+@inject AdminApiClient Api
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">@(Plan is null ? "New plan" : $"Edit plan {Plan.Code}")</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (_problem is not null)
+        {
+            <ProblemAlert Problem="_problem" />
+        }
+        <MudGrid Spacing="2">
+            <MudItem xs="12" sm="5">
+                <MudTextField T="string" @bind-Value="_code" Label="Code" Variant="Variant.Outlined" Disabled="Plan is not null"
+                              Immediate="true" Error="@(_code.Length > 0 && !IsCodeValid)"
+                              ErrorText="2–32 lower-case letters, digits or dashes" HelperText="e.g. pro-monthly"
+                              data-testid="plan-code" />
+            </MudItem>
+            <MudItem xs="12" sm="7">
+                <MudTextField T="string" @bind-Value="_name" Label="Name" Variant="Variant.Outlined" Immediate="true"
+                              MaxLength="InputLimits.PlanNameMaxLength" data-testid="plan-name" />
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudNumericField T="int" @bind-Value="_dailyScanQuota" Label="Scans per day" Variant="Variant.Outlined"
+                                 Min="0" Max="InputLimits.MaxDailyScanQuota" Immediate="true" />
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudNumericField T="int" @bind-Value="_maxMembers" Label="Max members" Variant="Variant.Outlined"
+                                 Min="InputLimits.MinPlanMembers" Max="InputLimits.MaxPlanMembers" Immediate="true" />
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudTextField T="string" @bind-Value="_monthlyPrice" Label="Monthly price (EGP)" Variant="Variant.Outlined"
+                              Immediate="true" Error="@(!IsPriceValid)" ErrorText="Up to 2 decimals, e.g. 199.00"
+                              InputMode="@(InputMode.@decimal)" data-testid="plan-price" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudSwitch T="bool" @bind-Value="_isActive" Color="Color.Primary" Label="Active (can be assigned to shops)" />
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="!CanSave || _saving" OnClick="SaveAsync"
+                   data-testid="plan-save">
+            @(Plan is null ? "Create plan" : "Save changes")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private static readonly Regex CodePattern = new(InputLimits.PlanCodePattern, RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+    private static readonly Regex MoneyPattern = new(InputLimits.MoneyPattern, RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+
+    private string _code = string.Empty;
+    private string _name = string.Empty;
+    private int _dailyScanQuota;
+    private int _maxMembers = InputLimits.MinPlanMembers;
+    private string _monthlyPrice = string.Empty;
+    private bool _isActive = true;
+    private bool _saving;
+    private ApiProblem? _problem;
+
+    [CascadingParameter]
+    private IMudDialogInstance Dialog { get; set; } = default!;
+
+    /// <summary>The plan to edit; <c>null</c> creates a new one.</summary>
+    [Parameter]
+    public PlanDto? Plan { get; set; }
+
+    private bool IsCodeValid => CodePattern.IsMatch(_code);
+
+    private bool IsPriceValid => MoneyPattern.IsMatch(_monthlyPrice.Trim());
+
+    private bool CanSave =>
+        IsCodeValid
+        && !string.IsNullOrWhiteSpace(_name)
+        && IsPriceValid
+        && _dailyScanQuota is >= 0 and <= InputLimits.MaxDailyScanQuota
+        && _maxMembers is >= InputLimits.MinPlanMembers and <= InputLimits.MaxPlanMembers;
+
+    protected override void OnInitialized()
+    {
+        if (Plan is not null)
+        {
+            _code = Plan.Code;
+            _name = Plan.Name;
+            _dailyScanQuota = Plan.DailyScanQuota;
+            _maxMembers = Plan.MaxMembers;
+            _monthlyPrice = Plan.MonthlyPrice;
+            _isActive = Plan.IsActive;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (!CanSave)
+        {
+            return;
+        }
+
+        _saving = true;
+        _problem = null;
+        var name = _name.Trim();
+        var price = _monthlyPrice.Trim();
+        var result = Plan is null
+            ? await Api.CreatePlanAsync(new CreatePlanRequest(_code, name, _dailyScanQuota, _maxMembers, price, _isActive), PageToken)
+            : await Api.UpdatePlanAsync(Plan.Id, new UpdatePlanRequest(name, _dailyScanQuota, _maxMembers, price, _isActive), PageToken);
+        _saving = false;
+
+        if (result.IsSuccess)
+        {
+            Dialog.Close(DialogResult.Ok(result.Value));
+        }
+        else
+        {
+            _problem = result.Problem;
+        }
+    }
+
+    private void Cancel() => Dialog.Cancel();
+}

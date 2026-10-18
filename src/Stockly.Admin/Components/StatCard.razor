@@ -1,0 +1,40 @@
+<MudPaper Elevation="0" Class="stat-card section-card pa-5">
+    <div class="d-flex align-start gap-4">
+        <div class="@($"stat-icon {Tone}")">
+            <MudIcon Icon="@Icon" />
+        </div>
+        <div class="flex-grow-1" style="min-width: 0">
+            <MudText Class="mud-text-secondary" Typo="Typo.body2">@Label</MudText>
+            <MudText Typo="Typo.h5" Class="stat-value mt-1">@Value</MudText>
+            @if (Caption is not null)
+            {
+                <MudText Class="mud-text-secondary" Typo="Typo.caption">@Caption</MudText>
+            }
+        </div>
+    </div>
+</MudPaper>
+
+@code {
+    public const string Primary = "primary";
+    public const string Secondary = "secondary";
+    public const string Tertiary = "tertiary";
+    public const string Error = "error";
+    public const string Success = "success";
+    public const string Info = "info";
+
+    [Parameter, EditorRequired]
+    public string Icon { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string Label { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string Value { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? Caption { get; set; }
+
+    /// <summary>One of the tone constants above; colors the icon badge.</summary>
+    [Parameter]
+    public string Tone { get; set; } = Primary;
+}

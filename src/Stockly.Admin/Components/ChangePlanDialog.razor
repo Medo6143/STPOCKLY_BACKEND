@@ -1,0 +1,86 @@
+@* AD8: move the shop to another active plan from today; optional end date and reason (contract §11.3). *@
+@inherits ApiPageBase
+@inject AdminApiClient Api
+@inject TimeProvider Clock
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Change plan</MudText>
+    </TitleContent>
+    <DialogContent>
+        <StateView Loading="_plans is null" Problem="_problem" IsEmpty="_plans is { Count: 0 }"
+                   EmptyTitle="No active plans" EmptyText="Create or activate a plan first." OnRetry="LoadAsync">
+            <MudText Typo="Typo.body2" Class="mb-4">
+                The current subscription ends today and the new one starts today. A quota override is kept.
+            </MudText>
+            <MudSelect T="Guid?" @bind-Value="_planId" Label="Plan" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter"
+                       data-testid="plan-select">
+                @foreach (var plan in _plans!)
+                {
+                    <MudSelectItem T="Guid?" Value="plan.Id">
+                        @plan.Name (@plan.Code) · @Display.Count(plan.DailyScanQuota) scans/day · @Display.Egp(plan.MonthlyPrice)
+                    </MudSelectItem>
+                }
+            </MudSelect>
+            <MudDatePicker @bind-Date="_endsOn" Label="Ends on (optional)" Variant="Variant.Outlined" Class="mt-4"
+                           MinDate="Today.ToDateTime(TimeOnly.MinValue)" Clearable="true" DateFormat="yyyy-MM-dd" />
+            <MudTextField T="string" @bind-Value="_reason" Label="Reason (optional)" Variant="Variant.Outlined" Lines="2"
+                          Class="mt-4" MaxLength="InputLimits.ReasonMaxLength" Counter="InputLimits.ReasonMaxLength"
+                          HelperText="Kept in the audit log." />
+        </StateView>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="_planId is null" OnClick="Confirm"
+                   data-testid="change-plan-confirm">Change plan</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private IReadOnlyList<PlanDto>? _plans;
+    private ApiProblem? _problem;
+    private Guid? _planId;
+    private DateTime? _endsOn;
+    private string? _reason;
+
+    [CascadingParameter]
+    private IMudDialogInstance Dialog { get; set; } = default!;
+
+    [Parameter]
+    public Guid? CurrentPlanId { get; set; }
+
+    private DateOnly Today => DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _problem = null;
+        _plans = null;
+        var result = await Api.GetPlansAsync(PageToken);
+        if (!result.IsSuccess)
+        {
+            _problem = result.Problem;
+            _plans = [];
+            return;
+        }
+
+        // An inactive plan cannot be assigned (400 Plan.Inactive), so only active plans are offered.
+        _plans = result.Value.Where(plan => plan.IsActive).ToList();
+        _planId = _plans.Any(plan => plan.Id == CurrentPlanId) ? CurrentPlanId : null;
+    }
+
+    private void Confirm()
+    {
+        if (_planId is not { } planId)
+        {
+            return;
+        }
+
+        var endsOn = _endsOn is { } date ? DateOnly.FromDateTime(date) : (DateOnly?)null;
+        var reason = string.IsNullOrWhiteSpace(_reason) ? null : _reason.Trim();
+        Dialog.Close(DialogResult.Ok(new ChangeSubscriptionRequest(planId, endsOn, reason)));
+    }
+
+    private void Cancel() => Dialog.Cancel();
+}

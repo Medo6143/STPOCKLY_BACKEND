@@ -1,0 +1,80 @@
+@page "/plans"
+@attribute [Authorize]
+@inherits ApiPageBase
+@inject AdminApiClient Api
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+
+<PageTitle>Plans · Stockly Admin</PageTitle>
+
+<PageHeader Title="Plans" Subtitle="Subscription plans: daily scan quota, members and monthly price.">
+    <Actions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.Add" OnClick="CreateAsync"
+                   data-testid="new-plan">New plan</MudButton>
+    </Actions>
+</PageHeader>
+
+<MudPaper Elevation="0" Class="section-card pa-2">
+    <StateView Loading="_plans is null && _problem is null" Problem="_problem" IsEmpty="_plans is { Count: 0 }" OnRetry="LoadAsync"
+               EmptyIcon="@Icons.Material.Rounded.WorkspacePremium" EmptyTitle="No plans yet"
+               EmptyText="Create the first plan to assign it to shops.">
+        <MudTable T="PlanDto" Items="_plans" Hover="true" Elevation="0" Breakpoint="Breakpoint.Sm" data-testid="plans-table">
+            <HeaderContent>
+                <MudTh>Plan</MudTh>
+                <MudTh Style="text-align: right">Scans per day</MudTh>
+                <MudTh Style="text-align: right">Max members</MudTh>
+                <MudTh Style="text-align: right">Monthly price</MudTh>
+                <MudTh>Status</MudTh>
+                <MudTh />
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Plan">
+                    <MudText Typo="Typo.body2" Style="font-weight: 600">@context.Name</MudText>
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary mono">@context.Code</MudText>
+                </MudTd>
+                <MudTd DataLabel="Scans per day" Style="text-align: right">@Display.Count(context.DailyScanQuota)</MudTd>
+                <MudTd DataLabel="Max members" Style="text-align: right">@Display.Count(context.MaxMembers)</MudTd>
+                <MudTd DataLabel="Monthly price" Style="text-align: right">@Display.Egp(context.MonthlyPrice)</MudTd>
+                <MudTd DataLabel="Status">
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text"
+                             Color="@(context.IsActive ? Color.Success : Color.Default)">@(context.IsActive ? "Active" : "Inactive")</MudChip>
+                </MudTd>
+                <MudTd Style="text-align: right">
+                    <MudIconButton Icon="@Icons.Material.Rounded.Edit" Size="Size.Small" aria-label="Edit plan"
+                                   OnClick="() => EditAsync(context)" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    </StateView>
+</MudPaper>
+
+@code {
+    private IReadOnlyList<PlanDto>? _plans;
+    private ApiProblem? _problem;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _problem = null;
+        _plans = null;
+        var result = await Api.GetPlansAsync(PageToken);
+        _plans = result.Value;
+        _problem = result.Problem;
+    }
+
+    private Task CreateAsync() => OpenEditorAsync(null, "Plan created.");
+
+    private Task EditAsync(PlanDto plan) => OpenEditorAsync(plan, "Plan saved.");
+
+    private async Task OpenEditorAsync(PlanDto? plan, string success)
+    {
+        var parameters = new DialogParameters<PlanEditorDialog> { { dialog => dialog.Plan, plan } };
+        var saved = await Dialogs.ShowAsync<PlanEditorDialog, PlanDto>(plan is null ? "New plan" : "Edit plan", parameters);
+        if (saved is not null)
+        {
+            Snackbar.Add(success, Severity.Success);
+            await LoadAsync();
+        }
+    }
+}

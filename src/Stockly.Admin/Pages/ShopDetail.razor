@@ -1,0 +1,232 @@
+@page "/shops/{Id:guid}"
+@attribute [Authorize]
+@inherits ApiPageBase
+@inject AdminApiClient Api
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+
+<PageTitle>@(_shop?.Name ?? "Shop") · Stockly Admin</PageTitle>
+
+<StateView Loading="_shop is null && _problem is null" Problem="_problem" OnRetry="LoadAsync">
+    <PageHeader Title="@_shop!.Name" BackHref="@AppRoutes.Shops" BackText="Shops"
+                Subtitle="@($"{_shop.ShopType} · created {Display.Timestamp(_shop.CreatedAt)}")">
+        <TitleContent>
+            <ShopStatusChip Status="_shop.Status" />
+        </TitleContent>
+        <Actions>
+            @if (_shop.Status == ShopStatus.Active)
+            {
+                <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Rounded.Block"
+                           Disabled="_busy" OnClick="SuspendAsync" data-testid="suspend-shop">Suspend</MudButton>
+            }
+            else
+            {
+                <MudButton Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Material.Rounded.CheckCircle"
+                           Disabled="_busy" OnClick="ActivateAsync" data-testid="activate-shop">Activate</MudButton>
+            }
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.WorkspacePremium"
+                       Disabled="_busy" OnClick="ChangePlanAsync" data-testid="change-plan">Change plan</MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.Tune"
+                       Disabled="_busy || _shop.Subscription is null" OnClick="SetQuotaAsync" data-testid="quota-override">Quota override</MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.RestartAlt"
+                       Disabled="_busy" OnClick="ResetQuotaAsync" data-testid="reset-quota">Reset today's quota</MudButton>
+        </Actions>
+    </PageHeader>
+
+    @if (_shop.Status == ShopStatus.Suspended)
+    {
+        <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mb-4">
+            Suspended @Display.Timestamp(_shop.SuspendedAt). Reason: @Display.Text(_shop.SuspendedReason)
+        </MudAlert>
+    }
+
+    <MudGrid Spacing="3">
+        <MudItem xs="12" sm="6" lg="3">
+            <StatCard Icon="@Icons.Material.Rounded.DocumentScanner" Label="Scans today"
+                      Value="@Display.Count(_shop.ScansToday)"
+                      Caption="@(_shop.Subscription is { } s ? $"of {Display.Count(s.EffectiveDailyScanQuota)} allowed" : "No active plan")"
+                      Tone="@StatCard.Primary" />
+        </MudItem>
+        <MudItem xs="12" sm="6" lg="3">
+            <StatCard Icon="@Icons.Material.Rounded.Payments" Label="AI cost, 30 days" Value="@Display.Usd(_shop.AiCostLast30DaysUsd)"
+                      Caption="USD" Tone="@StatCard.Secondary" />
+        </MudItem>
+        <MudItem xs="12" sm="6" lg="3">
+            <StatCard Icon="@Icons.Material.Rounded.Inventory2" Label="Products" Value="@Display.Count(_shop.Counts.Products)"
+                      Tone="@StatCard.Tertiary" />
+        </MudItem>
+        <MudItem xs="12" sm="6" lg="3">
+            <StatCard Icon="@Icons.Material.Rounded.ReceiptLong" Label="Invoices · sales"
+                      Value="@($"{Display.Count(_shop.Counts.Invoices)} · {Display.Count(_shop.Counts.Sales)}")"
+                      Tone="@StatCard.Info" />
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudPaper Elevation="0" Class="section-card pa-5" Style="height: 100%">
+                <MudText Typo="Typo.h6" Class="mb-3">Subscription</MudText>
+                @if (_shop.Subscription is { } subscription)
+                {
+                    <MudSimpleTable Dense="true" Elevation="0" data-testid="subscription">
+                        <tbody>
+                            <tr><td>Plan</td><td><b>@subscription.PlanName</b> <span class="mono">(@subscription.PlanCode)</span></td></tr>
+                            <tr><td>Period</td><td>@Display.Date(subscription.StartsOn) → @(subscription.EndsOn is null ? "open-ended" : Display.Date(subscription.EndsOn))</td></tr>
+                            <tr><td>Plan quota</td><td>@Display.Count(subscription.PlanDailyScanQuota) scans/day</td></tr>
+                            <tr><td>Override</td><td>@(subscription.DailyScanQuotaOverride is { } value ? $"{Display.Count(value)} scans/day" : "none")</td></tr>
+                            <tr><td>Effective quota</td><td><b>@Display.Count(subscription.EffectiveDailyScanQuota) scans/day</b></td></tr>
+                        </tbody>
+                    </MudSimpleTable>
+                }
+                else
+                {
+                    <EmptyState Icon="@Icons.Material.Rounded.WorkspacePremium" Title="No active subscription"
+                                Text="Use Change plan to start one." />
+                }
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudPaper Elevation="0" Class="section-card pa-5" Style="height: 100%">
+                <MudText Typo="Typo.h6" Class="mb-3">Shop</MudText>
+                <MudSimpleTable Dense="true" Elevation="0">
+                    <tbody>
+                        <tr><td>Governorate</td><td>@Display.Text(_shop.Governorate)</td></tr>
+                        <tr><td>Phone</td><td>@Display.Text(_shop.Phone)</td></tr>
+                        <tr><td>Address</td><td>@Display.Text(_shop.Address)</td></tr>
+                        <tr><td>Shop id</td><td class="mono">@_shop.Id</td></tr>
+                    </tbody>
+                </MudSimpleTable>
+                <div class="d-flex flex-wrap gap-2 mt-4">
+                    <MudButton Href="@AppRoutes.FailedScansOfShop(_shop.Id)" Variant="Variant.Text" Color="Color.Primary"
+                               StartIcon="@Icons.Material.Rounded.ReportGmailerrorred">Failed scans</MudButton>
+                    <MudButton Href="@AppRoutes.AuditLogOfTarget(AuditTargetTypes.Shop, _shop.Id)" Variant="Variant.Text"
+                               Color="Color.Primary" StartIcon="@Icons.Material.Rounded.History">Audit log</MudButton>
+                </div>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12">
+            <MudPaper Elevation="0" Class="section-card">
+                <MudText Typo="Typo.h6" Class="pa-4">Members</MudText>
+                @if (_shop.Members.Count == 0)
+                {
+                    <EmptyState Icon="@Icons.Material.Rounded.Group" Title="No members" />
+                }
+                else
+                {
+                    <MudTable T="AdminShopMemberDto" Items="_shop.Members" Elevation="0" Dense="true" Breakpoint="Breakpoint.Sm">
+                        <HeaderContent>
+                            <MudTh>Name</MudTh><MudTh>Email</MudTh><MudTh>Role</MudTh><MudTh>Active</MudTh><MudTh>Joined</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Name">@context.FullName</MudTd>
+                            <MudTd DataLabel="Email">@context.Email</MudTd>
+                            <MudTd DataLabel="Role">
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Text"
+                                         Color="@(context.Role == ShopRole.Owner ? Color.Primary : Color.Default)">@context.Role</MudChip>
+                            </MudTd>
+                            <MudTd DataLabel="Active">
+                                <MudIcon Icon="@(context.IsActive ? Icons.Material.Rounded.CheckCircle : Icons.Material.Rounded.RemoveCircleOutline)"
+                                         Color="@(context.IsActive ? Color.Success : Color.Default)" Size="Size.Small" />
+                            </MudTd>
+                            <MudTd DataLabel="Joined">@Display.Timestamp(context.JoinedAt)</MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</StateView>
+
+@code {
+    private AdminShopDetail? _shop;
+    private ApiProblem? _problem;
+    private bool _busy;
+
+    [Parameter]
+    public Guid Id { get; set; }
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _problem = null;
+        var result = await Api.GetShopAsync(Id, PageToken);
+        _shop = result.Value;
+        _problem = result.Problem;
+    }
+
+    private async Task SuspendAsync()
+    {
+        var reason = await Dialogs.AskReasonAsync("Suspend shop",
+            $"Members of {_shop!.Name} are signed out everywhere and cannot use the app until the shop is activated.",
+            "Suspend", Color.Error);
+        if (reason is not null)
+        {
+            await RunAsync(Api.SuspendShopAsync(Id, reason, PageToken), "Shop suspended.");
+        }
+    }
+
+    private async Task ActivateAsync()
+    {
+        var reason = await Dialogs.AskReasonAsync("Activate shop",
+            $"Members of {_shop!.Name} can sign in again.", "Activate", Color.Success);
+        if (reason is not null)
+        {
+            await RunAsync(Api.ActivateShopAsync(Id, reason, PageToken), "Shop activated.");
+        }
+    }
+
+    private async Task ResetQuotaAsync()
+    {
+        var reason = await Dialogs.AskReasonAsync("Reset today's scan quota",
+            "Today's scan counter starts again from zero. The scans-today figure does not change.", "Reset", Color.Primary);
+        if (reason is not null)
+        {
+            await RunAsync(Api.ResetQuotaAsync(Id, reason, PageToken), "Today's quota was reset.");
+        }
+    }
+
+    private async Task ChangePlanAsync()
+    {
+        var parameters = new DialogParameters<ChangePlanDialog> { { dialog => dialog.CurrentPlanId, _shop!.Subscription?.PlanId } };
+        var request = await Dialogs.ShowAsync<ChangePlanDialog, ChangeSubscriptionRequest>("Change plan", parameters);
+        if (request is not null)
+        {
+            await RunAsync(Api.ChangeSubscriptionAsync(Id, request, PageToken), "Plan changed.");
+        }
+    }
+
+    private async Task SetQuotaAsync()
+    {
+        if (_shop!.Subscription is not { } subscription)
+        {
+            return;
+        }
+
+        var parameters = new DialogParameters<QuotaOverrideDialog>
+        {
+            { dialog => dialog.PlanQuota, subscription.PlanDailyScanQuota },
+            { dialog => dialog.CurrentOverride, subscription.DailyScanQuotaOverride },
+        };
+        var request = await Dialogs.ShowAsync<QuotaOverrideDialog, QuotaOverrideRequest>("Daily scan quota", parameters);
+        if (request is not null)
+        {
+            await RunAsync(Api.SetQuotaOverrideAsync(Id, request, PageToken), "Quota saved.");
+        }
+    }
+
+    private async Task RunAsync<T>(Task<ApiResult<T>> call, string success)
+    {
+        _busy = true;
+        var result = await call;
+        _busy = false;
+        if (!result.IsSuccess)
+        {
+            Snackbar.Add(result.Problem.OneLine, Severity.Error);
+            return;
+        }
+
+        Snackbar.Add(success, Severity.Success);
+        await LoadAsync();
+    }
+}

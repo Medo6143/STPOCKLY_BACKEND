@@ -1,0 +1,85 @@
+@page "/failed-scans"
+@attribute [Authorize]
+@inherits ApiPageBase
+@inject AdminApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>Failed scans · Stockly Admin</PageTitle>
+
+<PageHeader Title="Failed scans" Subtitle="Invoices the AI could not extract, newest first. Open one to see the photo and re-run it.">
+    <TitleContent>
+        @if (ShopId is { } shopId)
+        {
+            <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined" OnClose="ClearShopFilter" data-testid="shop-filter">
+                Shop @shopId.ToString()[..8]
+            </MudChip>
+        }
+    </TitleContent>
+</PageHeader>
+
+<MudPaper Elevation="0" Class="section-card pa-2">
+    <StateView Loading="_loading" Problem="_problem" IsEmpty="_page is { TotalCount: 0 }" OnRetry="LoadAsync"
+               EmptyIcon="@Icons.Material.Rounded.TaskAlt" EmptyTitle="No failed scans"
+               EmptyText="Every scan was processed. Nothing to look at.">
+        <MudTable T="AdminFailedInvoice" Items="_page!.Items" Hover="true" Elevation="0" Breakpoint="Breakpoint.Sm"
+                  OnRowClick="Open" RowClass="clickable-row" data-testid="failed-table">
+            <HeaderContent>
+                <MudTh>Shop</MudTh>
+                <MudTh>Failure reason</MudTh>
+                <MudTh Style="text-align: right">AI attempts</MudTh>
+                <MudTh>Scanned</MudTh>
+                <MudTh>Last processed</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Shop" Style="font-weight: 600">@context.ShopName</MudTd>
+                <MudTd DataLabel="Failure reason">@Display.Text(context.FailureReason)</MudTd>
+                <MudTd DataLabel="AI attempts" Style="text-align: right">@Display.Count(context.Attempts)</MudTd>
+                <MudTd DataLabel="Scanned">@Display.Timestamp(context.CreatedAt)</MudTd>
+                <MudTd DataLabel="Last processed">@Display.Timestamp(context.UpdatedAt)</MudTd>
+            </RowTemplate>
+        </MudTable>
+        <Pager Page="_pageNumber" PageSize="InputLimits.DefaultPageSize" TotalCount="_page!.TotalCount" PageChanged="PageChangedAsync" />
+    </StateView>
+</MudPaper>
+
+@code {
+    private int _pageNumber = 1;
+    private bool _loading = true;
+    private ApiProblem? _problem;
+    private PagedResponse<AdminFailedInvoice>? _page;
+
+    [SupplyParameterFromQuery(Name = QueryNames.ShopId)]
+    public Guid? ShopId { get; set; }
+
+    protected override Task OnParametersSetAsync()
+    {
+        _pageNumber = 1;
+        return LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _problem = null;
+        var result = await Api.GetFailedInvoicesAsync(ShopId, _pageNumber, InputLimits.DefaultPageSize, PageToken);
+        _page = result.Value;
+        _problem = result.Problem;
+        _loading = false;
+    }
+
+    private Task PageChangedAsync(int page)
+    {
+        _pageNumber = page;
+        return LoadAsync();
+    }
+
+    private void ClearShopFilter() => Navigation.NavigateTo(AppRoutes.FailedScans);
+
+    private void Open(TableRowClickEventArgs<AdminFailedInvoice> row)
+    {
+        if (row.Item is { } invoice)
+        {
+            Navigation.NavigateTo(AppRoutes.FailedScan(invoice.InvoiceId));
+        }
+    }
+}

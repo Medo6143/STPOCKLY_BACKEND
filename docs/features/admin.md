@@ -1,9 +1,9 @@
-# Feature: Platform admin (API)
+# Feature: Platform admin (API and dashboard)
 
-Status: Done (API, step 5a; the Blazor UI is step 5b) · Sprint: 5 · Owner: backend lane
+Status: Done (API, step 5a; Blazor dashboard `Stockly.Admin`, step 5b) · Sprint: 5 · Owner: backend lane
 
 ## 1. Purpose
-The platform owner runs the business from `Stockly.Admin`: signs in as a platform admin, finds and inspects shops, suspends or reactivates them, moves them between plans, raises or resets their daily scan quota, watches AI usage and cost, debugs and re-runs failed scans, reads the audit log of every admin write, and opens the Hangfire dashboard. This document covers the API that the Blazor UI (step 5b) consumes. Contract: `docs/api/contract.md` §11 (v1.5), ADR-0005 (with its update of 2026-10-18) and ADR-0002 (update 2026-10-18).
+The platform owner runs the business from `Stockly.Admin`: signs in as a platform admin, finds and inspects shops, suspends or reactivates them, moves them between plans, raises or resets their daily scan quota, watches AI usage and cost, debugs and re-runs failed scans, reads the audit log of every admin write, and opens the Hangfire dashboard. This document covers the API (§3–§12) and the Blazor dashboard that consumes it (§13). Contract: `docs/api/contract.md` §11 (v1.5), ADR-0005 (with its update of 2026-10-18) and ADR-0002 (update 2026-10-18).
 
 ## 2. User flow
 1. The admin signs in on the admin login page (AD1). The token has `platform_role=PlatformAdmin` and no shop. The app refreshes it with AD2 and signs out with AD3.
@@ -122,18 +122,21 @@ The effective daily quota (plan quota or override) is not cached. The scan reads
 | `Admin__Email` | `admin@example.com` | no (never logged anyway) |
 | `Admin__Password` | `change-me-admin-password-1` | **yes** |
 | `Admin__FullName` | `Platform Admin` | no |
+| `Cors__AdminOrigins` | `http://127.0.0.1:5080` | no. Comma-separated browser origins allowed to call the API (CORS policy `admin`, no credentials). Empty: no cross-origin call is allowed |
+| `ApiBaseUrl` (in `src/Stockly.Admin/wwwroot/appsettings.json`) | `http://127.0.0.1:5000/` | no. Public file downloaded by the browser; never put a secret there |
 
 When any of the three is missing, seeding is skipped and an information line is logged.
 
 ## 10. Mobile / Admin screens
-Mobile: none. Admin (`Stockly.Admin`, step 5b): login, shops list and detail, plans, AI usage, failed scans, audit log, Hangfire link. Each screen has the 4 states (loading, empty, error, data), Arabic first (RTL).
+Mobile: none. Admin (`Stockly.Admin`, step 5b): login, overview, shops list and detail, plans, AI usage, failed scans list and detail, audit log, Hangfire button. Each screen has the 4 states (loading, empty, error, data). The admin UI is English only, left to right (brief 5b); the screen names in §2 are the Arabic equivalents. Details in §13.
 
 ## 11. Tests
 - Domain: `PlatformAdminShopTests` (suspend/activate idempotency, normalized name, quota override range, subscription start/end, plan update), `AdminAuditLogTests`, `InvoiceTests.Rerun_*`.
 - Application: `AdminAuthHandlerTests` (AD1/AD2: admin-only, lockout, rotation, reuse, shop token), `AdminShopHandlerTests` (AD4–AD10: happy paths, audit once, none on repeats, reason/validation, not found, unauthenticated, reset after the save), `AdminPlanAndUsageHandlerTests` (AD11–AD16: language, code taken incl. race, precision, zero-filled days, Cairo boundaries and summer time, range validation), `AdminInvoiceAndMiscHandlerTests` (AD17–AD20, re-run only `Failed`, queued after the commit with a status-cache write, signed image URL, Hangfire session, seed created once / never promotes), `ProcessInvoiceCommandHandlerTests.Handle_AdminRerun_*` (bypasses DB reuse and AI cache, usage row written).
 - Infrastructure (Testcontainers): `AdminPersistenceTests` (cross-tenant list/search/detail, escaped wildcards, subscription replacement inside a transaction, quota CHECK, effective quota, member token revocation, daily usage by Cairo day, by shop/model ordering and paging, failed list and invoice detail of any shop, lock-and-save re-run, audit log filters and JSON, plan code race, platform admin accounts), `RedisScanLimiterTests.Reset_*` (incl. Redis down), `S3FileStorageTests.GetDownloadUrl_*` (pre-signed GET serves the bytes; missing → null), `InMemoryHangfireSessionCodesTests` (single use, 60 s), `JwtTokenServiceTests.CreateAdminAccessToken_*`, `MigrationTests` (new tables, indexes, CHECK).
 - Api (real host): `AdminAuthEndpointTests` (seeded once, admin token claims, shop user 401, token families, logout, 403 matrix both ways, 401 anonymous), `AdminShopEndpointTests` (suspend → `403 Shop.Suspended` and revoked refresh, one audit row on repeats, activate, reason/404, override changes the next scan's quota and AD10 gives it back, list/search/detail, subscription change carrying the override, audit log), `AdminPlanUsageInvoiceEndpointTests` (plans and language, usage zero-fill and range 400, failed list, signed image, re-run 202/409/404, end-to-end re-run that bypasses the cache, calls the AI once and charges no quota), `HangfireDashboardEndpointTests` (single-use code, cookie flags, 401 without or with a forged or expired cookie, not in OpenAPI).
-- Architecture: `IgnoreQueryFiltersTests` (only `Infrastructure/Persistence/Admin`), `AdminPortUsageTests` (only `Application/Features/Admin` uses the admin ports; cross-tenant implementations live in `Persistence/Admin`), `ShopMemberAccessTests` (by-shop reads only there).
+- Admin UI (bUnit, `tests/Stockly.Admin.Tests`): every page in its loading, empty, error (detail + trace id) and data states against a fake `HttpMessageHandler`; `BearerTokenHandlerTests` (attaches the token, refreshes once on 401 and retries once, concurrent 401s share one refresh, signs out when the refresh fails, no second refresh); reason dialogs keep Confirm disabled while the reason is blank; costs render with their 8 decimals unchanged and sums are exact (`DisplayTests`); login (validation, error, return URL, no open redirect); logout calls AD3 then forgets the tokens; Hangfire button opens the one-time URL on the API host.
+- Architecture: `ProjectReferenceTests` (Admin references only Contracts) and `LayerDependencyTests.Admin_DoesNotDependOnServerLayers`; `IgnoreQueryFiltersTests` (only `Infrastructure/Persistence/Admin`), `AdminPortUsageTests` (only `Application/Features/Admin` uses the admin ports; cross-tenant implementations live in `Persistence/Admin`), `ShopMemberAccessTests` (by-shop reads only there).
 
 ## 12. Known limitations
 - One API instance (see §7). Multi-instance needs the dashboard codes in Redis and a shared Data Protection key ring (release sprint).
@@ -141,3 +144,31 @@ Mobile: none. Admin (`Stockly.Admin`, step 5b): login, shops list and detail, pl
 - The `shops.normalized_name` backfill of existing rows follows the normalizer in SQL. `lower()` follows the database collation, while the Domain uses invariant lower case. Every new or renamed shop gets the Domain value.
 - `scansToday` counts invoices created today and does not drop after AD10, which only resets the quota counter.
 - A suspension signs members out of every shop they belong to, because refresh tokens are per user.
+
+## 13. Admin dashboard (`Stockly.Admin`, step 5b)
+
+Blazor WebAssembly + MudBlazor, served as static files, referencing **only** `Stockly.Contracts` (ADR-0005, architecture-tested). It calls the API exactly like the mobile app: JSON per contract §1, `Authorization: Bearer`, `Accept-Language: en`.
+
+**Run locally.** The API must run from this branch (it needs the `admin` CORS policy) with `Cors__AdminOrigins=http://127.0.0.1:5080` (in `.env`), then `dotnet run --project src/Stockly.Admin` and open http://127.0.0.1:5080. The API address is `ApiBaseUrl` in `wwwroot/appsettings.json` (default `http://127.0.0.1:5000/`). Use `127.0.0.1` for both (not `localhost` for one of them): the Hangfire cookie is `SameSite=Strict`, so the dashboard tab must be same-site with the admin.
+
+| Page | Route | Endpoints | Notes |
+|---|---|---|---|
+| Login | `/login` | AD1 | Return URL limited to paths inside the app (no open redirect) |
+| Overview | `/` | AD4 (counts), AD14, AD16, AD17 | KPI cards, 30-day cost chart, cost by model, latest failed scans |
+| Shops | `/shops` | AD4 | Search (debounced), status filter, server paging |
+| Shop | `/shops/{id}` | AD5–AD10, AD11 | Suspend/activate, reset quota and quota override ask a required reason; change plan offers active plans only, end date and reason optional (AD8) |
+| Plans | `/plans` | AD11–AD13 | Create and edit in a dialog; `409 Plan.CodeTaken` and other errors stay in the dialog |
+| AI usage | `/ai-usage` | AD14–AD16 | Date range picker (default last 30 days; at most 92 days between the dates, checked before calling), totals, daily chart, by shop (paged) and by model |
+| Failed scans | `/failed-scans`, `/failed-scans/{id}` | AD17–AD19 | Optional `?shopId=` filter; detail shows the photo (`imageUrl`), raw AI JSON in a read-only code view, AI calls; re-run asks a reason |
+| Audit log | `/audit-log` | AD20 | Filters target type, target id, admin id (also from `?targetType=&targetId=`); expandable before/after JSON |
+| Hangfire | app bar button | `POST /api/admin/hangfire/session` | Opens `{api}/hangfire?code=…` in a new tab (`noopener`) |
+
+Decisions:
+- **Tokens in memory only.** `AuthSession` (singleton per tab) keeps the access and refresh tokens in memory; nothing is written to `localStorage` or `sessionStorage`. A reload signs the admin out (trade-off accepted for XSS safety). Tokens are never logged or rendered.
+- **Refresh.** `BearerTokenHandler` (a `DelegatingHandler` on the typed `AdminApiClient` from `IHttpClientFactory`) adds the token; on `401` it calls AD2 through `TokenRefresher` once and retries once. Concurrent `401`s share one in-flight refresh; a request whose token was already replaced retries with the new one. A failed refresh signs out and the router sends the admin to the login page. AD1/AD2 use a separate typed client without the handler.
+- **Logout** calls AD3 with the refresh token, then forgets the session even if the API cannot be reached.
+- **Decimals.** Money and USD costs are parsed with `decimal.Parse(..., CultureInfo.InvariantCulture)` and never pass through `double`; USD costs are shown with their 8 decimals unchanged and totals are decimal sums. The chart is `MudChart<decimal>`.
+- **Errors.** Every API failure becomes an `ApiProblem` (RFC 7807 `title`, `detail`, `code`, `traceId`, `errors`); pages show the detail, code and trace id with a retry button, actions show them in a snackbar. Network/CORS failures show `Client.Unreachable`.
+- **Theme.** Light and dark palettes; the app bar toggle switches them (starts from the system preference, kept in memory).
+
+Known limitations: a page reload needs a new sign-in; the pre-signed image URL must be reachable from the browser (see §12); the dashboard is English only.

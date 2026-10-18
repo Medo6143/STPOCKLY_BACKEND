@@ -10,6 +10,7 @@ public sealed class ProjectReferenceTests
         [Layers.Application] = [Layers.Domain, Layers.Contracts],
         [Layers.Infrastructure] = [Layers.Application],
         [Layers.Api] = [Layers.Application, Layers.Infrastructure, Layers.Contracts],
+        [Layers.Admin] = [Layers.Contracts],
     };
 
     // Package prefixes Application must never reference (AGENTS.md §4).

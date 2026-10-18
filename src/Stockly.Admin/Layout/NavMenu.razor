@@ -1,0 +1,13 @@
+<div class="nav-section">Monitor</div>
+<MudNavMenu Color="Color.Primary" Rounded="true" Margin="Margin.Dense" Class="px-2">
+    <MudNavLink Href="@AppRoutes.Overview" Match="NavLinkMatch.All" Icon="@Icons.Material.Rounded.SpaceDashboard">Overview</MudNavLink>
+    <MudNavLink Href="@AppRoutes.Shops" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Rounded.Storefront">Shops</MudNavLink>
+    <MudNavLink Href="@AppRoutes.AiUsage" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Rounded.Insights">AI usage</MudNavLink>
+    <MudNavLink Href="@AppRoutes.FailedScans" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Rounded.ReportGmailerrorred">Failed scans</MudNavLink>
+</MudNavMenu>
+
+<div class="nav-section">Manage</div>
+<MudNavMenu Color="Color.Primary" Rounded="true" Margin="Margin.Dense" Class="px-2">
+    <MudNavLink Href="@AppRoutes.Plans" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Rounded.WorkspacePremium">Plans</MudNavLink>
+    <MudNavLink Href="@AppRoutes.AuditLog" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Rounded.History">Audit log</MudNavLink>
+</MudNavMenu>

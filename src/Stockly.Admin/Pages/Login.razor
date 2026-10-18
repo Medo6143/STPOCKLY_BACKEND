@@ -1,0 +1,94 @@
+@page "/login"
+@layout AuthLayout
+@attribute [AllowAnonymous]
+@inherits ApiPageBase
+@inject AccountService Account
+@inject AuthSession Session
+@inject NavigationManager Navigation
+
+<PageTitle>Sign in · Stockly Admin</PageTitle>
+
+<MudPaper Elevation="8" Class="login-card pa-8" Style="border-radius: 16px">
+    <div class="brand mb-6" style="justify-content: center">
+        <img src="favicon.svg" alt="" style="width: 40px; height: 40px" />
+        <MudText Typo="Typo.h5" HtmlTag="h1">Stockly Admin</MudText>
+    </div>
+    <MudText Typo="Typo.body2" Align="Align.Center" Class="mud-text-secondary mb-6">
+        Sign in with your platform admin account.
+    </MudText>
+
+    @if (_problem is not null)
+    {
+        <ProblemAlert Problem="_problem" />
+    }
+
+    <EditForm Model="_form" OnValidSubmit="SignInAsync">
+        <DataAnnotationsValidator />
+        <MudTextField @bind-Value="_form.Email" For="@(() => _form.Email)" Label="Email" Variant="Variant.Outlined"
+                      InputType="InputType.Email" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Rounded.AlternateEmail"
+                      autocomplete="username" Class="mb-4" data-testid="login-email" />
+        <MudTextField @bind-Value="_form.Password" For="@(() => _form.Password)" Label="Password" Variant="Variant.Outlined"
+                      InputType="@(_showPassword ? InputType.Text : InputType.Password)"
+                      Adornment="Adornment.End"
+                      AdornmentIcon="@(_showPassword ? Icons.Material.Rounded.VisibilityOff : Icons.Material.Rounded.Visibility)"
+                      OnAdornmentClick="() => _showPassword = !_showPassword" AdornmentAriaLabel="Show password"
+                      autocomplete="current-password" Class="mb-6" data-testid="login-password" />
+        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large"
+                   FullWidth="true" Disabled="_submitting" data-testid="login-submit">
+            @if (_submitting)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" data-testid="state-loading" />
+                <span>Signing in…</span>
+            }
+            else
+            {
+                <span>Sign in</span>
+            }
+        </MudButton>
+    </EditForm>
+</MudPaper>
+
+@code {
+    private readonly LoginForm _form = new();
+    private bool _submitting;
+    private bool _showPassword;
+    private ApiProblem? _problem;
+
+    [SupplyParameterFromQuery(Name = AppRoutes.ReturnUrlParameter)]
+    public string? ReturnUrl { get; set; }
+
+    protected override void OnInitialized()
+    {
+        if (Session.IsSignedIn)
+        {
+            Navigation.NavigateTo(SafeReturnUrl(), replace: true);
+        }
+    }
+
+    private async Task SignInAsync()
+    {
+        _submitting = true;
+        _problem = null;
+        _problem = await Account.SignInAsync(_form.Email, _form.Password, PageToken);
+        _submitting = false;
+        if (_problem is null)
+        {
+            _form.Password = string.Empty;
+            Navigation.NavigateTo(SafeReturnUrl(), replace: true);
+        }
+    }
+
+    // Only a path inside this app: an absolute or protocol-relative URL would be an open redirect.
+    private string SafeReturnUrl()
+    {
+        if (string.IsNullOrWhiteSpace(ReturnUrl)
+            || !Uri.TryCreate(ReturnUrl, UriKind.Relative, out _)
+            || ReturnUrl.StartsWith('/')
+            || ReturnUrl.StartsWith(AppRoutes.Login, StringComparison.OrdinalIgnoreCase))
+        {
+            return AppRoutes.Overview;
+        }
+
+        return ReturnUrl;
+    }
+}

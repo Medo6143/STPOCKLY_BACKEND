@@ -1,0 +1,7 @@
+@* Read-only code view. Blazor HTML-encodes the text, so AI output can never inject markup. *@
+<pre class="code-view" data-testid="json-view">@Text</pre>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Text { get; set; } = string.Empty;
+}

@@ -1,0 +1,25 @@
+@implements IDisposable
+@inject ThemeState ThemeState
+
+<MudThemeProvider @ref="_themeProvider" Theme="StocklyTheme.Theme" IsDarkMode="ThemeState.IsDarkMode" />
+<MudPopoverProvider />
+<MudDialogProvider CloseButton="true" BackdropClick="false" MaxWidth="MaxWidth.Small" FullWidth="true" />
+<MudSnackbarProvider />
+
+@code {
+    private MudThemeProvider? _themeProvider;
+
+    protected override void OnInitialized() => ThemeState.Changed += OnThemeChanged;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !ThemeState.IsInitialized && _themeProvider is not null)
+        {
+            ThemeState.Initialize(await _themeProvider.GetSystemDarkModeAsync());
+        }
+    }
+
+    public void Dispose() => ThemeState.Changed -= OnThemeChanged;
+
+    private void OnThemeChanged(object? sender, EventArgs e) => _ = InvokeAsync(StateHasChanged);
+}
