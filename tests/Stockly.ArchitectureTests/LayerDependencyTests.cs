@@ -57,6 +57,17 @@ public sealed class LayerDependencyTests
     }
 
     [Fact]
+    public void Admin_DoesNotDependOnServerLayers()
+    {
+        var result = Types.InAssembly(Layers.Load(Layers.Admin))
+            .ShouldNot()
+            .HaveDependencyOnAny(Layers.Domain, Layers.Application, Layers.Infrastructure, Layers.Api)
+            .GetResult();
+
+        result.ShouldBeSuccessful("Stockly.Admin talks to the API over HTTP with Contracts only (ADR-0005)");
+    }
+
+    [Fact]
     public void Infrastructure_DoesNotDependOnApi()
     {
         var result = Types.InAssembly(Layers.Load(Layers.Infrastructure))
