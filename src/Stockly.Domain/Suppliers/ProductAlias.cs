@@ -19,6 +19,7 @@ public sealed class ProductAlias : Entity, ITenantEntity
         ProductUnitId = productUnitId;
         AliasText = aliasText;
         NormalizedAlias = ArabicTextNormalizer.Normalize(aliasText);
+        LatinKey = Text.LatinKey.From(NormalizedAlias);
         TimesConfirmed = timesConfirmed;
         LastUsedAt = lastUsedAt;
     }
@@ -34,6 +35,9 @@ public sealed class ProductAlias : Entity, ITenantEntity
     public string AliasText { get; }
 
     public string NormalizedAlias { get; }
+
+    /// <summary>Cross-script matching key of <see cref="NormalizedAlias"/> (<see cref="Text.LatinKey"/>).</summary>
+    public string LatinKey { get; }
 
     /// <summary>How many confirmed lines taught this alias; at least 1.</summary>
     public int TimesConfirmed { get; private set; }
