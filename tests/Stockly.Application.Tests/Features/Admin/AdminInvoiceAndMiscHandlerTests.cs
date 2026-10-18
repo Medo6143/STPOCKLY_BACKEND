@@ -4,6 +4,7 @@ using Stockly.Application.Abstractions.Caching;
 using Stockly.Application.Abstractions.Identity;
 using Stockly.Application.Features.Admin;
 using Stockly.Application.Features.Admin.CreateHangfireSession;
+using Stockly.Application.Features.Admin.ExpireInvoiceImages;
 using Stockly.Application.Features.Admin.GetAdminInvoice;
 using Stockly.Application.Features.Admin.GetAuditLogs;
 using Stockly.Application.Features.Admin.GetFailedInvoices;
@@ -103,6 +104,33 @@ public sealed class AdminInvoiceAndMiscHandlerTests
 
         (await handler.Handle(new GetAdminInvoiceQuery(id), CancellationToken.None)).Value.ImageUrl.Should().BeNull();
         (await handler.Handle(new GetAdminInvoiceQuery(Guid.CreateVersion7()), CancellationToken.None)).Error.Should().Be(InvoiceErrors.NotFound);
+    }
+
+    [Fact]
+    public async Task GetAdminInvoice_ImageMarkedDeleted_NullUrlWithoutAskingStorage()
+    {
+        var id = Guid.CreateVersion7();
+        _context.Invoices.FindAsync(id, Arg.Any<CancellationToken>()).Returns(Record(id, ContractInvoiceStatus.Confirmed, imageDeleted: true));
+
+        var result = await new GetAdminInvoiceQueryHandler(_context.Invoices, _context.Storage)
+            .Handle(new GetAdminInvoiceQuery(id), CancellationToken.None);
+
+        result.Value.ImageUrl.Should().BeNull();
+        result.Value.RawAiJson.Should().Be("{\"items\":[]}");
+        await _context.Storage.DidNotReceiveWithAnyArgs().GetDownloadUrlAsync(default!, default, default);
+    }
+
+    [Fact]
+    public async Task ExpireInvoiceImages_MarksImagesOlderThanTheRetentionAndReturnsTheCount()
+    {
+        var retention = Substitute.For<IAdminInvoiceImageRetention>();
+        retention.MarkImagesDeletedAsync(Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(3);
+
+        var result = await new ExpireInvoiceImagesCommandHandler(retention, _context.Clock)
+            .Handle(new ExpireInvoiceImagesCommand(), CancellationToken.None);
+
+        result.Value.Should().Be(3);
+        await retention.Received(1).MarkImagesDeletedAsync(Now.AddDays(-InvoiceLimits.ImageRetentionDays), Now, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -216,12 +244,13 @@ public sealed class AdminInvoiceAndMiscHandlerTests
         return invoice;
     }
 
-    private static AdminInvoiceRecord Record(Guid id, ContractInvoiceStatus status) =>
+    private static AdminInvoiceRecord Record(Guid id, ContractInvoiceStatus status, bool imageDeleted = false) =>
         new(
             new InvoiceDetail(id, Guid.CreateVersion7(), status, null, null, null, null, null, null, [], null, [], Now.UtcDateTime, null, null),
             ShopId,
             "صيدلية",
             "invoices/key.jpg",
+            imageDeleted,
             "{\"items\":[]}",
             []);
 }

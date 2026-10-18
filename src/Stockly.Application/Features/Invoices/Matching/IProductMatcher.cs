@@ -14,7 +14,7 @@ public interface IProductMatcher
 public sealed record MatchInput(int LineNo, string NormalizedName, string? NormalizedUnit);
 
 /// <summary>
-/// The result for one line: product and unit together (both or neither) and the confidence (1.00, 0.90 or 0.70), or all
+/// The result for one line: product and unit together (both or neither) and the confidence (1.00, 0.90 or 0.70 from the exact strategies; 0.01..1.00 from the trigram strategy), or all
 /// <c>null</c> when nothing matched.
 /// </summary>
 public sealed record LineMatch(int LineNo, Guid? ProductId, Guid? ProductUnitId, decimal? Confidence)

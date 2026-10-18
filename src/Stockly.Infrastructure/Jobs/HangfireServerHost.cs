@@ -7,8 +7,8 @@ using Microsoft.Extensions.Logging;
 namespace Stockly.Infrastructure.Jobs;
 
 /// <summary>
-/// Runs the Hangfire server inside the Api process (docs/design/backend.md §4.1): queue <c>invoices</c>,
-/// <c>Hangfire:WorkerCount</c> workers, DI-scoped jobs. It waits for PostgreSQL in the background instead of failing
+/// Runs the Hangfire server inside the Api process (docs/design/backend.md §4.1): queues <c>invoices</c> and <c>maintenance</c>,
+/// <c>Hangfire:WorkerCount</c> workers, DI-scoped jobs, and the daily <see cref="ExpireInvoiceImagesJob"/>. It waits for PostgreSQL in the background instead of failing
 /// startup, so the Api serves (and reports itself unready) while the database is down.
 /// </summary>
 public sealed partial class HangfireServerHost(
@@ -34,11 +34,12 @@ public sealed partial class HangfireServerHost(
 
         var serverOptions = new BackgroundJobServerOptions
         {
-            Queues = [HangfireOptions.InvoicesQueue],
+            Queues = [HangfireOptions.InvoicesQueue, HangfireOptions.MaintenanceQueue],
             WorkerCount = options.WorkerCount,
             Activator = activator,
             FilterProvider = filters,
         };
+        ScheduleRecurringJobs(jobStorage);
         using var server = new BackgroundJobServer(serverOptions, jobStorage);
         LogStarted(logger, options.WorkerCount, HangfireOptions.InvoicesQueue);
         try
@@ -50,6 +51,15 @@ public sealed partial class HangfireServerHost(
             server.SendStop();
         }
     }
+
+    /// <summary>Adds or updates the recurring jobs (idempotent: same id, same schedule on every start).</summary>
+    private static void ScheduleRecurringJobs(JobStorage jobStorage) =>
+        new RecurringJobManager(jobStorage).AddOrUpdate<ExpireInvoiceImagesJob>(
+            ExpireInvoiceImagesJob.RecurringJobId,
+            HangfireOptions.MaintenanceQueue,
+            job => job.RunAsync(CancellationToken.None),
+            ExpireInvoiceImagesJob.Cron,
+            new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
 
     private async Task<JobStorage?> WaitForStorageAsync(CancellationToken stoppingToken)
     {

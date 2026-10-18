@@ -12,11 +12,12 @@ internal sealed class ProductAliasRepository(StocklyDbContext db) : IProductAlia
     // Arbiter: ux_product_aliases_shop_id_supplier_id_normalized_alias (NULLS NOT DISTINCT, so a null supplier conflicts).
     // One row per alias from parallel arrays; an existing alias adds the new confirmations.
     private const string UpsertSql =
-        "INSERT INTO product_aliases (id, shop_id, product_id, supplier_id, product_unit_id, alias_text, normalized_alias, " +
+        "INSERT INTO product_aliases (id, shop_id, product_id, supplier_id, product_unit_id, alias_text, normalized_alias, latin_key, " +
         "times_confirmed, last_used_at) " +
-        "SELECT a.id, a.shop_id, a.product_id, {0}, a.product_unit_id, a.alias_text, a.normalized_alias, a.times_confirmed, a.last_used_at " +
-        "FROM unnest({1}, {2}, {3}, {4}, {5}, {6}, {7}, {8}) " +
-        "AS a(id, shop_id, product_id, product_unit_id, alias_text, normalized_alias, times_confirmed, last_used_at) " +
+        "SELECT a.id, a.shop_id, a.product_id, {0}, a.product_unit_id, a.alias_text, a.normalized_alias, a.latin_key, a.times_confirmed, " +
+        "a.last_used_at " +
+        "FROM unnest({1}, {2}, {3}, {4}, {5}, {6}, {7}, {8}, {9}) " +
+        "AS a(id, shop_id, product_id, product_unit_id, alias_text, normalized_alias, latin_key, times_confirmed, last_used_at) " +
         "ON CONFLICT (shop_id, supplier_id, normalized_alias) DO UPDATE SET " +
         "product_id = EXCLUDED.product_id, product_unit_id = EXCLUDED.product_unit_id, " +
         "times_confirmed = product_aliases.times_confirmed + EXCLUDED.times_confirmed, last_used_at = EXCLUDED.last_used_at";
@@ -65,6 +66,7 @@ internal sealed class ProductAliasRepository(StocklyDbContext db) : IProductAlia
             aliases.Select(alias => alias.ProductUnitId).ToArray(),
             aliases.Select(alias => alias.AliasText).ToArray(),
             aliases.Select(alias => alias.NormalizedAlias).ToArray(),
+            aliases.Select(alias => alias.LatinKey).ToArray(),
             aliases.Select(alias => alias.TimesConfirmed).ToArray(),
             aliases.Select(alias => alias.LastUsedAt).ToArray(),
         ];

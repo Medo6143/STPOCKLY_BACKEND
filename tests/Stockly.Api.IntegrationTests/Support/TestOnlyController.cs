@@ -15,6 +15,11 @@ public sealed class TestOnlyController : ControllerBase
     public IActionResult Throw() =>
         throw new InvalidOperationException(SecretDetail + Request.Path);
 
+    /// <summary>What the Api sees of the connection after the forwarded-headers middleware.</summary>
+    [HttpGet("connection")]
+    public IActionResult Connection() =>
+        Ok(new { ip = HttpContext.Connection.RemoteIpAddress?.ToString(), scheme = Request.Scheme });
+
     /// <summary>Stands in for the owner-only endpoints of step 1.6.</summary>
     [HttpGet("owner-only")]
     [Authorize(Policy = AuthPolicies.Owner)]

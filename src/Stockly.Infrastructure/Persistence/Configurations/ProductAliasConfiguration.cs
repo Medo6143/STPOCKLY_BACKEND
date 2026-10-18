@@ -23,6 +23,7 @@ internal sealed class ProductAliasConfiguration : IEntityTypeConfiguration<Produ
         builder.Property(a => a.SupplierId);
         builder.Property(a => a.AliasText).IsRequired();
         builder.Property(a => a.NormalizedAlias).IsRequired();
+        builder.Property(a => a.LatinKey).IsRequired();
         builder.Property(a => a.TimesConfirmed).HasDefaultValue(1);
 
         builder.HasOne<Shop>().WithMany().HasForeignKey(a => a.ShopId).OnDelete(DeleteBehavior.Restrict);
@@ -37,10 +38,16 @@ internal sealed class ProductAliasConfiguration : IEntityTypeConfiguration<Produ
             .AreNullsDistinct(false)
             .HasDatabaseName("ux_product_aliases_shop_id_supplier_id_normalized_alias");
 
-        // Fuzzy match fallback (Sprint 6).
+        // Fuzzy match (TrigramMatchStrategy): ProductSimilarityQueries, normalized_alias % @name.
         builder.HasIndex(a => a.NormalizedAlias)
             .HasMethod("gin")
             .HasOperators("gin_trgm_ops")
             .HasDatabaseName("ix_product_aliases_normalized_alias_trgm");
+
+        // Cross-script fuzzy match: ProductSimilarityQueries, latin_key % @latin.
+        builder.HasIndex(a => a.LatinKey)
+            .HasMethod("gin")
+            .HasOperators("gin_trgm_ops")
+            .HasDatabaseName("ix_product_aliases_latin_key_trgm");
     }
 }

@@ -41,6 +41,7 @@ internal sealed class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
         builder.Property(i => i.ComputedTotal).HasPrecision(18, 2);
         builder.Property(i => i.FailureReason).HasConversion<string>();
         builder.Property(i => i.RawAiJson).HasColumnType("jsonb");
+        builder.Property(i => i.ImageDeletedAt);
 
         // A jsonb array of warning names, e.g. ["TotalMismatch"] (contract §6).
         builder.Property(i => i.Warnings)
@@ -94,5 +95,10 @@ internal sealed class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
             .IsDescending(false, true)
             .HasFilter($"status = {(short)InvoiceStatus.Failed}")
             .HasDatabaseName("ix_invoices_status_created_at_failed");
+
+        // Daily image retention job (AdminInvoiceImageRetention): created_at < @cutoff among images still kept.
+        builder.HasIndex(i => i.CreatedAt)
+            .HasFilter("image_deleted_at IS NULL")
+            .HasDatabaseName("ix_invoices_created_at_image_kept");
     }
 }

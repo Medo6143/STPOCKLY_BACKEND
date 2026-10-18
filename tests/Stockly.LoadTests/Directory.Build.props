@@ -1,0 +1,9 @@
+<Project>
+
+  <!--
+    The load test is a console app, not a test project: import the repository-wide settings only, not
+    tests/Directory.Build.props (which adds xUnit and marks projects as tests). `dotnet test` therefore skips it.
+  -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../../'))" />
+
+</Project>

@@ -3,6 +3,12 @@
   <PropertyGroup>
     <!-- Neutral resources (*.resx) are English; Arabic lives in *.ar.resx satellites. -->
     <NeutralLanguage>en</NeutralLanguage>
+    <!--
+      Thread-pool floor (runtimeconfig System.Threading.ThreadPool.MinThreads). Hangfire's enqueue in the scan request is
+      synchronous database I/O; a burst of scans after an idle period blocked every pool thread and waited for the pool
+      to grow (about one thread per 0.5 s): p95 of I1 22.6 s instead of 0.9 s. docs/operations/load-test.md.
+    -->
+    <ThreadPoolMinThreads>64</ThreadPoolMinThreads>
   </PropertyGroup>
 
   <ItemGroup>

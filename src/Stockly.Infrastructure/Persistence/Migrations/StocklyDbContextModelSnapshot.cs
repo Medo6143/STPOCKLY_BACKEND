@@ -139,6 +139,10 @@ namespace Stockly.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("failure_reason");
 
+                    b.Property<DateTimeOffset?>("ImageDeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("image_deleted_at");
+
                     b.Property<string>("ImageObjectKey")
                         .IsRequired()
                         .HasColumnType("text")
@@ -206,6 +210,10 @@ namespace Stockly.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ConfirmedByUserId")
                         .HasDatabaseName("ix_invoices_confirmed_by_user_id");
+
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("ix_invoices_created_at_image_kept")
+                        .HasFilter("image_deleted_at IS NULL");
 
                     b.HasIndex("CreatedByUserId")
                         .HasDatabaseName("ix_invoices_created_by_user_id");
@@ -524,6 +532,11 @@ namespace Stockly.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_archived");
 
+                    b.Property<string>("LatinKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("latin_key");
+
                     b.Property<decimal>("LowStockThreshold")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(14, 3)
@@ -562,6 +575,12 @@ namespace Stockly.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_products");
+
+                    b.HasIndex("LatinKey")
+                        .HasDatabaseName("ix_products_latin_key_trgm");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("LatinKey"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("LatinKey"), new[] { "gin_trgm_ops" });
 
                     b.HasIndex("NormalizedName")
                         .HasDatabaseName("ix_products_normalized_name_trgm");
@@ -1102,6 +1121,11 @@ namespace Stockly.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_used_at");
 
+                    b.Property<string>("LatinKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("latin_key");
+
                     b.Property<string>("NormalizedAlias")
                         .IsRequired()
                         .HasColumnType("text")
@@ -1131,6 +1155,12 @@ namespace Stockly.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_product_aliases");
+
+                    b.HasIndex("LatinKey")
+                        .HasDatabaseName("ix_product_aliases_latin_key_trgm");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("LatinKey"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("LatinKey"), new[] { "gin_trgm_ops" });
 
                     b.HasIndex("NormalizedAlias")
                         .HasDatabaseName("ix_product_aliases_normalized_alias_trgm");

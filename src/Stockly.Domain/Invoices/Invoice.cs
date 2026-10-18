@@ -70,6 +70,12 @@ public sealed class Invoice : Entity, ITenantEntity
 
     public DateTimeOffset CreatedAt { get; }
 
+    /// <summary>
+    /// When the image retention job recorded that the storage lifecycle rule has expired the image
+    /// (docs/operations/image-lifecycle.md); <c>null</c> while the image is kept. Set in bulk by that job only.
+    /// </summary>
+    public DateTimeOffset? ImageDeletedAt { get; private set; }
+
     /// <summary>The lines, numbered from 1.</summary>
     public IReadOnlyCollection<InvoiceItem> Items => _items.AsReadOnly();
 

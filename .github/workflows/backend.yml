@@ -1,0 +1,94 @@
+# Backend CI (AGENTS.md section 3 and 8): build with zero warnings, every backend test project with coverage, the
+# coverage gate (>= 80 % lines on Stockly.Domain and Stockly.Application) and the OpenAPI drift check.
+# Testcontainers starts PostgreSQL, Redis and MinIO itself: the GitHub-hosted Ubuntu runner has Docker, so no
+# service containers are declared. Actions are pinned by full commit SHA (version in the comment).
+name: backend
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Set up .NET (global.json)
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore Stockly.sln
+
+      - name: Build (warnings are errors)
+        run: dotnet build Stockly.sln --no-restore -warnaserror
+
+      # OWASP API8/API10 (docs/security/owasp-api-review.md): no known-vulnerable package, direct or transitive.
+      - name: No vulnerable packages
+        run: |
+          set -euo pipefail
+          dotnet list Stockly.sln package --vulnerable --include-transitive | tee vulnerable-packages.txt
+          if grep -q "has the following vulnerable packages" vulnerable-packages.txt; then
+            echo "::error::Vulnerable NuGet packages found (see the list above)."
+            exit 1
+          fi
+
+      # One project at a time (the suites share Docker); each writes its own Cobertura file under coverage/.
+      - name: Test with coverage
+        run: |
+          set -euo pipefail
+          for project in \
+            tests/Stockly.Domain.Tests \
+            tests/Stockly.Application.Tests \
+            tests/Stockly.ArchitectureTests \
+            tests/Stockly.Infrastructure.Tests \
+            tests/Stockly.Api.IntegrationTests; do
+            name="$(basename "$project")"
+            dotnet test "$project" --no-build \
+              --collect:"XPlat Code Coverage" \
+              --results-directory "coverage/$name" \
+              --logger "trx;LogFileName=$name.trx"
+          done
+
+      - name: Coverage gate (Domain and Application >= 80 % lines)
+        shell: pwsh
+        run: ./.github/workflows/coverage-gate.ps1 -ResultsDirectory coverage -Threshold 80
+
+      # OpenApiDocumentTests rewrites docs/api/openapi.json when the runtime document changed (and fails). This step
+      # fails on any difference as well, so a stale spec can never pass, and the regenerated file is uploaded below.
+      - name: OpenAPI spec is up to date
+        if: always()
+        run: git diff --exit-code -- docs/api/openapi.json
+
+      - name: Upload regenerated openapi.json
+        if: failure()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: openapi-json
+          path: docs/api/openapi.json
+          if-no-files-found: ignore
+
+      - name: Upload test results and coverage
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: test-results
+          path: coverage/
+          if-no-files-found: ignore
+          retention-days: 14

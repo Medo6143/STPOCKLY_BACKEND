@@ -66,7 +66,10 @@ public sealed class ApiFixture : IAsyncLifetime
         string jwtSigningKey = TestJwt.SigningKey,
         string? authPermitLimit = StocklyApiFactory.RaisedAuthPermitLimit,
         IClock? clock = null,
-        StocklyApiFactory.JobMode jobs = StocklyApiFactory.JobMode.Off) =>
+        StocklyApiFactory.JobMode jobs = StocklyApiFactory.JobMode.Off,
+        string environment = StocklyApiFactory.TestEnvironment,
+        IReadOnlyDictionary<string, string?>? settings = null,
+        bool replaceExtractor = true) =>
         new(
             postgres ?? PostgresConnectionString,
             redis ?? RedisConnectionString,
@@ -76,7 +79,10 @@ public sealed class ApiFixture : IAsyncLifetime
             clock,
             Storage,
             jobs,
-            seedAdmin: postgres is null);
+            seedAdmin: postgres is null,
+            environment,
+            settings,
+            replaceExtractor);
 
     /// <summary>Raw SQL for arranging states the API cannot create yet (suspended shop, staff membership...).</summary>
     public async Task<int> ExecuteAsync(string sql, params object[] parameters)

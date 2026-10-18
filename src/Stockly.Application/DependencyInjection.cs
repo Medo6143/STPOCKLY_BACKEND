@@ -1,5 +1,6 @@
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Stockly.Application.Behaviors;
 using Stockly.Application.Features.Admin;
 using Stockly.Application.Features.Auth;
@@ -41,6 +42,10 @@ public static class DependencyInjection
         services.AddScoped<IProductMatcher, ProductMatcher>();
         services.AddScoped<IProductMatchStrategy, ExactAliasMatchStrategy>();
         services.AddScoped<IProductMatchStrategy, ExactNameMatchStrategy>();
+        services.AddScoped<IProductMatchStrategy, TrigramMatchStrategy>();
+
+        // The default threshold unless the host binds section Matching (Infrastructure's AddInvoiceScanning does).
+        services.TryAddSingleton(new MatchingOptions());
 
         return services;
     }

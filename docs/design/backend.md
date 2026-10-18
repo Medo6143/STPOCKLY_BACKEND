@@ -722,7 +722,7 @@ So a matched line always has both `product_id` and `product_unit_id` (`ck_invoic
 
 Ports: `IProductAliasRepository.FindExactAsync(Guid? supplierId, IReadOnlyCollection<string> normalizedAliases, CancellationToken)` and `IProductRepository.FindByNormalizedNamesAsync(IReadOnlyCollection<string> normalizedNames, CancellationToken)`, both returning read records, never entities.
 
-**Left for Sprint 6:** `TrigramMatchStrategy` (Order 30) with `pg_trgm` similarity on `product_aliases.normalized_alias` and `products.normalized_name` (GIN indexes already exist or are created in Sprint 2, section 12), confidence = similarity rounded to 2 decimals, cross-script matches ("بنادول اكسترا" ↔ "Panadol Extra"), and aliases learned from other suppliers.
+**Built in Sprint 6 (see ADR-0012 and `docs/features/invoice-scan.md`):** `TrigramMatchStrategy` (Order 30) with `pg_trgm` similarity on `product_aliases.normalized_alias` and `products.normalized_name` (GIN indexes already exist or are created in Sprint 2, section 12), confidence = similarity rounded to 2 decimals, cross-script matches ("بنادول اكسترا" ↔ "Panadol Extra"), and aliases learned from other suppliers.
 
 ---
 

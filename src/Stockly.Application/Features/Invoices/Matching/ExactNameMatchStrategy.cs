@@ -34,11 +34,18 @@ public sealed class ExactNameMatchStrategy(IProductRepository products) : IProdu
         return matches;
     }
 
+    /// <summary>
+    /// The unit a line names for sure: the unit whose normalized name equals the line's unit text, or the only unit when
+    /// the line has no unit text; otherwise <c>null</c> (the caller falls back to the base unit).
+    /// </summary>
+    internal static NamedProductUnit? CertainUnit(MatchInput line, IReadOnlyList<NamedProductUnit> units) =>
+        line.NormalizedUnit is { } unitText
+            ? units.FirstOrDefault(candidate => ArabicTextNormalizer.Normalize(candidate.Name) == unitText)
+            : units.Count == 1 ? units[0] : null;
+
     private static LineMatch? Match(MatchInput line, NamedProduct product)
     {
-        var unit = line.NormalizedUnit is { } unitText
-            ? product.Units.FirstOrDefault(candidate => ArabicTextNormalizer.Normalize(candidate.Name) == unitText)
-            : product.Units.Count == 1 ? product.Units[0] : null;
+        var unit = CertainUnit(line, product.Units);
         if (unit is not null)
         {
             return new LineMatch(line.LineNo, product.Id, unit.Id, MatchConfidence.NameAndUnit);

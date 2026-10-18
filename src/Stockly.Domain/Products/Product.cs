@@ -28,6 +28,7 @@ public sealed class Product : Entity, ITenantEntity
         ShopId = shopId;
         Name = name;
         NormalizedName = ArabicTextNormalizer.Normalize(name);
+        LatinKey = Text.LatinKey.From(NormalizedName);
         Barcode = barcode;
         Category = category;
         CostPrice = costPrice;
@@ -40,6 +41,9 @@ public sealed class Product : Entity, ITenantEntity
     public string Name { get; private set; }
 
     public string NormalizedName { get; private set; }
+
+    /// <summary>Cross-script matching key of <see cref="NormalizedName"/> (<see cref="Text.LatinKey"/>), kept in step with it.</summary>
+    public string LatinKey { get; private set; }
 
     /// <summary>Trimmed; <c>null</c> when blank. Unique among the shop's non-archived products (database index).</summary>
     public string? Barcode { get; private set; }
@@ -123,6 +127,7 @@ public sealed class Product : Entity, ITenantEntity
 
         Name = name.Trim();
         NormalizedName = ArabicTextNormalizer.Normalize(Name);
+        LatinKey = Text.LatinKey.From(NormalizedName);
         Barcode = cleanBarcode;
         Category = cleanCategory;
         CostPrice = costPrice;
@@ -140,6 +145,7 @@ public sealed class Product : Entity, ITenantEntity
 
         Name = name.Trim();
         NormalizedName = ArabicTextNormalizer.Normalize(Name);
+        LatinKey = Text.LatinKey.From(NormalizedName);
         return Result.Success();
     }
 
