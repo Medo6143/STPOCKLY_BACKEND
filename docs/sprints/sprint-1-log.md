@@ -301,3 +301,16 @@ Totals on `main` after 1.6: Domain 260, Application 232, Architecture 23, Infras
 - Decisions accepted: tokens in memory only (reload asks to sign in again); single-flight refresh; English admin UI (`Accept-Language: en`); `MudChart<decimal>`; extra Overview page; client-side 92-day range check; CORS from `Cors__AdminOrigins` only (none by default).
 - Environment note: during its smoke test the worker ran the branch API on port 5001 with `.env.example` admin placeholders, which seeded `admin@example.com` with the example password into the local dev DB. Local only; change it before any shared use.
 - Follow-up for Sprint 6: an API integration test for the CORS policy.
+
+---
+
+# Sprint 6: smart matching, CI, hardening (backend)
+
+- Brief: `docs/agents/briefs/backend-6-matching-ci-hardening.md` (+ admin CORS integration test, admin CI). Branch `feature/matching-ci-hardening`.
+- Report: contract deviations NONE; openapi.json unchanged; no vulnerable packages.
+- Orchestrator verification: `dotnet build -warnaserror` 0 warnings; `dotnet test` 1,740 passed (Domain 408, Application 557, Admin 68, Architecture 28, Infrastructure 311, Api integration 368). Coverage (worker, merged): Domain 90.17 %, Application 96.88 %. Only changed assertion-free arrangement: `BarcodeRaceEndpointTests` raw INSERT now sets `latin_key`.
+- Migration `20261018130842_MatchingAndImageLifecycle`: `latin_key` on products and aliases (backfilled by `stockly_latin_key`), `invoices.image_deleted_at`, trigram and partial indexes.
+- Load test (20 users, dev laptop): P1 p95 15–24 ms; S1 p95 0.6–2.4 s (row-lock waits, worst case one shop's 50 products); I1 p95 0.23–0.29 s; I3 p95 12–15 ms; 0 % errors. Found and fixed thread-pool starvation on scan bursts (ADR-0014).
+- ADRs written by the orchestrator: 0012 Latin key, 0013 90-day image retention, 0014 thread-pool floor; backend.md §8 updated.
+- Security gaps left (docs/security/owasp-api-review.md): no general per-tenant/IP limit on authenticated endpoints; registration has no bot protection beyond the IP limit; refresh not rate limited; no admin MFA; TLS and private network for Postgres/Redis/MinIO are deployment work; local dev DB still has the example admin password.
+- Environment: a separate `stockly_loadtest` database and Redis db 5 were used for the load test; ~25 MB of test images in the dev bucket.
