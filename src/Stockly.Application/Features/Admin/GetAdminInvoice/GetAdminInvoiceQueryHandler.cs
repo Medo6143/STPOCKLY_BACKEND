@@ -20,7 +20,9 @@ public sealed class GetAdminInvoiceQueryHandler(IAdminInvoiceQueries invoices, I
             return InvoiceErrors.NotFound;
         }
 
-        var imageUrl = await storage.GetDownloadUrlAsync(record.ImageObjectKey, AdminLimits.ImageUrlLifetime, cancellationToken);
+        var imageUrl = record.ImageDeleted
+            ? null
+            : await storage.GetDownloadUrlAsync(record.ImageObjectKey, AdminLimits.ImageUrlLifetime, cancellationToken);
         return new AdminInvoiceDetail(record.Invoice, record.ShopId, record.ShopName, imageUrl, record.RawAiJson, record.Usage);
     }
 }

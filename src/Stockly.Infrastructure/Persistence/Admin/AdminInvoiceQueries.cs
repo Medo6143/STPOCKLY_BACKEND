@@ -80,6 +80,7 @@ internal sealed class AdminInvoiceQueries(StocklyDbContext db) : IAdminInvoiceQu
                 invoice.ShopId,
                 ShopName = db.Shops.Where(shop => shop.Id == invoice.ShopId).Select(shop => shop.Name).FirstOrDefault(),
                 invoice.ImageObjectKey,
+                invoice.ImageDeletedAt,
                 invoice.RawAiJson,
             })
             .SingleAsync(cancellationToken);
@@ -107,6 +108,7 @@ internal sealed class AdminInvoiceQueries(StocklyDbContext db) : IAdminInvoiceQu
             meta.ShopId,
             meta.ShopName ?? string.Empty,
             meta.ImageObjectKey,
+            meta.ImageDeletedAt is not null,
             meta.RawAiJson,
             [.. usage.Select(record => new AdminAiUsageDto(
                 record.Id,

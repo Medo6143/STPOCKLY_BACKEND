@@ -13,6 +13,9 @@ public sealed class HangfireOptions
     /// <summary>The queue of invoice jobs.</summary>
     public const string InvoicesQueue = "invoices";
 
+    /// <summary>The queue of platform maintenance jobs (image retention), served after <see cref="InvoicesQueue"/>.</summary>
+    public const string MaintenanceQueue = "maintenance";
+
     /// <summary>Workers on the <see cref="InvoicesQueue"/> queue in this process (<c>Hangfire__WorkerCount</c>).</summary>
     [Range(1, 50)]
     public int WorkerCount { get; set; } = 2;

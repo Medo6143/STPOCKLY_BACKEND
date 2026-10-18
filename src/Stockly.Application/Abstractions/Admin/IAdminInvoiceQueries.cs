@@ -21,11 +21,15 @@ public interface IAdminInvoiceQueries
     Task<Invoice?> FindForUpdateAsync(Guid invoiceId, CancellationToken cancellationToken);
 }
 
-/// <summary>An invoice as the admin sees it, before the image URL is signed.</summary>
+/// <summary>
+/// An invoice as the admin sees it, before the image URL is signed. <see cref="ImageDeleted"/>: the retention job
+/// recorded that the image expired (docs/operations/image-lifecycle.md), so no URL is signed.
+/// </summary>
 public sealed record AdminInvoiceRecord(
     InvoiceDetail Invoice,
     Guid ShopId,
     string ShopName,
     string ImageObjectKey,
+    bool ImageDeleted,
     string? RawAiJson,
     IReadOnlyList<AdminAiUsageDto> Usage);
