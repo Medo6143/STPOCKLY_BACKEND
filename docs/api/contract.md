@@ -1,10 +1,10 @@
 # Stockly API contract
 
-**Version: v1.6** · Status: **Approved** (v1.1 at checkpoint 1, v1.3 at checkpoint 2, v1.4 by the product owner, 2026-10-12; v1.2 clarifications and v1.5 admin section by the orchestrator under the product owner's no-pause mandate, 2026-10-17) · Owner: orchestrator
+**Version: v1.7** · Status: **Approved** (v1.1 at checkpoint 1, v1.3 at checkpoint 2, v1.4 by the product owner, 2026-10-12; v1.2 clarifications and v1.5 admin section by the orchestrator under the product owner's no-pause mandate, 2026-10-17) · Owner: orchestrator
 
-Change log: v1 (2026-10-12) first draft · v1.1 (2026-10-12) opening stock on create (P3), list price and override flag on sales (S1, D1), `newProduct` without category (I4), `GET /api/auth/me` fields made explicit (A5) · v1.2 (2026-10-12) `Http.*` codes for framework errors (§1.8), `newProduct` on `InvoiceItemDto` (§6), logout allowed for suspended shops (A4) · v1.3 (2026-10-12) `Retry-After` on `429 Scan.DailyQuotaExceeded` (I1) · v1.4 (2026-10-12) account lockout (`423 Auth.LockedOut`) and per-IP rate limiting (`429 Auth.TooManyRequests`) on A1/A2 · v1.5 (2026-10-17) platform admin API for `Stockly.Admin` (§11, AD1–AD20); no change to A/P/I/S/D endpoints · v1.6 (2026-10-18) `403 Auth.Forbidden` listed on A4 (admin token) and AD3 (shop token), as §11.1 already required.
+Change log: v1 (2026-10-12) first draft · v1.1 (2026-10-12) opening stock on create (P3), list price and override flag on sales (S1, D1), `newProduct` without category (I4), `GET /api/auth/me` fields made explicit (A5) · v1.2 (2026-10-12) `Http.*` codes for framework errors (§1.8), `newProduct` on `InvoiceItemDto` (§6), logout allowed for suspended shops (A4) · v1.3 (2026-10-12) `Retry-After` on `429 Scan.DailyQuotaExceeded` (I1) · v1.4 (2026-10-12) account lockout (`423 Auth.LockedOut`) and per-IP rate limiting (`429 Auth.TooManyRequests`) on A1/A2 · v1.5 (2026-10-17) platform admin API for `Stockly.Admin` (§11, AD1–AD20); no change to A/P/I/S/D endpoints · v1.6 (2026-10-18) `403 Auth.Forbidden` listed on A4 (admin token) and AD3 (shop token), as §11.1 already required · v1.7 (2026-10-18) plans and payments through Paymob (§12, B1–B6, AD21–AD22; ADR-0015).
 
-This is the binding contract between `stockly-backend` and `stockly-mobile` (and `Stockly.Admin` later) for Sprints 1–5. Field names, types, status codes and error codes here are exact. Only the orchestrator changes this file: every change bumps the version, updates the copy in `stockly-mobile/docs/api/contract.md`, and is announced to the running lanes.
+This is the binding contract between `stockly-backend` and `stockly-mobile` (and `Stockly.Admin` later) for Sprints 1–5 and plans/payments. Field names, types, status codes and error codes here are exact. Only the orchestrator changes this file: every change bumps the version, updates the copy in `stockly-mobile/docs/api/contract.md`, and is announced to the running lanes.
 
 The machine-readable spec is `docs/api/openapi.json`. A backend test checks that every **implemented** row of the [endpoint index](#2-endpoint-index) matches `openapi.json` (path, method, status codes), and that `openapi.json` has no operation missing from the index.
 
@@ -140,6 +140,14 @@ Every error response is `application/problem+json`:
 | AD18 | GET | /api/admin/invoices/{id} | admin | 200, 401, 403, 404 | 5 | implemented |
 | AD19 | POST | /api/admin/invoices/{id}/rerun | admin | 202, 400, 401, 403, 404, 409 | 5 | implemented |
 | AD20 | GET | /api/admin/audit-logs | admin | 200, 400, 401, 403 | 5 | implemented |
+| B1 | GET | /api/billing/plans | user | 200, 401, 403 | billing | planned |
+| B2 | GET | /api/billing/subscription | user | 200, 401, 403 | billing | planned |
+| B3 | POST | /api/billing/checkout | owner | 200, 201, 400, 401, 403, 404, 409, 502 | billing | planned |
+| B4 | GET | /api/billing/payments/{id} | user | 200, 401, 403, 404 | billing | planned |
+| B5 | GET | /api/billing/payments | user | 200, 400, 401, 403 | billing | planned |
+| B6 | POST | /api/billing/payments/{id}/cancel | owner | 200, 401, 403, 404, 409 | billing | planned |
+| AD21 | GET | /api/admin/payments | admin | 200, 400, 401, 403 | billing | planned |
+| AD22 | GET | /api/admin/payments/summary | admin | 200, 400, 401, 403 | billing | planned |
 
 Not in the API (by design): `/health/live`, `/health/ready` (operations, not part of the mobile contract) and `/openapi/v1.json`.
 
@@ -534,6 +542,12 @@ ExpiringItem { productId: uuid, productName: string, expiryDate: date, batchNo: 
 | `Plan.CodeTaken` | 409 | AD12 | Plan code already used |
 | `Plan.Inactive` | 400 | AD8 | An inactive plan cannot be assigned |
 | `Invoice.NotRerunnable` | 409 | AD19 | Only a `Failed` invoice can be re-run |
+| `Billing.FreePlan` | 400 | B3 | A free plan cannot be checked out |
+| `Billing.MethodUnavailable` | 400 | B3 | This payment method is not configured |
+| `Billing.PaymentPending` | 409 | B3 | The shop already has a pending payment that has not expired |
+| `Billing.NotCancelable` | 409 | B6 | Only a pending payment can be cancelled |
+| `Billing.ProviderUnavailable` | 502 | B3 | The payment provider failed; nothing was charged; retry with the same `clientRequestId` |
+| `Payment.NotFound` | 404 | B4, B6 | No such payment in this shop |
 
 Domain movement-rule codes (`Stock.InvoiceSourceRequired`, `Stock.SaleSourceRequired`, `Stock.SourceNotAllowed`, `Stock.EmptySourceReference`, `Stock.ChangeMustBePositive`, `Stock.ChangeMustBeNegative`, `Stock.UserRequired`, `Stock.UnknownReason`) protect server-built movements; a client request cannot trigger them. If one ever reaches the API it is a server bug and is returned as `500 Server.Unexpected`.
 
@@ -639,3 +653,52 @@ AuditLogEntry { id: uuid, adminUserId: uuid, adminEmail: string, action: string,
 - **AD20** `GET /api/admin/audit-logs?targetType=&targetId=&adminUserId=&page=&pageSize=` → paged `AuditLogEntry`, newest first (indexes in `docs/erd.md` §3.6).
 
 Hangfire dashboard: served at `/hangfire` only to an admin. Because the browser cannot attach a bearer token to the dashboard's own requests, `Stockly.Admin` opens it with a one-time code: `POST /api/admin/hangfire/session` (admin) → `200 { url }` where `url` is `/hangfire?code=…` valid 60 seconds and single use; the API exchanges it for an HttpOnly, `SameSite=Strict` cookie scoped to `/hangfire`, valid 15 minutes. This operation is not part of the endpoint index (operations, like `/health`).
+
+---
+
+## 12. Plans and payments (v1.7, ADR-0015)
+
+Shop side (mobile). Conventions §1 apply. `owner` endpoints return `403 Auth.Forbidden` to Staff.
+
+### 12.1 Schemas
+```text
+BillingPlan {
+  id: uuid, code: string, name: string,          // name in the request language
+  monthlyPrice: money-string, dailyScanQuota: int, maxMembers: int,
+  isFree: boolean, isCurrent: boolean
+}
+SubscriptionSummary {
+  plan: BillingPlan,
+  startsOn: date, endsOn: date|null,              // null = open-ended (free plan)
+  effectiveDailyScanQuota: int, scansToday: int,
+  memberCount: int,
+  pendingPayment: PaymentDto|null                 // newest Pending payment of this shop, if any
+}
+PaymentMethod = "Card" | "Wallet" | "Kiosk"
+PaymentStatus = "Pending" | "Paid" | "Failed" | "Expired"
+PaymentDto {
+  id: uuid, clientRequestId: uuid, planId: uuid, planName: string,
+  amount: money-string, currency: "EGP",
+  method: PaymentMethod, status: PaymentStatus,
+  checkoutUrl: string|null,                       // Card, Wallet: provider-hosted page; open in the system browser
+  referenceNumber: string|null,                   // Kiosk: pay this reference in cash at a kiosk partner
+  expiresAt: timestamp|null,                      // after this a Pending payment becomes Expired
+  failureReason: string|null,                     // provider text, informational only
+  createdAt: timestamp, paidAt: timestamp|null
+}
+```
+
+### 12.2 Endpoints
+- **B1** `GET /api/billing/plans` (user) → `BillingPlan[]`: active plans, free first, then by price. Small, not paged.
+- **B2** `GET /api/billing/subscription` (user) → `SubscriptionSummary`.
+- **B3** `POST /api/billing/checkout` (owner) `{ clientRequestId: uuid, planId: uuid, method: PaymentMethod, walletPhone: string|null }` → `201 PaymentDto` (`Location: /api/billing/payments/{id}`), status `Pending`. Repeat `clientRequestId`: `200` with the existing payment (rule 20, ADR-0006). `walletPhone` is required for `Wallet` (Egyptian mobile `^01[0125][0-9]{8}$`), ignored otherwise. The amount is the plan's `monthlyPrice` now; the client never sends an amount. Errors: `400 Validation.Failed`, `400 Billing.FreePlan` (price 0), `400 Plan.Inactive`, `400 Billing.MethodUnavailable` (method not configured), `404 Plan.NotFound`, `409 Billing.PaymentPending` (the shop already has a `Pending` payment that has not expired; pay or wait for it), `502 Billing.ProviderUnavailable` (provider error; nothing was charged; retry with the same `clientRequestId`).
+- **B4** `GET /api/billing/payments/{id}` (user) → `PaymentDto`. `404 Payment.NotFound` (also another shop's id).
+- **B5** `GET /api/billing/payments?page=&pageSize=` (user) → paged `PaymentDto`, newest first.
+- **B6** `POST /api/billing/payments/{id}/cancel` (owner) → `200 PaymentDto` (status `Expired`). Only for `Pending`; lets the owner start a different method. `409 Billing.NotCancelable` otherwise. A late provider callback for a cancelled payment that reports success is still honoured (the money was taken) and the payment becomes `Paid`.
+
+### 12.3 Provider callbacks (operations, not in the endpoint index)
+`POST /api/payments/paymob/callback`: anonymous, HMAC-verified, idempotent by provider transaction id, compare amount, currency and provider order id with the stored payment. Invalid signature → `401` with no body detail; valid → `200` always (also for repeats and unknown orders, which are logged by id only). Only these callbacks and the reconcile job change a payment's status (ADR-0015 §4).
+
+### 12.4 Admin (platform)
+- **AD21** `GET /api/admin/payments?shopId=&status=&page=&pageSize=` → paged `AdminPayment` = `PaymentDto` + `shopId`, `shopName`, `provider` ("Paymob"), `providerTransactionId: string|null`, newest first.
+- AD14-style revenue: **AD22** `GET /api/admin/payments/summary?from=&to=` → `{ paidCount: int, paidAmount: money-string, byMethod: { method: PaymentMethod, paidCount: int, paidAmount: money-string }[] }` (Cairo days, `to - from <= 92`).
