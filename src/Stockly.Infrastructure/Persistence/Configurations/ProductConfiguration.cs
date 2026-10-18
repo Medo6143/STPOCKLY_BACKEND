@@ -24,6 +24,7 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.Property(p => p.CreatedAt);
         builder.Property(p => p.Name).IsRequired();
         builder.Property(p => p.NormalizedName).IsRequired();
+        builder.Property(p => p.LatinKey).IsRequired();
         builder.Property(p => p.Barcode);
         builder.Property(p => p.Category);
         builder.Property(p => p.Quantity).HasPrecision(14, 3);
@@ -57,6 +58,12 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
             .HasMethod("gin")
             .HasOperators("gin_trgm_ops")
             .HasDatabaseName("ix_products_normalized_name_trgm");
+
+        // Cross-script fuzzy match: ProductSimilarityQueries, latin_key % @latin (erd.md §3.2).
+        builder.HasIndex(p => p.LatinKey)
+            .HasMethod("gin")
+            .HasOperators("gin_trgm_ops")
+            .HasDatabaseName("ix_products_latin_key_trgm");
 
         // GetLowStockQuery: only low items live in this partial index.
         builder.HasIndex(p => p.ShopId)

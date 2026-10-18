@@ -23,6 +23,7 @@ using Stockly.Application.Abstractions.Time;
 using Stockly.Application.Features.Admin.SeedPlatformAdmin;
 using Stockly.Application.Features.Auth;
 using Stockly.Application.Features.Invoices;
+using Stockly.Application.Features.Invoices.Matching;
 using Stockly.Infrastructure.Ai.OpenRouter;
 using Stockly.Infrastructure.Caching;
 using Stockly.Infrastructure.Configuration;
@@ -90,6 +91,7 @@ public static class DependencyInjection
         services.AddScoped<ISaleQueries, SaleQueries>();
         services.AddScoped<IDashboardQueries, DashboardQueries>();
         services.AddScoped<IProductUnitUsageQueries, ProductUnitUsageQueries>();
+        services.AddScoped<IProductSimilarityQueries, ProductSimilarityQueries>();
 
         // Platform admin (ADR-0005, update 2026-10-18): the only cross-tenant access, used only by Features/Admin.
         services.AddScoped<IAdminShopQueries, AdminShopQueries>();
@@ -98,6 +100,7 @@ public static class DependencyInjection
         services.AddScoped<IAdminAiUsageQueries, AdminAiUsageQueries>();
         services.AddScoped<IAdminInvoiceQueries, AdminInvoiceQueries>();
         services.AddScoped<IAdminAuditLog, AdminAuditLogRepository>();
+        services.AddScoped<IAdminInvoiceImageRetention, AdminInvoiceImageRetention>();
 
         return services;
     }
@@ -182,16 +185,18 @@ public static class DependencyInjection
 
     /// <summary>
     /// Everything the invoice scan needs besides persistence and Redis (docs/design/backend.md §3–§6, §14): the scan
-    /// limits, image storage, the OpenRouter extractor and the Hangfire jobs. Each options section is validated at startup.
+    /// limits, the matching threshold, image storage, the OpenRouter extractor and the Hangfire jobs. Each options section
+    /// is validated at startup. <paramref name="useFakeAi"/>: see <see cref="AddOpenRouter"/>.
     /// </summary>
     public static IServiceCollection AddInvoiceScanning(
-        this IServiceCollection services, IConfiguration configuration, string postgresConnectionString)
+        this IServiceCollection services, IConfiguration configuration, string postgresConnectionString, bool useFakeAi = false)
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
         services.AddValidatedOptions<ScanOptions>(configuration, ScanOptions.SectionName);
+        services.AddValidatedOptions<MatchingOptions>(configuration, MatchingOptions.SectionName);
         services.AddStocklyStorage(configuration);
-        services.AddOpenRouter(configuration);
+        services.AddOpenRouter(configuration, useFakeAi);
         services.AddStocklyJobs(configuration, postgresConnectionString);
         return services;
     }
@@ -227,9 +232,10 @@ public static class DependencyInjection
     /// The OpenRouter extractor as a typed client (rule 42) with the pipeline of docs/design/backend.md §6.1: retry
     /// (outer; 429 and 5xx only; exponential backoff with jitter; honours <c>Retry-After</c>), then a per-attempt timeout,
     /// then <see cref="OpenRouterAttemptRecorder"/> (innermost, sees every attempt). No circuit breaker and no hedging:
-    /// hedging would duplicate paid calls.
+    /// hedging would duplicate paid calls. With <paramref name="useFakeAi"/> the client's primary handler is
+    /// <see cref="FakeOpenRouterHandler"/> and nothing leaves the process (load test only; the Api refuses it elsewhere).
     /// </summary>
-    public static IServiceCollection AddOpenRouter(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddOpenRouter(this IServiceCollection services, IConfiguration configuration, bool useFakeAi = false)
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
@@ -264,6 +270,13 @@ public static class DependencyInjection
             .Services
             .AddHttpClient<IAiInvoiceExtractor, OpenRouterInvoiceExtractor>()
             .AddHttpMessageHandler<OpenRouterAttemptRecorder>();
+        if (useFakeAi)
+        {
+            var latency = FakeOpenRouterHandler.ReadLatency(configuration);
+            services.AddHttpClient<IAiInvoiceExtractor, OpenRouterInvoiceExtractor>()
+                .ConfigurePrimaryHttpMessageHandler(() => new FakeOpenRouterHandler(latency));
+        }
+
         return services;
     }
 
@@ -287,6 +300,7 @@ public static class DependencyInjection
         services.AddScoped<JobTenantContext>();
         services.AddTransient<ProcessInvoiceJob>();
         services.AddTransient<FailInvoiceProcessingJob>();
+        services.AddTransient<ExpireInvoiceImagesJob>();
         services.AddHostedService<HangfireServerHost>();
         return services;
     }

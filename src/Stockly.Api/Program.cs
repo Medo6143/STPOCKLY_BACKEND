@@ -22,6 +22,14 @@ var postgres = builder.Configuration.GetRequiredConnectionString(ConnectionStrin
 var redis = builder.Configuration.GetRequiredConnectionString(ConnectionStringNames.Redis);
 var jwt = builder.Configuration.GetRequiredJwtOptions();
 var authRateLimit = builder.Configuration.GetAuthRateLimitOptions();
+var useFakeAi = FakeAi.IsEnabled(builder.Configuration, builder.Environment);
+
+// No Server header; JSON bodies up to RequestLimits.MaxBodyBytes (the scan endpoint raises its own limit).
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.AddServerHeader = false;
+    options.Limits.MaxRequestBodySize = RequestLimits.MaxBodyBytes;
+});
 
 builder.Services.AddSerilog((services, logger) => logger
     .ReadFrom.Configuration(builder.Configuration)
@@ -36,7 +44,7 @@ builder.Services.AddScoped<ICurrentTenant, HttpContextCurrentTenant>();
 builder.Services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
 builder.Services.AddPersistence(postgres);
 builder.Services.AddStocklyCaching(redis);
-builder.Services.AddInvoiceScanning(builder.Configuration, postgres);
+builder.Services.AddInvoiceScanning(builder.Configuration, postgres, useFakeAi);
 builder.Services.AddStocklyIdentity(jwt);
 builder.Services.AddApplication();
 builder.Services.AddPlatformAdmin(builder.Configuration);
@@ -45,6 +53,7 @@ builder.Services.AddStocklyAuthentication(jwt);
 builder.Services.AddStocklyLocalization();
 builder.Services.AddStocklyRateLimiting(authRateLimit);
 builder.Services.AddAdminCors(builder.Configuration);
+var forwardedHeaders = builder.Services.AddStocklyForwardedHeaders(builder.Configuration);
 
 builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = ProblemDetailsEnricher.Enrich);
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
@@ -54,6 +63,17 @@ builder.Services.AddStocklyHealthChecks(postgres, redis);
 
 var app = builder.Build();
 
+if (forwardedHeaders)
+{
+    app.UseForwardedHeaders();
+}
+
+if (app.Environment.IsProduction())
+{
+    app.UseHsts();
+}
+
+app.UseMiddleware<SecurityHeadersMiddleware>();
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseRequestLocalization();
 app.UseSerilogRequestLogging();
