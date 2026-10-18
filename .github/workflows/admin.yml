@@ -1,0 +1,74 @@
+# Admin CI: builds Stockly.Admin (Blazor WebAssembly) with zero warnings and runs its bUnit tests
+# (tests/Stockly.Admin.Tests). Runs when the admin, the shared contracts or the build settings change.
+# Actions are pinned by full commit SHA (version in the comment).
+name: admin
+
+on:
+  push:
+    paths:
+      - "src/Stockly.Admin/**"
+      - "src/Stockly.Contracts/**"
+      - "tests/Stockly.Admin.Tests/**"
+      - "Directory.Build.props"
+      - "Directory.Packages.props"
+      - "tests/Directory.Build.props"
+      - "global.json"
+      - ".github/workflows/admin.yml"
+  pull_request:
+    paths:
+      - "src/Stockly.Admin/**"
+      - "src/Stockly.Contracts/**"
+      - "tests/Stockly.Admin.Tests/**"
+      - "Directory.Build.props"
+      - "Directory.Packages.props"
+      - "tests/Directory.Build.props"
+      - "global.json"
+      - ".github/workflows/admin.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: admin-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Set up .NET (global.json)
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: |
+          dotnet restore src/Stockly.Admin/Stockly.Admin.csproj
+          dotnet restore tests/Stockly.Admin.Tests/Stockly.Admin.Tests.csproj
+
+      - name: Build Stockly.Admin (warnings are errors)
+        run: dotnet build src/Stockly.Admin/Stockly.Admin.csproj --no-restore -warnaserror
+
+      - name: Build Stockly.Admin.Tests (warnings are errors)
+        run: dotnet build tests/Stockly.Admin.Tests/Stockly.Admin.Tests.csproj --no-restore -warnaserror
+
+      - name: bUnit tests
+        run: dotnet test tests/Stockly.Admin.Tests/Stockly.Admin.Tests.csproj --no-build --logger "trx;LogFileName=Stockly.Admin.Tests.trx" --results-directory test-results
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: admin-test-results
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 14
