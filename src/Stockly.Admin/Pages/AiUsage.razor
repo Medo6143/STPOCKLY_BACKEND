@@ -1,0 +1,199 @@
+@page "/ai-usage"
+@attribute [Authorize]
+@inherits ApiPageBase
+@inject AdminApiClient Api
+@inject TimeProvider Clock
+@inject NavigationManager Navigation
+
+<PageTitle>AI usage · Stockly Admin</PageTitle>
+
+<PageHeader Title="AI usage" Subtitle="OpenRouter calls and cost per Cairo day, shop and model." />
+
+<MudPaper Elevation="0" Class="section-card pa-4 mb-4">
+    <div class="d-flex flex-wrap align-center gap-3">
+        <MudDateRangePicker @bind-DateRange="_picked" Label="Date range" Variant="Variant.Outlined" Margin="Margin.Dense"
+                            DateFormat="yyyy-MM-dd" Style="max-width: 320px" data-testid="usage-range" />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.Refresh"
+                   Disabled="RangeError is not null" OnClick="ApplyAsync" data-testid="usage-apply">Apply</MudButton>
+        @if (RangeError is not null)
+        {
+            <MudText Typo="Typo.body2" Color="Color.Error" data-testid="range-error">@RangeError</MudText>
+        }
+        else
+        {
+            <MudText Class="mud-text-secondary" Typo="Typo.body2">@_range.Days days, both ends included</MudText>
+        }
+    </div>
+</MudPaper>
+
+<StateView Loading="_loading" Problem="_problem" IsEmpty="IsEmpty" OnRetry="LoadAsync"
+           EmptyIcon="@Icons.Material.Rounded.Insights" EmptyTitle="No AI usage in this range"
+           EmptyText="No scan called the AI between these dates.">
+    <MudGrid Spacing="3">
+        <MudItem xs="12" sm="6" lg="3">
+            <StatCard Icon="@Icons.Material.Rounded.Payments" Label="Cost" Value="@Display.Usd(_totalCost)" Caption="USD"
+                      Tone="@StatCard.Secondary" />
+        </MudItem>
+        <MudItem xs="12" sm="6" lg="3">
+            <StatCard Icon="@Icons.Material.Rounded.AutoAwesome" Label="Calls" Value="@Display.Count(_days.Sum(d => d.Calls))"
+                      Caption="@($"{Display.Count(_days.Sum(d => d.Failures))} failures")" Tone="@StatCard.Tertiary" />
+        </MudItem>
+        <MudItem xs="12" sm="6" lg="3">
+            <StatCard Icon="@Icons.Material.Rounded.Bolt" Label="Cache hits" Value="@Display.Count(_days.Sum(d => d.CacheHits))"
+                      Caption="Answered without calling the AI" Tone="@StatCard.Success" />
+        </MudItem>
+        <MudItem xs="12" sm="6" lg="3">
+            <StatCard Icon="@Icons.Material.Rounded.DataUsage" Label="Tokens"
+                      Value="@Display.Count(_days.Sum(d => d.InputTokens) + _days.Sum(d => d.OutputTokens))"
+                      Caption="@($"{Display.Count(_days.Sum(d => d.InputTokens))} in · {Display.Count(_days.Sum(d => d.OutputTokens))} out")"
+                      Tone="@StatCard.Info" />
+        </MudItem>
+
+        <MudItem xs="12">
+            <MudPaper Elevation="0" Class="section-card pa-5">
+                <MudText Typo="Typo.h6" Class="mb-2">Daily cost</MudText>
+                <UsageChart Days="_days" />
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" lg="7">
+            <MudPaper Elevation="0" Class="section-card">
+                <MudText Typo="Typo.h6" Class="pa-4">By shop</MudText>
+                <MudTable T="AiUsageByShop" Items="_byShop!.Items" Hover="true" Dense="true" Elevation="0" Breakpoint="Breakpoint.Sm"
+                          OnRowClick="OpenShop" RowClass="clickable-row" data-testid="usage-by-shop">
+                    <HeaderContent>
+                        <MudTh>Shop</MudTh>
+                        <MudTh Style="text-align: right">Calls</MudTh>
+                        <MudTh Style="text-align: right">Failures</MudTh>
+                        <MudTh Style="text-align: right">Cost (USD)</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Shop">@context.ShopName</MudTd>
+                        <MudTd DataLabel="Calls" Style="text-align: right">@Display.Count(context.Calls)</MudTd>
+                        <MudTd DataLabel="Failures" Style="text-align: right">@Display.Count(context.Failures)</MudTd>
+                        <MudTd DataLabel="Cost (USD)" Style="text-align: right" Class="mono">@Display.Usd(context.CostUsd)</MudTd>
+                    </RowTemplate>
+                </MudTable>
+                <Pager Page="_shopPage" PageSize="InputLimits.DefaultPageSize" TotalCount="_byShop!.TotalCount" PageChanged="ShopPageChangedAsync" />
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" lg="5">
+            <MudPaper Elevation="0" Class="section-card">
+                <MudText Typo="Typo.h6" Class="pa-4">By model</MudText>
+                <MudTable T="AiUsageByModel" Items="_byModel" Dense="true" Elevation="0" Breakpoint="Breakpoint.Sm" data-testid="usage-by-model">
+                    <HeaderContent>
+                        <MudTh>Model</MudTh>
+                        <MudTh Style="text-align: right">Calls</MudTh>
+                        <MudTh Style="text-align: right">Avg latency</MudTh>
+                        <MudTh Style="text-align: right">Cost (USD)</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Model" Class="mono">@context.Model</MudTd>
+                        <MudTd DataLabel="Calls" Style="text-align: right">
+                            @Display.Count(context.Calls)
+                            @if (context.Failures > 0)
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Error">@Display.Count(context.Failures) failed</MudText>
+                            }
+                        </MudTd>
+                        <MudTd DataLabel="Avg latency" Style="text-align: right">@Display.Count(context.AvgLatencyMs) ms</MudTd>
+                        <MudTd DataLabel="Cost (USD)" Style="text-align: right" Class="mono">@Display.Usd(context.CostUsd)</MudTd>
+                    </RowTemplate>
+                </MudTable>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</StateView>
+
+@code {
+    private UsageRange _range;
+    private DateRange _picked = new();
+    private int _shopPage = 1;
+    private bool _loading = true;
+    private ApiProblem? _problem;
+    private IReadOnlyList<AiUsageDay> _days = [];
+    private PagedResponse<AiUsageByShop>? _byShop;
+    private IReadOnlyList<AiUsageByModel> _byModel = [];
+    private decimal _totalCost;
+
+    private bool IsEmpty => _days.All(day => day.Calls == 0 && day.CacheHits == 0);
+
+    private string? RangeError
+    {
+        get
+        {
+            if (_picked.Start is null || _picked.End is null)
+            {
+                return "Pick a start and an end date.";
+            }
+
+            var range = PickedRange();
+            return range.IsValid ? null : $"The range can cover at most {InputLimits.MaxUsageRangeDays + 1} days.";
+        }
+    }
+
+    protected override Task OnInitializedAsync()
+    {
+        _range = UsageRange.LastDays(Clock, InputLimits.DefaultUsageRangeDays);
+        _picked = new DateRange(_range.From.ToDateTime(TimeOnly.MinValue), _range.To.ToDateTime(TimeOnly.MinValue));
+        return LoadAsync();
+    }
+
+    private UsageRange PickedRange() => new(DateOnly.FromDateTime(_picked.Start!.Value), DateOnly.FromDateTime(_picked.End!.Value));
+
+    private Task ApplyAsync()
+    {
+        if (RangeError is not null)
+        {
+            return Task.CompletedTask;
+        }
+
+        _range = PickedRange();
+        _shopPage = 1;
+        return LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _problem = null;
+        var days = Api.GetDailyUsageAsync(_range.From, _range.To, null, PageToken);
+        var byShop = Api.GetUsageByShopAsync(_range.From, _range.To, _shopPage, InputLimits.DefaultPageSize, PageToken);
+        var byModel = Api.GetUsageByModelAsync(_range.From, _range.To, PageToken);
+        await Task.WhenAll(days, byShop, byModel);
+
+        _problem = (await days).Problem ?? (await byShop).Problem ?? (await byModel).Problem;
+        if (_problem is null)
+        {
+            _days = (await days).Value!;
+            _byShop = (await byShop).Value!;
+            _byModel = (await byModel).Value!;
+            _totalCost = _days.Sum(day => Display.ParseDecimal(day.CostUsd));
+        }
+
+        _loading = false;
+    }
+
+    private async Task ShopPageChangedAsync(int page)
+    {
+        _shopPage = page;
+        var result = await Api.GetUsageByShopAsync(_range.From, _range.To, _shopPage, InputLimits.DefaultPageSize, PageToken);
+        if (result.IsSuccess)
+        {
+            _byShop = result.Value;
+        }
+        else
+        {
+            _problem = result.Problem;
+        }
+    }
+
+    private void OpenShop(TableRowClickEventArgs<AiUsageByShop> row)
+    {
+        if (row.Item is { } shop)
+        {
+            Navigation.NavigateTo(AppRoutes.Shop(shop.ShopId));
+        }
+    }
+}

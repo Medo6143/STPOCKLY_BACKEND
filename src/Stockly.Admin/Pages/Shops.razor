@@ -1,0 +1,117 @@
+@page "/shops"
+@attribute [Authorize]
+@inherits ApiPageBase
+@inject AdminApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>Shops · Stockly Admin</PageTitle>
+
+<PageHeader Title="Shops" Subtitle="Every shop on the platform, newest first." />
+
+<MudPaper Elevation="0" Class="section-card">
+    <div class="d-flex flex-wrap align-center gap-3 pa-4">
+        <MudTextField T="string" @bind-Value="_search" Placeholder="Search by shop name or owner email"
+                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Rounded.Search" Variant="Variant.Outlined"
+                      Margin="Margin.Dense" Clearable="true" MaxLength="InputLimits.SearchMaxLength" DebounceInterval="400"
+                      OnDebounceIntervalElapsed="SearchAsync" OnClearButtonClick="SearchAsync" Style="min-width: 280px"
+                      Class="flex-grow-1" data-testid="shop-search" />
+        <MudSelect T="ShopStatus?" Value="_status" ValueChanged="StatusChangedAsync" Label="Status" Variant="Variant.Outlined"
+                   Margin="Margin.Dense" Style="max-width: 200px" data-testid="shop-status">
+            <MudSelectItem T="ShopStatus?" Value="null">All statuses</MudSelectItem>
+            <MudSelectItem T="ShopStatus?" Value="ShopStatus.Active">Active</MudSelectItem>
+            <MudSelectItem T="ShopStatus?" Value="ShopStatus.Suspended">Suspended</MudSelectItem>
+        </MudSelect>
+    </div>
+    <MudDivider />
+
+    <div class="pa-2">
+        <StateView Loading="_loading" Problem="_problem" IsEmpty="_page is { TotalCount: 0 }" OnRetry="LoadAsync"
+                   EmptyIcon="@Icons.Material.Rounded.Storefront" EmptyTitle="No shops found"
+                   EmptyText="@(HasFilter ? "No shop matches the search or the status filter." : "No shop has registered yet.")">
+            <MudTable T="AdminShopListItem" Items="_page!.Items" Hover="true" Elevation="0" Breakpoint="Breakpoint.Sm"
+                      OnRowClick="OpenShop" RowClass="clickable-row" data-testid="shops-table">
+                <HeaderContent>
+                    <MudTh>Shop</MudTh>
+                    <MudTh>Owner</MudTh>
+                    <MudTh>Plan</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh Style="text-align: right">Scans today</MudTh>
+                    <MudTh>Created</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Shop">
+                        <MudText Typo="Typo.body2" Style="font-weight: 600">@context.Name</MudText>
+                        <MudText Class="mud-text-secondary" Typo="Typo.caption">
+                            @context.ShopType@(context.Governorate is null ? string.Empty : $" · {context.Governorate}")
+                        </MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Owner">@context.OwnerEmail</MudTd>
+                    <MudTd DataLabel="Plan">
+                        @if (context.PlanCode is not null)
+                        {
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary">@context.PlanCode</MudChip>
+                        }
+                        else
+                        {
+                            <MudText Class="mud-text-secondary" Typo="Typo.caption">No plan</MudText>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Status"><ShopStatusChip Status="context.Status" /></MudTd>
+                    <MudTd DataLabel="Scans today" Style="text-align: right">@Display.Count(context.ScansToday)</MudTd>
+                    <MudTd DataLabel="Created">@Display.Timestamp(context.CreatedAt)</MudTd>
+                </RowTemplate>
+            </MudTable>
+            <Pager Page="_pageNumber" PageSize="InputLimits.DefaultPageSize" TotalCount="_page!.TotalCount" PageChanged="PageChangedAsync" />
+        </StateView>
+    </div>
+</MudPaper>
+
+@code {
+    private string? _search;
+    private ShopStatus? _status;
+    private int _pageNumber = 1;
+    private bool _loading = true;
+    private ApiProblem? _problem;
+    private PagedResponse<AdminShopListItem>? _page;
+
+    private bool HasFilter => !string.IsNullOrWhiteSpace(_search) || _status is not null;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _problem = null;
+        var result = await Api.GetShopsAsync(_search, _status, _pageNumber, InputLimits.DefaultPageSize, PageToken);
+        _page = result.Value;
+        _problem = result.Problem;
+        _loading = false;
+    }
+
+    private Task SearchAsync()
+    {
+        _pageNumber = 1;
+        return LoadAsync();
+    }
+
+    private Task StatusChangedAsync(ShopStatus? status)
+    {
+        _status = status;
+        _pageNumber = 1;
+        return LoadAsync();
+    }
+
+    private Task PageChangedAsync(int page)
+    {
+        _pageNumber = page;
+        return LoadAsync();
+    }
+
+    private void OpenShop(TableRowClickEventArgs<AdminShopListItem> row)
+    {
+        if (row.Item is { } shop)
+        {
+            Navigation.NavigateTo(AppRoutes.Shop(shop.Id));
+        }
+    }
+}

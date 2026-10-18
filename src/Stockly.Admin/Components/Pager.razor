@@ -1,0 +1,40 @@
+@* Server paging footer (contract §1.3): "1–20 of 137" and page buttons. *@
+<div class="d-flex flex-wrap align-center justify-space-between gap-2 pa-3">
+    <MudText Class="mud-text-secondary" Typo="Typo.body2" data-testid="pager-summary">@Summary</MudText>
+    @if (PageCount > 1)
+    {
+        <MudPagination Count="PageCount" Selected="Page" SelectedChanged="PageChanged" Size="Size.Small"
+                       Color="Color.Primary" Variant="Variant.Text" />
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public int Page { get; set; }
+
+    [Parameter, EditorRequired]
+    public int PageSize { get; set; }
+
+    [Parameter, EditorRequired]
+    public int TotalCount { get; set; }
+
+    [Parameter]
+    public EventCallback<int> PageChanged { get; set; }
+
+    private int PageCount => PageSize <= 0 ? 0 : (TotalCount + PageSize - 1) / PageSize;
+
+    private string Summary
+    {
+        get
+        {
+            if (TotalCount == 0)
+            {
+                return "No results";
+            }
+
+            var first = ((Page - 1) * PageSize) + 1;
+            var last = Math.Min(Page * PageSize, TotalCount);
+            return $"{Display.Count(first)}–{Display.Count(last)} of {Display.Count(TotalCount)}";
+        }
+    }
+}

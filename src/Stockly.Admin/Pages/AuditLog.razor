@@ -1,0 +1,164 @@
+@page "/audit-log"
+@attribute [Authorize]
+@inherits ApiPageBase
+@inject AdminApiClient Api
+
+<PageTitle>Audit log · Stockly Admin</PageTitle>
+
+<PageHeader Title="Audit log" Subtitle="Every admin write with its reason and the fields it changed, newest first." />
+
+<MudPaper Elevation="0" Class="section-card">
+    <div class="d-flex flex-wrap align-center gap-3 pa-4">
+        <MudSelect T="string" @bind-Value="_targetType" Label="Target type" Variant="Variant.Outlined" Margin="Margin.Dense"
+                   Clearable="true" Style="max-width: 180px" data-testid="filter-target-type">
+            @foreach (var type in AuditTargetTypes.All)
+            {
+                <MudSelectItem T="string" Value="type">@type</MudSelectItem>
+            }
+        </MudSelect>
+        <MudTextField T="string" @bind-Value="_targetId" Label="Target id" Variant="Variant.Outlined" Margin="Margin.Dense"
+                      Immediate="true" Error="@(!IsGuidOrEmpty(_targetId))" ErrorText="Not a valid id" Class="mono"
+                      Style="min-width: 300px" data-testid="filter-target-id" />
+        <MudTextField T="string" @bind-Value="_adminUserId" Label="Admin user id" Variant="Variant.Outlined" Margin="Margin.Dense"
+                      Immediate="true" Error="@(!IsGuidOrEmpty(_adminUserId))" ErrorText="Not a valid id" Class="mono"
+                      Style="min-width: 300px" data-testid="filter-admin" />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.FilterList"
+                   Disabled="!FiltersValid" OnClick="ApplyAsync" data-testid="filter-apply">Apply</MudButton>
+        <MudButton Variant="Variant.Text" OnClick="ClearAsync">Clear</MudButton>
+    </div>
+    <MudDivider />
+
+    <div class="pa-2">
+        <StateView Loading="_loading" Problem="_problem" IsEmpty="_page is { TotalCount: 0 }" OnRetry="LoadAsync"
+                   EmptyIcon="@Icons.Material.Rounded.History" EmptyTitle="No audit entries"
+                   EmptyText="No admin write matches these filters.">
+            <MudTable T="AuditLogEntry" Items="_page!.Items" Elevation="0" Breakpoint="Breakpoint.Sm" data-testid="audit-table">
+                <HeaderContent>
+                    <MudTh>When</MudTh>
+                    <MudTh>Action</MudTh>
+                    <MudTh>Target</MudTh>
+                    <MudTh>Admin</MudTh>
+                    <MudTh>Reason</MudTh>
+                    <MudTh />
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="When">@Display.Timestamp(context.CreatedAt)</MudTd>
+                    <MudTd DataLabel="Action">
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary">@context.Action</MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Target">
+                        <MudText Typo="Typo.body2">@context.TargetType</MudText>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary mono">@context.TargetId</MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Admin">@context.AdminEmail</MudTd>
+                    <MudTd DataLabel="Reason">@Display.Text(context.Reason)</MudTd>
+                    <MudTd Style="text-align: right">
+                        @if (context.Before is not null || context.After is not null)
+                        {
+                            <MudIconButton Size="Size.Small" aria-label="Show changes"
+                                           Icon="@(_expanded.Contains(context.Id) ? Icons.Material.Rounded.ExpandLess : Icons.Material.Rounded.ExpandMore)"
+                                           OnClick="() => Toggle(context.Id)" />
+                        }
+                    </MudTd>
+                </RowTemplate>
+                <ChildRowContent>
+                    @if (_expanded.Contains(context.Id))
+                    {
+                        <MudTr>
+                            <td colspan="6" class="pa-4">
+                                <MudGrid Spacing="2">
+                                    <MudItem xs="12" md="6">
+                                        <MudText Class="mud-text-secondary" Typo="Typo.caption">Before</MudText>
+                                        <JsonView Text="@(context.Before is { } before ? JsonText.Pretty(before) : Display.Missing)" />
+                                    </MudItem>
+                                    <MudItem xs="12" md="6">
+                                        <MudText Class="mud-text-secondary" Typo="Typo.caption">After</MudText>
+                                        <JsonView Text="@(context.After is { } after ? JsonText.Pretty(after) : Display.Missing)" />
+                                    </MudItem>
+                                </MudGrid>
+                            </td>
+                        </MudTr>
+                    }
+                </ChildRowContent>
+            </MudTable>
+            <Pager Page="_pageNumber" PageSize="InputLimits.DefaultPageSize" TotalCount="_page!.TotalCount" PageChanged="PageChangedAsync" />
+        </StateView>
+    </div>
+</MudPaper>
+
+@code {
+    private readonly HashSet<Guid> _expanded = [];
+    private string? _targetType;
+    private string? _targetId;
+    private string? _adminUserId;
+    private AuditLogFilter _filter = new(null, null, null);
+    private int _pageNumber = 1;
+    private bool _loading = true;
+    private ApiProblem? _problem;
+    private PagedResponse<AuditLogEntry>? _page;
+
+    [SupplyParameterFromQuery(Name = QueryNames.TargetType)]
+    public string? TargetTypeQuery { get; set; }
+
+    [SupplyParameterFromQuery(Name = QueryNames.TargetId)]
+    public Guid? TargetIdQuery { get; set; }
+
+    private bool FiltersValid => IsGuidOrEmpty(_targetId) && IsGuidOrEmpty(_adminUserId);
+
+    protected override Task OnParametersSetAsync()
+    {
+        _targetType = TargetTypeQuery;
+        _targetId = TargetIdQuery?.ToString();
+        _adminUserId = null;
+        return ApplyAsync();
+    }
+
+    private static bool IsGuidOrEmpty(string? value) => string.IsNullOrWhiteSpace(value) || Guid.TryParse(value, out _);
+
+    private static Guid? ParseGuid(string? value) => Guid.TryParse(value, out var id) ? id : null;
+
+    private Task ApplyAsync()
+    {
+        if (!FiltersValid)
+        {
+            return Task.CompletedTask;
+        }
+
+        _filter = new AuditLogFilter(_targetType, ParseGuid(_targetId), ParseGuid(_adminUserId));
+        _pageNumber = 1;
+        return LoadAsync();
+    }
+
+    private Task ClearAsync()
+    {
+        _targetType = null;
+        _targetId = null;
+        _adminUserId = null;
+        return ApplyAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _problem = null;
+        _expanded.Clear();
+        var result = await Api.GetAuditLogAsync(_filter, _pageNumber, InputLimits.DefaultPageSize, PageToken);
+        _page = result.Value;
+        _problem = result.Problem;
+        _loading = false;
+    }
+
+    private Task PageChangedAsync(int page)
+    {
+        _pageNumber = page;
+        return LoadAsync();
+    }
+
+    private void Toggle(Guid id)
+    {
+        if (!_expanded.Remove(id))
+        {
+            _expanded.Add(id);
+        }
+    }
+}

@@ -1,0 +1,42 @@
+<div class="d-flex flex-wrap align-center gap-4 mb-6">
+    <div class="flex-grow-1">
+        @if (BackHref is not null)
+        {
+            <MudLink Href="@BackHref" Typo="Typo.body2" Class="d-inline-flex align-center mb-1">
+                <MudIcon Icon="@Icons.Material.Rounded.ArrowBack" Size="Size.Small" Class="mr-1" />@BackText
+            </MudLink>
+        }
+        <div class="d-flex align-center gap-2 flex-wrap">
+            <MudText Typo="Typo.h4" HtmlTag="h1">@Title</MudText>
+            @TitleContent
+        </div>
+        @if (Subtitle is not null)
+        {
+            <MudText Typo="Typo.body1" Class="mud-text-secondary mt-1">@Subtitle</MudText>
+        }
+    </div>
+    @if (Actions is not null)
+    {
+        <div class="d-flex flex-wrap gap-2">@Actions</div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? Subtitle { get; set; }
+
+    [Parameter]
+    public string? BackHref { get; set; }
+
+    [Parameter]
+    public string BackText { get; set; } = "Back";
+
+    [Parameter]
+    public RenderFragment? TitleContent { get; set; }
+
+    [Parameter]
+    public RenderFragment? Actions { get; set; }
+}

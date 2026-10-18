@@ -1,0 +1,35 @@
+@*
+    Daily AI cost and calls (AD14). The chart plots the decimal values directly (MudChart<decimal>), so no cost passes
+    through double; the exact strings are shown in the tables.
+*@
+<MudChart T="decimal" ChartType="ChartType.Line" ChartSeries="_costSeries" ChartLabels="_labels" Width="100%" Height="300px"
+          ChartOptions="_options" data-testid="usage-chart" />
+
+@code {
+    private const int LabelEvery = 5;
+    private const string LabelFormat = "MM-dd";
+
+    private readonly LineChartOptions _options = new() { YAxisTicks = 4 };
+    private List<ChartSeries<decimal>> _costSeries = [];
+    private string[] _labels = [];
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<AiUsageDay> Days { get; set; } = [];
+
+    protected override void OnParametersSet()
+    {
+        _labels = Days
+            .Select((day, index) => index % LabelEvery == 0 || index == Days.Count - 1
+                ? day.Date.ToString(LabelFormat, System.Globalization.CultureInfo.InvariantCulture)
+                : string.Empty)
+            .ToArray();
+        _costSeries =
+        [
+            new ChartSeries<decimal>
+            {
+                Name = "Cost (USD)",
+                Data = new ChartData<decimal>(Days.Select(day => Display.ParseDecimal(day.CostUsd)).ToList()),
+            },
+        ];
+    }
+}

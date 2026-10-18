@@ -1,0 +1,52 @@
+@* Asks for the reason every audited admin write needs (AD6, AD7, AD9, AD10, AD19). Confirm stays disabled while it is blank. *@
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">@Title</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (Message is not null)
+        {
+            <MudText Typo="Typo.body2" Class="mb-4">@Message</MudText>
+        }
+        <MudTextField T="string" @bind-Value="_reason" Label="Reason" Variant="Variant.Outlined" Lines="3"
+                      MaxLength="InputLimits.ReasonMaxLength" Counter="InputLimits.ReasonMaxLength" Immediate="true"
+                      Required="true" RequiredError="A reason is required."
+                      HelperText="Kept in the audit log." AutoFocus="true" data-testid="reason-input" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" data-testid="reason-cancel">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="ConfirmColor" Disabled="!CanConfirm" OnClick="Confirm"
+                   data-testid="reason-confirm">@ConfirmText</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private string? _reason;
+
+    [CascadingParameter]
+    private IMudDialogInstance Dialog { get; set; } = default!;
+
+    [Parameter]
+    public string Title { get; set; } = "Confirm";
+
+    [Parameter]
+    public string? Message { get; set; }
+
+    [Parameter]
+    public string ConfirmText { get; set; } = "Confirm";
+
+    [Parameter]
+    public Color ConfirmColor { get; set; } = Color.Primary;
+
+    private bool CanConfirm => !string.IsNullOrWhiteSpace(_reason);
+
+    private void Confirm()
+    {
+        if (CanConfirm)
+        {
+            Dialog.Close(DialogResult.Ok(_reason!.Trim()));
+        }
+    }
+
+    private void Cancel() => Dialog.Cancel();
+}

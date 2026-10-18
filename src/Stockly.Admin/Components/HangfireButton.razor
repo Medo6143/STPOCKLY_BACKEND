@@ -1,0 +1,37 @@
+@using Stockly.Admin.Configuration
+@inject AdminApiClient Api
+@inject AdminOptions Options
+@inject IJSRuntime Js
+@inject ISnackbar Snackbar
+
+<MudTooltip Text="Open the Hangfire dashboard in a new tab (one-time link)">
+    <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" Class="mr-2"
+               StartIcon="@Icons.Material.Rounded.Schedule" Disabled="_opening" OnClick="OpenAsync"
+               data-testid="open-hangfire">
+        Hangfire
+    </MudButton>
+</MudTooltip>
+
+@code {
+    private const string WindowOpen = "open";
+    private const string NewTab = "_blank";
+    private const string NoOpener = "noopener";
+
+    private bool _opening;
+
+    private async Task OpenAsync()
+    {
+        _opening = true;
+        var result = await Api.CreateHangfireSessionAsync(CancellationToken.None);
+        _opening = false;
+        if (!result.IsSuccess)
+        {
+            Snackbar.Add(result.Problem.OneLine, Severity.Error);
+            return;
+        }
+
+        // The API returns "/hangfire?code=…" relative to its own root; the code is valid 60 seconds and single use.
+        var url = new Uri(Options.ApiBaseUrl, result.Value.Url);
+        await Js.InvokeVoidAsync(WindowOpen, url.AbsoluteUri, NewTab, NoOpener);
+    }
+}

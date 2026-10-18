@@ -1,0 +1,10 @@
+<MudChip T="string" Size="Size.Small" Variant="Variant.Text"
+         Color="@(Status == ShopStatus.Active ? Color.Success : Color.Error)"
+         Icon="@(Status == ShopStatus.Active ? Icons.Material.Rounded.CheckCircle : Icons.Material.Rounded.Block)">
+    @Status
+</MudChip>
+
+@code {
+    [Parameter, EditorRequired]
+    public ShopStatus Status { get; set; }
+}

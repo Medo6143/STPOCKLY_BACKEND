@@ -1,0 +1,67 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject AuthSession Session
+@inject AccountService Account
+@inject ThemeState ThemeState
+
+<AppProviders />
+
+<MudLayout>
+    <MudAppBar Elevation="0" Class="app-bar">
+        <MudIconButton Icon="@Icons.Material.Rounded.Menu" Color="Color.Inherit" Edge="Edge.Start"
+                       OnClick="ToggleDrawer" aria-label="Toggle navigation" />
+        <div class="brand ml-2">
+            <img src="favicon.svg" alt="" />
+            <span>Stockly</span>
+            <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Text">Admin</MudChip>
+        </div>
+        <MudSpacer />
+        <HangfireButton />
+        <MudTooltip Text="@(ThemeState.IsDarkMode ? "Switch to light mode" : "Switch to dark mode")">
+            <MudIconButton Icon="@(ThemeState.IsDarkMode ? Icons.Material.Rounded.LightMode : Icons.Material.Rounded.DarkMode)"
+                           Color="Color.Inherit" OnClick="ThemeState.Toggle" aria-label="Toggle dark mode" />
+        </MudTooltip>
+        <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" Class="ml-1">
+            <ActivatorContent>
+                <MudAvatar Color="Color.Primary" Size="Size.Small" Style="cursor: pointer">@Initials</MudAvatar>
+            </ActivatorContent>
+            <ChildContent>
+                <div class="px-4 py-2">
+                    <MudText Typo="Typo.subtitle2">@Session.User?.FullName</MudText>
+                    <MudText Class="mud-text-secondary" Typo="Typo.caption">@Session.User?.Email</MudText>
+                </div>
+                <MudDivider />
+                <MudMenuItem Icon="@Icons.Material.Rounded.Logout" OnClick="SignOutAsync">Sign out</MudMenuItem>
+            </ChildContent>
+        </MudMenu>
+    </MudAppBar>
+
+    <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="0" Variant="DrawerVariant.Responsive"
+               Class="app-drawer">
+        <NavMenu />
+    </MudDrawer>
+
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-6">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    private bool _drawerOpen = true;
+
+    private string Initials => Session.User?.FullName is { Length: > 0 } name
+        ? string.Concat(name.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(part => char.ToUpperInvariant(part[0])))
+        : "?";
+
+    protected override void OnInitialized() => Session.Changed += OnSessionChanged;
+
+    public void Dispose() => Session.Changed -= OnSessionChanged;
+
+    private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
+
+    private Task SignOutAsync() => Account.SignOutAsync(CancellationToken.None);
+
+    private void OnSessionChanged(object? sender, EventArgs e) => _ = InvokeAsync(StateHasChanged);
+}

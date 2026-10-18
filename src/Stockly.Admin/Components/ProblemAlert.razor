@@ -1,0 +1,33 @@
+@* An API error as the contract defines it: the localized detail for people, the code, and the trace id for support. *@
+<MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mb-4" data-testid="state-error">
+    <MudText Typo="Typo.subtitle2">@Problem.Title</MudText>
+    @if (!string.IsNullOrWhiteSpace(Problem.Detail) && Problem.Detail != Problem.Title)
+    {
+        <MudText Typo="Typo.body2">@Problem.Detail</MudText>
+    }
+    @foreach (var (field, messages) in Problem.Errors)
+    {
+        <MudText Typo="Typo.body2">@field: @string.Join(" ", messages)</MudText>
+    }
+    <div class="d-flex flex-wrap align-center gap-2 mt-2">
+        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Error" Class="ml-0">@Problem.Code</MudChip>
+        @if (Problem.TraceId is not null)
+        {
+            <MudText Typo="Typo.caption" Class="mono" data-testid="trace-id">Trace id: @Problem.TraceId</MudText>
+        }
+        @if (OnRetry.HasDelegate)
+        {
+            <MudSpacer />
+            <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Error" StartIcon="@Icons.Material.Rounded.Refresh"
+                       OnClick="OnRetry">Try again</MudButton>
+        }
+    </div>
+</MudAlert>
+
+@code {
+    [Parameter, EditorRequired]
+    public ApiProblem Problem { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback OnRetry { get; set; }
+}

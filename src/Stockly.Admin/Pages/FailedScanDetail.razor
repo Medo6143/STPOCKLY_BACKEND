@@ -1,0 +1,149 @@
+@page "/failed-scans/{Id:guid}"
+@attribute [Authorize]
+@using Stockly.Contracts.Invoices
+@inherits ApiPageBase
+@inject AdminApiClient Api
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+
+<PageTitle>Scan · Stockly Admin</PageTitle>
+
+<StateView Loading="_detail is null && _problem is null" Problem="_problem" OnRetry="LoadAsync">
+    <PageHeader Title="@($"Scan of {_detail!.ShopName}")" BackHref="@AppRoutes.FailedScans" BackText="Failed scans"
+                Subtitle="@($"Scanned {Display.Timestamp(_detail.Invoice.CreatedAt)} · invoice {_detail.Invoice.Id}")">
+        <TitleContent>
+            <MudChip T="string" Size="Size.Small" Variant="Variant.Text" data-testid="invoice-status"
+                     Color="@(_detail.Invoice.Status == InvoiceStatus.Failed ? Color.Error : Color.Info)">@_detail.Invoice.Status</MudChip>
+        </TitleContent>
+        <Actions>
+            <MudButton Href="@AppRoutes.Shop(_detail.ShopId)" Variant="Variant.Outlined" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Rounded.Storefront">Shop</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.Replay"
+                       Disabled="_busy || _detail.Invoice.Status != InvoiceStatus.Failed" OnClick="RerunAsync"
+                       data-testid="rerun">Re-run</MudButton>
+        </Actions>
+    </PageHeader>
+
+    @if (_detail.Invoice.FailureReason is { } reason)
+    {
+        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mb-4">@reason</MudAlert>
+    }
+
+    <MudGrid Spacing="3">
+        <MudItem xs="12" md="5">
+            <MudPaper Elevation="0" Class="section-card pa-4" Style="height: 100%">
+                <MudText Typo="Typo.h6" Class="mb-3">Photo</MudText>
+                @if (_detail.ImageUrl is { } imageUrl)
+                {
+                    <a href="@imageUrl" target="_blank" rel="noopener noreferrer">
+                        <img src="@imageUrl" alt="Scanned invoice" class="scan-image" data-testid="scan-image" />
+                    </a>
+                    <MudText Class="mud-text-secondary" Typo="Typo.caption">The link is valid for 5 minutes; reload the page for a new one.</MudText>
+                }
+                else
+                {
+                    <EmptyState Icon="@Icons.Material.Rounded.HideImage" Title="Photo not available"
+                                Text="The image is no longer in storage." />
+                }
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="7">
+            <MudPaper Elevation="0" Class="section-card pa-4" Style="height: 100%">
+                <MudText Typo="Typo.h6" Class="mb-3">Raw AI output</MudText>
+                @if (_detail.RawAiJson is { } raw)
+                {
+                    <JsonView Text="@JsonText.Pretty(raw)" />
+                }
+                else
+                {
+                    <EmptyState Icon="@Icons.Material.Rounded.DataObject" Title="No AI output stored"
+                                Text="The scan failed before the AI answered." />
+                }
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12">
+            <MudPaper Elevation="0" Class="section-card">
+                <MudText Typo="Typo.h6" Class="pa-4">AI calls</MudText>
+                @if (_detail.Usage.Count == 0)
+                {
+                    <EmptyState Icon="@Icons.Material.Rounded.AutoAwesome" Title="No AI calls recorded" />
+                }
+                else
+                {
+                    <MudTable T="AdminAiUsageDto" Items="_detail.Usage" Dense="true" Elevation="0" Breakpoint="Breakpoint.Sm" data-testid="usage-rows">
+                        <HeaderContent>
+                            <MudTh>When</MudTh>
+                            <MudTh>Model</MudTh>
+                            <MudTh>Result</MudTh>
+                            <MudTh Style="text-align: right">Tokens in / out</MudTh>
+                            <MudTh Style="text-align: right">Latency</MudTh>
+                            <MudTh Style="text-align: right">Cost (USD)</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="When">@Display.Timestamp(context.CreatedAt)</MudTd>
+                            <MudTd DataLabel="Model" Class="mono">@context.Model</MudTd>
+                            <MudTd DataLabel="Result">
+                                @if (context.IsCacheHit)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Info">Cache hit</MudChip>
+                                }
+                                else
+                                {
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text"
+                                             Color="@(context.Succeeded ? Color.Success : Color.Error)">@(context.Succeeded ? "Succeeded" : "Failed")</MudChip>
+                                }
+                            </MudTd>
+                            <MudTd DataLabel="Tokens" Style="text-align: right">@Display.Count(context.InputTokens) / @Display.Count(context.OutputTokens)</MudTd>
+                            <MudTd DataLabel="Latency" Style="text-align: right">@Display.Count(context.LatencyMs) ms</MudTd>
+                            <MudTd DataLabel="Cost (USD)" Style="text-align: right" Class="mono">@Display.Usd(context.CostUsd)</MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</StateView>
+
+@code {
+    private AdminInvoiceDetail? _detail;
+    private ApiProblem? _problem;
+    private bool _busy;
+
+    [Parameter]
+    public Guid Id { get; set; }
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _problem = null;
+        var result = await Api.GetInvoiceAsync(Id, PageToken);
+        _detail = result.Value;
+        _problem = result.Problem;
+    }
+
+    private async Task RerunAsync()
+    {
+        var reason = await Dialogs.AskReasonAsync("Re-run this scan",
+            "The AI extracts the photo again, bypassing the cache. The call is paid; the shop's quota is not charged.",
+            "Re-run", Color.Primary);
+        if (reason is null)
+        {
+            return;
+        }
+
+        _busy = true;
+        var result = await Api.RerunInvoiceAsync(Id, reason, PageToken);
+        _busy = false;
+        if (!result.IsSuccess)
+        {
+            Snackbar.Add(result.Problem.OneLine, Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("Re-run queued. The status updates when the job finishes.", Severity.Success);
+        await LoadAsync();
+    }
+}
