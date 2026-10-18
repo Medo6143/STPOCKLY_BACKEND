@@ -108,6 +108,9 @@ Step 2b adds no migration: matching and the reads use indexes of `InitialCatalog
 - `IProductMatcher` runs the `IProductMatchStrategy` classes by order on the lines still unmatched; each strategy makes **one** query for all its lines (`= ANY(@names)`), never one per line. Archived products never match. A new strategy is a new class (SOLID O); trigram matching is Sprint 6.
 - Order 10, `ExactAliasMatchStrategy`: the supplier's learned alias (`product_aliases`, written by confirm in Sprint 4) with exactly the line's normalized name; an unknown supplier uses only aliases without a supplier. Alias unit, confidence **1.00**.
 - Order 20, `ExactNameMatchStrategy`: the one non-archived product whose normalized name equals the line's (two or more: ambiguous, no match). The unit whose normalized name equals the line's unit text, or the only unit when the line has none: **0.90**; otherwise the base unit: **0.70**.
+- Order 30, `TrigramMatchStrategy` (Sprint 6): fuzzy and cross-script. Each remaining line is compared with `pg_trgm` `similarity()` against the non-archived products (`normalized_name`) and the aliases learned from **every** supplier (`normalized_alias`), each by its normalized text **and** by its `latin_key` (`Domain/Text/LatinKey`: "بنادول اكسترا" and "Panadol Extra" are both `bndl kstr`); the higher similarity counts and must reach `Matching__TrigramThreshold` (default **0.45**, allowed 0.3–1.0: the index-backed `%` pre-filter uses PostgreSQL's default 0.3). One statement for all lines (`ProductSimilarityQueries`, indexes in `docs/erd.md` §3.2), at most 5 candidates per line.
+  - Confidence = similarity rounded to 2 decimals (half away from zero), never above the exact strategy of the same kind: an alias of the invoice's supplier up to **1.00** with the alias unit; an alias learned from **another** supplier (or with a different known/unknown supplier) × **0.9**; a product name up to **0.90** with a certain unit (same unit rules as order 20) and up to **0.70** with the base unit.
+  - The best confidence wins; on a tie an alias beats a name match of the same product; two **different** products sharing the best confidence are ambiguous and the line stays unmatched.
 - Nothing found: `productId`, `productUnitId`, `matchConfidence` stay null. Names and units are compared after `ArabicTextNormalizer` (hamza, teh marbuta, tashkeel, digits, case).
 
 **Review edit (I4)** (backend.md §9.1):
@@ -168,7 +171,7 @@ Mobile (stockly-mobile): camera and upload queue, then the polling state. States
 - Api: `ScanEndpointTests` (202/200, other shop, 400s, 413 for image and body, 429 rate limit and quota with `Retry-After`, Redis down, 401, end to end with the Hangfire server and a fake AI).
 
 ## 12. Known limitations
-- Matching is exact only (alias text or normalized name); fuzzy and cross-script matching (trigram) is Sprint 6. Aliases are learned by confirm (Sprint 4), so until then only the name strategy finds products.
+- Fuzzy matching (Sprint 6) is a similarity, not an understanding: the Latin skeleton drops vowels, so short names can collide (`cocoa` and `kaka` are both `k`); the confidence and the review screen are the safeguard. `pg_trgm.similarity_threshold` must stay at its default 0.3 (or lower) on the server, otherwise the `%` pre-filter hides matches the configured threshold would accept.
 - I4 does not write the status snapshot: it never changes the status.
 - An orphan image (upload succeeded, insert failed) is left for the bucket lifecycle rule (90 days, ADR-0008).
 - Model ids are configuration defaults, not yet verified with a real OpenRouter key.
