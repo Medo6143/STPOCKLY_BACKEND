@@ -1,0 +1,58 @@
+@* AD21 rows: shop (linked), plan, method, amount from the decimal string, status, created, paid, provider transaction id. *@
+<MudTable T="AdminPayment" Items="Payments" Hover="true" Elevation="0" Dense="Dense" Breakpoint="Breakpoint.Sm" data-testid="payments-table">
+    <HeaderContent>
+        @if (ShowShop)
+        {
+            <MudTh>Shop</MudTh>
+        }
+        <MudTh>Plan</MudTh>
+        <MudTh>Method</MudTh>
+        <MudTh Style="text-align: right">Amount</MudTh>
+        <MudTh>Status</MudTh>
+        <MudTh>Created</MudTh>
+        <MudTh>Paid</MudTh>
+        <MudTh>Paymob transaction</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        @if (ShowShop)
+        {
+            <MudTd DataLabel="Shop">
+                <MudLink Href="@AppRoutes.Shop(context.ShopId)" Typo="Typo.body2" Style="font-weight: 600">@context.ShopName</MudLink>
+            </MudTd>
+        }
+        <MudTd DataLabel="Plan">@context.PlanName</MudTd>
+        <MudTd DataLabel="Method">
+            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Icon="@MethodIcon(context.Method)">@context.Method</MudChip>
+        </MudTd>
+        <MudTd DataLabel="Amount" Style="text-align: right" Class="mono">@Display.Egp(context.Amount)</MudTd>
+        <MudTd DataLabel="Status">
+            <PaymentStatusChip Status="context.Status" />
+            @if (context.FailureReason is not null)
+            {
+                <MudText Typo="Typo.caption" Class="mud-text-secondary d-block">@context.FailureReason</MudText>
+            }
+        </MudTd>
+        <MudTd DataLabel="Created">@Display.Timestamp(context.CreatedAt)</MudTd>
+        <MudTd DataLabel="Paid">@Display.Timestamp(context.PaidAt)</MudTd>
+        <MudTd DataLabel="Paymob transaction" Class="mono">@Display.Text(context.ProviderTransactionId)</MudTd>
+    </RowTemplate>
+</MudTable>
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<AdminPayment> Payments { get; set; } = [];
+
+    /// <summary>Show the shop column (the platform list); the shop page hides it.</summary>
+    [Parameter]
+    public bool ShowShop { get; set; }
+
+    [Parameter]
+    public bool Dense { get; set; }
+
+    public static string MethodIcon(PaymentMethod method) => method switch
+    {
+        PaymentMethod.Card => Icons.Material.Rounded.CreditCard,
+        PaymentMethod.Wallet => Icons.Material.Rounded.PhoneIphone,
+        _ => Icons.Material.Rounded.Storefront,
+    };
+}

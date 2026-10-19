@@ -7,7 +7,7 @@
 
 <PageTitle>Overview · Stockly Admin</PageTitle>
 
-<PageHeader Title="Overview" Subtitle="Shops, AI spend and failed scans of the last 30 days." />
+<PageHeader Title="Overview" Subtitle="Shops, AI spend, revenue and failed scans of the last 30 days." />
 
 <StateView Loading="_loading" Problem="_problem" IsEmpty="IsEmpty" OnRetry="LoadAsync"
            EmptyIcon="@Icons.Material.Rounded.Storefront" EmptyTitle="No shops yet"
@@ -67,8 +67,12 @@
             </MudPaper>
         </MudItem>
 
-        <MudItem xs="12">
-            <MudPaper Elevation="0" Class="section-card">
+        <MudItem xs="12" lg="4">
+            <RevenueSummary />
+        </MudItem>
+
+        <MudItem xs="12" lg="8">
+            <MudPaper Elevation="0" Class="section-card" Style="height: 100%">
                 <div class="d-flex align-center pa-4">
                     <MudText Typo="Typo.h6">Latest failed scans</MudText>
                     <MudSpacer />

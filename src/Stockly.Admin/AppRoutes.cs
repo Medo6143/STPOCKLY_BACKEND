@@ -10,6 +10,7 @@ public static class AppRoutes
     public const string AiUsage = "ai-usage";
     public const string FailedScans = "failed-scans";
     public const string AuditLog = "audit-log";
+    public const string Payments = "payments";
     public const string ReturnUrlParameter = "returnUrl";
 
     public static string Shop(Guid id) => $"{Shops}/{id}";
@@ -17,6 +18,8 @@ public static class AppRoutes
     public static string FailedScan(Guid id) => $"{FailedScans}/{id}";
 
     public static string FailedScansOfShop(Guid shopId) => $"{FailedScans}?shopId={shopId}";
+
+    public static string PaymentsOfShop(Guid shopId) => $"{Payments}?shopId={shopId}";
 
     public static string AuditLogOfTarget(string targetType, Guid targetId) =>
         $"{AuditLog}?targetType={Uri.EscapeDataString(targetType)}&targetId={targetId}";

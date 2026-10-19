@@ -1,5 +1,6 @@
 using Stockly.Contracts.Admin;
 using Stockly.Contracts.Auth;
+using Stockly.Contracts.Billing;
 using Stockly.Contracts.Common;
 using Stockly.Contracts.Invoices;
 using Stockly.Contracts.Shops;
@@ -7,7 +8,7 @@ using Stockly.Contracts.Shops;
 namespace Stockly.Admin.Services;
 
 /// <summary>
-/// Typed client of the authenticated admin endpoints (contract §11, AD3–AD20 and the Hangfire session). Its
+/// Typed client of the authenticated admin endpoints (contract §11, AD3–AD20 and the Hangfire session; §12.4, AD21–AD22). Its
 /// <see cref="HttpClient"/> comes from <c>IHttpClientFactory</c> with <see cref="Auth.BearerTokenHandler"/>, which adds the
 /// token and refreshes it once on <c>401</c>. Every method returns the value or the problem to show; none throws for an
 /// API error.
@@ -112,6 +113,27 @@ public sealed class AdminApiClient(HttpClient http)
             .Add(QueryNames.Page, page)
             .Add(QueryNames.PageSize, pageSize);
         return HttpCalls.GetAsync<PagedResponse<AuditLogEntry>>(http, path.ToString(), cancellationToken);
+    }
+
+    /// <summary>AD21: a page of payments, newest first, of every shop or of <paramref name="shopId"/>, optionally of one status.</summary>
+    public Task<ApiResult<PagedResponse<AdminPayment>>> GetPaymentsAsync(
+        Guid? shopId, PaymentStatus? status, int page, int pageSize, CancellationToken cancellationToken)
+    {
+        var path = new QueryString(ApiRoutes.Payments)
+            .Add(QueryNames.ShopId, shopId)
+            .Add(QueryNames.Status, status)
+            .Add(QueryNames.Page, page)
+            .Add(QueryNames.PageSize, pageSize);
+        return HttpCalls.GetAsync<PagedResponse<AdminPayment>>(http, path.ToString(), cancellationToken);
+    }
+
+    /// <summary>AD22: paid count and amount, in total and per method, for the Cairo days <paramref name="from"/>–<paramref name="to"/>.</summary>
+    public Task<ApiResult<PaymentSummary>> GetPaymentSummaryAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken)
+    {
+        var path = new QueryString(ApiRoutes.PaymentSummary)
+            .Add(QueryNames.From, from)
+            .Add(QueryNames.To, to);
+        return HttpCalls.GetAsync<PaymentSummary>(http, path.ToString(), cancellationToken);
     }
 
     public Task<ApiResult<HangfireSessionResponse>> CreateHangfireSessionAsync(CancellationToken cancellationToken) =>

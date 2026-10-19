@@ -1,0 +1,45 @@
+@* Overview revenue (AD22): paid amount and count of the last 30 days, and the split by method. Its own four states. *@
+@inherits ApiPageBase
+@inject AdminApiClient Api
+@inject TimeProvider Clock
+
+<MudPaper Elevation="0" Class="section-card pa-5" Style="height: 100%" data-testid="revenue">
+    <div class="d-flex align-center mb-2">
+        <MudText Typo="Typo.h6">Revenue, 30 days</MudText>
+        <MudSpacer />
+        <MudButton Href="@AppRoutes.Payments" Variant="Variant.Text" Color="Color.Primary"
+                   EndIcon="@Icons.Material.Rounded.ArrowForward">Payments</MudButton>
+    </div>
+    <StateView Loading="_summary is null && _problem is null" Problem="_problem" IsEmpty="_summary is { PaidCount: 0 }" OnRetry="LoadAsync"
+               EmptyIcon="@Icons.Material.Rounded.Payments" EmptyTitle="No paid plans yet"
+               EmptyText="Paid plan payments of the last 30 days appear here.">
+        <MudText Typo="Typo.h4" Class="stat-value" data-testid="revenue-amount">@Display.Egp(_summary!.PaidAmount)</MudText>
+        <MudText Class="mud-text-secondary" Typo="Typo.body2">@Display.Count(_summary!.PaidCount) paid payments</MudText>
+        <MudDivider Class="my-3" />
+        @foreach (var method in _summary!.ByMethod)
+        {
+            <div class="d-flex align-center py-1" data-testid="revenue-method">
+                <MudIcon Icon="@PaymentsTable.MethodIcon(method.Method)" Size="Size.Small" Class="mr-2" />
+                <MudText Typo="Typo.body2" Class="flex-grow-1">@method.Method · @Display.Count(method.PaidCount)</MudText>
+                <MudText Typo="Typo.body2" Class="mono">@Display.Egp(method.PaidAmount)</MudText>
+            </div>
+        }
+    </StateView>
+</MudPaper>
+
+@code {
+    private PaymentSummary? _summary;
+    private ApiProblem? _problem;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _summary = null;
+        _problem = null;
+        var range = UsageRange.LastDays(Clock, InputLimits.DefaultUsageRangeDays);
+        var result = await Api.GetPaymentSummaryAsync(range.From, range.To, PageToken);
+        _summary = result.Value;
+        _problem = result.Problem;
+    }
+}

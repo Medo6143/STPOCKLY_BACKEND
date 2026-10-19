@@ -1,0 +1,52 @@
+@* The shop detail's payments (AD21 with shopId), with its own four states so the rest of the page never waits for it. *@
+@inherits ApiPageBase
+@inject AdminApiClient Api
+
+<MudPaper Elevation="0" Class="section-card" data-testid="shop-payments">
+    <div class="d-flex align-center pa-4">
+        <MudText Typo="Typo.h6">Payments</MudText>
+        <MudSpacer />
+        <MudButton Href="@AppRoutes.PaymentsOfShop(ShopId)" Variant="Variant.Text" Color="Color.Primary"
+                   EndIcon="@Icons.Material.Rounded.ArrowForward">All payments</MudButton>
+    </div>
+    <StateView Loading="_loading" Problem="_problem" IsEmpty="_page is { TotalCount: 0 }" OnRetry="LoadAsync"
+               EmptyIcon="@Icons.Material.Rounded.Payments" EmptyTitle="No payments"
+               EmptyText="This shop has not paid for a plan yet.">
+        <PaymentsTable Payments="_page!.Items" Dense="true" />
+        <Pager Page="_pageNumber" PageSize="PageSize" TotalCount="_page!.TotalCount" PageChanged="PageChangedAsync" />
+    </StateView>
+</MudPaper>
+
+@code {
+    private const int PageSize = 10;
+
+    private int _pageNumber = 1;
+    private bool _loading = true;
+    private ApiProblem? _problem;
+    private PagedResponse<AdminPayment>? _page;
+
+    [Parameter, EditorRequired]
+    public Guid ShopId { get; set; }
+
+    protected override Task OnParametersSetAsync()
+    {
+        _pageNumber = 1;
+        return LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _problem = null;
+        var result = await Api.GetPaymentsAsync(ShopId, null, _pageNumber, PageSize, PageToken);
+        _page = result.Value;
+        _problem = result.Problem;
+        _loading = false;
+    }
+
+    private Task PageChangedAsync(int page)
+    {
+        _pageNumber = page;
+        return LoadAsync();
+    }
+}
