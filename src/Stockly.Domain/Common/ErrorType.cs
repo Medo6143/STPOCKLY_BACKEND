@@ -19,4 +19,7 @@ public enum ErrorType
 
     /// <summary>The request body is larger than allowed, e.g. an invoice image over 8 MB (413).</summary>
     PayloadTooLarge = 9,
+
+    /// <summary>An upstream provider (e.g. the payment provider) failed; nothing was changed (502).</summary>
+    BadGateway = 10,
 }

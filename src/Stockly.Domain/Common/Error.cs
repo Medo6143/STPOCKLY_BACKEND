@@ -30,4 +30,6 @@ public sealed record Error(string Code, string Message, ErrorType Type)
     public static Error TooManyRequests(string code, string message) => new(code, message, ErrorType.TooManyRequests);
 
     public static Error PayloadTooLarge(string code, string message) => new(code, message, ErrorType.PayloadTooLarge);
+
+    public static Error BadGateway(string code, string message) => new(code, message, ErrorType.BadGateway);
 }

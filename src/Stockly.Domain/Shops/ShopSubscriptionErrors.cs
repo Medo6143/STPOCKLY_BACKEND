@@ -21,4 +21,8 @@ public static class ShopSubscriptionErrors
     /// <summary>Internal guard: only an active subscription can be ended.</summary>
     public static readonly Error NotActive =
         Error.Conflict("ShopSubscription.NotActive", "The subscription is not active.");
+
+    /// <summary>Internal guard: only a subscription whose last day has passed lapses.</summary>
+    public static readonly Error NotLapsed =
+        Error.Conflict("ShopSubscription.NotLapsed", "The subscription has not ended yet.");
 }
