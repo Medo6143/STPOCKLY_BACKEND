@@ -314,3 +314,13 @@ Totals on `main` after 1.6: Domain 260, Application 232, Architecture 23, Infras
 - ADRs written by the orchestrator: 0012 Latin key, 0013 90-day image retention, 0014 thread-pool floor; backend.md §8 updated.
 - Security gaps left (docs/security/owasp-api-review.md): no general per-tenant/IP limit on authenticated endpoints; registration has no bot protection beyond the IP limit; refresh not rate limited; no admin MFA; TLS and private network for Postgres/Redis/MinIO are deployment work; local dev DB still has the example admin password.
 - Environment: a separate `stockly_loadtest` database and Redis db 5 were used for the load test; ~25 MB of test images in the dev bucket.
+
+---
+
+# Plans and payments (Paymob), product owner request (2026-10-18)
+
+- The product owner chose paid plans with online payment ("option 3"): Paymob for Visa/cards, Vodafone Cash and other wallets, and kiosk cash; Fawry dropped the same day. ADR-0015 and contract **v1.7** (§12, B1–B6, AD21–AD22) by the orchestrator. Brief `docs/agents/briefs/backend-7-plans-payments.md`, branch `feature/plans-payments`; resumed once after the session ended.
+- Orchestrator verification: `dotnet build -warnaserror` 0 warnings; `dotnet test` 1,909 passed (Domain 453, Application 600, Architecture 28, Admin 82, Infrastructure 357, Api integration 389). Read `PaymobHmac`: HMAC-SHA512 over the documented field order, constant-time compare; invalid signature → 401.
+- Migration `20261018150034_PlanPayments`: `payments` with idempotency (`shop_id, client_request_id`), callback de-duplication (`provider_transaction_id`), order uniqueness, and indexes for pending, history, admin and the reconcile job.
+- Decisions accepted: callback/reconcile/downgrade behind admin ports (cross-tenant, rule 9), system actions without audit rows; extra config `Paymob__ApiKey`, `NotificationUrl`, `CheckoutBaseUrl`, `TimeoutSeconds`; no retries on POSTs to Paymob; Paymob called before the DB transaction (nothing persisted on 502); open-ended same-plan subscriptions are never shortened; late success after cancel/failure becomes Paid.
+- **To verify with Paymob test keys** (docs/features/billing.md §12): order id field signed by callbacks, intention expiry unit, wallet and kiosk pay calls, kiosk expiry, HMAC transport, required billing data, inquiry auth, success predicate, notification_url override, Egypt checkout URL.
