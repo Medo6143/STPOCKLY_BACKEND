@@ -340,4 +340,40 @@
   <data name="Invoice.NotRerunnable.Detail" xml:space="preserve">
     <value>يمكن إعادة معالجة الفاتورة الفاشلة فقط.</value>
   </data>
+  <data name="Billing.FreePlan.Title" xml:space="preserve">
+    <value>باقة مجانية</value>
+  </data>
+  <data name="Billing.FreePlan.Detail" xml:space="preserve">
+    <value>الباقة المجانية لا تحتاج إلى دفع.</value>
+  </data>
+  <data name="Billing.MethodUnavailable.Title" xml:space="preserve">
+    <value>طريقة الدفع غير متاحة</value>
+  </data>
+  <data name="Billing.MethodUnavailable.Detail" xml:space="preserve">
+    <value>طريقة الدفع هذه غير متاحة حالياً. اختر طريقة أخرى.</value>
+  </data>
+  <data name="Billing.PaymentPending.Title" xml:space="preserve">
+    <value>يوجد دفع قيد الانتظار</value>
+  </data>
+  <data name="Billing.PaymentPending.Detail" xml:space="preserve">
+    <value>لدى المتجر عملية دفع قيد الانتظار. أكملها أو ألغها أو انتظر حتى تنتهي صلاحيتها.</value>
+  </data>
+  <data name="Billing.NotCancelable.Title" xml:space="preserve">
+    <value>لا يمكن إلغاء الدفع</value>
+  </data>
+  <data name="Billing.NotCancelable.Detail" xml:space="preserve">
+    <value>يمكن إلغاء عملية الدفع قيد الانتظار فقط.</value>
+  </data>
+  <data name="Billing.ProviderUnavailable.Title" xml:space="preserve">
+    <value>مزود الدفع غير متاح</value>
+  </data>
+  <data name="Billing.ProviderUnavailable.Detail" xml:space="preserve">
+    <value>لم يستجب مزود الدفع. لم يتم خصم أي مبلغ؛ حاول مرة أخرى.</value>
+  </data>
+  <data name="Payment.NotFound.Title" xml:space="preserve">
+    <value>غير موجود</value>
+  </data>
+  <data name="Payment.NotFound.Detail" xml:space="preserve">
+    <value>لم يتم العثور على عملية الدفع.</value>
+  </data>
 </root>

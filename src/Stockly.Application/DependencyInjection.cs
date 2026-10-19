@@ -33,6 +33,7 @@ public static class DependencyInjection
         services.AddScoped<AuthSessions>();
         services.AddScoped<AdminSessions>();
         services.AddScoped<AdminAudit>();
+        services.AddScoped<PaymentSettlement>();
         services.AddScoped<CatalogListCache>();
         services.AddScoped<InvoiceValidator>();
         services.AddScoped<IInvoiceValidationRule, ItemCapExceededRule>();

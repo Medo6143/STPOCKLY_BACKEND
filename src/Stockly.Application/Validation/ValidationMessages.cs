@@ -36,6 +36,8 @@ public static class ValidationMessages
 
     public static string UsageRangeInvalid => Get(nameof(UsageRangeInvalid));
 
+    public static string WalletPhoneInvalid => Get(nameof(WalletPhoneInvalid));
+
     private static string Get(string key) =>
         Resources.GetString(key, CultureInfo.CurrentUICulture)
         ?? throw new InvalidOperationException($"Validation message '{key}' is missing.");

@@ -32,6 +32,12 @@ public static class AdminLimits
     /// <summary>Longest AD20 target type filter.</summary>
     public const int TargetTypeMaxLength = 64;
 
+    /// <summary>Expired pending payments checked with the provider per reconcile run.</summary>
+    public const int ReconcileBatchSize = 100;
+
+    /// <summary>Shops moved to the default plan per downgrade run.</summary>
+    public const int DowngradeBatchSize = 500;
+
     /// <summary>AD5 <c>aiCostLast30DaysUsd</c> window.</summary>
     public static readonly TimeSpan AiCostWindow = TimeSpan.FromDays(30);
 

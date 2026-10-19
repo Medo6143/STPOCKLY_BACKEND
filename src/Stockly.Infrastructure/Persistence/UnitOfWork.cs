@@ -3,6 +3,7 @@ using Npgsql;
 using Stockly.Application.Abstractions.Persistence;
 using Stockly.Domain.Common;
 using Stockly.Domain.Invoices;
+using Stockly.Domain.Payments;
 using Stockly.Domain.Products;
 using Stockly.Domain.Sales;
 using Stockly.Domain.Shops;
@@ -15,7 +16,7 @@ internal sealed class UnitOfWork(StocklyDbContext db) : IUnitOfWork
 {
     /// <summary>
     /// Unique indexes whose violation is an expected conflict: the handler checked first, but a concurrent request took
-    /// the value between that check and this save (a barcode, a scan's or a sale's client request id, or an invoice line's
+    /// the value between that check and this save (a barcode, a scan's, a sale's or a payment's client request id, or an invoice line's
     /// receipt taken by a concurrent confirm, the last safety net of backend.md §11 step 10). Every other unique
     /// violation stays an unexpected error (500).
     /// </summary>
@@ -27,6 +28,7 @@ internal sealed class UnitOfWork(StocklyDbContext db) : IUnitOfWork
         [SaleConfiguration.ClientRequestIndex] = SaleErrors.DuplicateClientRequest,
         [StockMovementConfiguration.InvoiceItemReasonIndex] = InvoiceErrors.AlreadyConfirmed,
         [PlanConfiguration.CodeIndex] = PlanErrors.CodeTaken,
+        [PaymentConfiguration.ClientRequestIndex] = PaymentErrors.DuplicateClientRequest,
     };
 
     /// <summary>

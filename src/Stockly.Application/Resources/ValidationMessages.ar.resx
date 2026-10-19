@@ -49,4 +49,7 @@
   <data name="UsageRangeInvalid" xml:space="preserve">
     <value>يجب أن ينتهي النطاق في يوم بدايته أو بعده وألا يتجاوز 92 يوماً.</value>
   </data>
+  <data name="WalletPhoneInvalid" xml:space="preserve">
+    <value>الدفع بالمحفظة يحتاج رقم موبايل مصري، مثل 01012345678.</value>
+  </data>
 </root>

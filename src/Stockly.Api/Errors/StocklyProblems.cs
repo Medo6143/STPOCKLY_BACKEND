@@ -30,6 +30,7 @@ public static class StocklyProblems
         [StatusCodes.Status423Locked] = "https://tools.ietf.org/html/rfc4918#section-11.3",
         [StatusCodes.Status429TooManyRequests] = "https://tools.ietf.org/html/rfc6585#section-4",
         [StatusCodes.Status500InternalServerError] = "https://tools.ietf.org/html/rfc9110#section-15.6.1",
+        [StatusCodes.Status502BadGateway] = "https://tools.ietf.org/html/rfc9110#section-15.6.3",
     };
 
     public static ProblemDetails Create(HttpContext httpContext, int status, string code, IReadOnlyDictionary<string, string[]>? errors = null)
@@ -61,7 +62,7 @@ public static class StocklyProblems
 
     /// <summary>
     /// Contract §1.8: Validation 400, Unauthorized 401, Forbidden 403, NotFound 404, Conflict 409, Failure 500;
-    /// v1.4: Locked 423, TooManyRequests 429; PayloadTooLarge 413 (I1, backend.md §13).
+    /// v1.4: Locked 423, TooManyRequests 429; PayloadTooLarge 413 (I1, backend.md §13); v1.7: BadGateway 502 (B3).
     /// </summary>
     public static int StatusFor(ErrorType type) => type switch
     {
@@ -73,6 +74,7 @@ public static class StocklyProblems
         ErrorType.Locked => StatusCodes.Status423Locked,
         ErrorType.TooManyRequests => StatusCodes.Status429TooManyRequests,
         ErrorType.PayloadTooLarge => StatusCodes.Status413PayloadTooLarge,
+        ErrorType.BadGateway => StatusCodes.Status502BadGateway,
         _ => StatusCodes.Status500InternalServerError,
     };
 

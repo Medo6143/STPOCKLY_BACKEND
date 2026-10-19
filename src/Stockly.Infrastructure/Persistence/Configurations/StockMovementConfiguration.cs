@@ -39,7 +39,7 @@ internal sealed class StockMovementConfiguration : IEntityTypeConfiguration<Stoc
         builder.Property(m => m.Reason).HasConversion<short>();
 
         // created_by_user_id became a real FK in migration Identity (1.5), invoice_id and invoice_item_id in migration
-        // InvoiceScan (Sprint 2), sale_id and sale_item_id in migration Sales (Sprint 4); see docs/erd.md §3.7.
+        // InvoiceScan (Sprint 2), sale_id and sale_item_id in migration Sales (Sprint 4); see docs/erd.md §3.8.
         builder.HasOne<Shop>().WithMany().HasForeignKey(m => m.ShopId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Product>().WithMany().HasForeignKey(m => m.ProductId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<ApplicationUser>().WithMany().HasForeignKey(m => m.CreatedByUserId).OnDelete(DeleteBehavior.Restrict);

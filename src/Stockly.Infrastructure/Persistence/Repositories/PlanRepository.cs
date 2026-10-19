@@ -11,4 +11,8 @@ internal sealed class PlanRepository(StocklyDbContext db) : IPlanRepository
             .Where(plan => plan.Code == code && plan.IsActive)
             .Select(plan => (Guid?)plan.Id)
             .SingleOrDefaultAsync(cancellationToken);
+
+    // Primary key.
+    public Task<Plan?> FindAsync(Guid planId, CancellationToken cancellationToken) =>
+        db.Set<Plan>().AsNoTracking().SingleOrDefaultAsync(plan => plan.Id == planId, cancellationToken);
 }

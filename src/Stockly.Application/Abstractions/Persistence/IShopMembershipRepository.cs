@@ -14,6 +14,12 @@ public interface IShopMembershipRepository
     /// <summary>The user's active membership in <paramref name="shopId"/>, with the shop; <c>null</c> when none.</summary>
     Task<ShopMembership?> FindActiveAsync(Guid userId, Guid shopId, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// The active members of <paramref name="shopId"/> (B2 <c>memberCount</c>), counted only when
+    /// <paramref name="userId"/> is one of them; otherwise 0.
+    /// </summary>
+    Task<int> CountActiveMembersAsync(Guid userId, Guid shopId, CancellationToken cancellationToken);
+
     /// <summary>Adds a membership. The member's own <see cref="ShopMember.UserId"/> is the user it belongs to.</summary>
     void Add(ShopMember member);
 }

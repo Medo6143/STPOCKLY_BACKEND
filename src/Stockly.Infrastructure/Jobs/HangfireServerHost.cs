@@ -8,7 +8,8 @@ namespace Stockly.Infrastructure.Jobs;
 
 /// <summary>
 /// Runs the Hangfire server inside the Api process (docs/design/backend.md §4.1): queues <c>invoices</c> and <c>maintenance</c>,
-/// <c>Hangfire:WorkerCount</c> workers, DI-scoped jobs, and the daily <see cref="ExpireInvoiceImagesJob"/>. It waits for PostgreSQL in the background instead of failing
+/// <c>Hangfire:WorkerCount</c> workers, DI-scoped jobs, and the recurring <see cref="ExpireInvoiceImagesJob"/>,
+/// <see cref="ReconcilePaymentsJob"/> and <see cref="DowngradeLapsedSubscriptionsJob"/>. It waits for PostgreSQL in the background instead of failing
 /// startup, so the Api serves (and reports itself unready) while the database is down.
 /// </summary>
 public sealed partial class HangfireServerHost(
@@ -53,13 +54,29 @@ public sealed partial class HangfireServerHost(
     }
 
     /// <summary>Adds or updates the recurring jobs (idempotent: same id, same schedule on every start).</summary>
-    private static void ScheduleRecurringJobs(JobStorage jobStorage) =>
-        new RecurringJobManager(jobStorage).AddOrUpdate<ExpireInvoiceImagesJob>(
+    private static void ScheduleRecurringJobs(JobStorage jobStorage)
+    {
+        var manager = new RecurringJobManager(jobStorage);
+        var utc = new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc };
+        manager.AddOrUpdate<ExpireInvoiceImagesJob>(
             ExpireInvoiceImagesJob.RecurringJobId,
             HangfireOptions.MaintenanceQueue,
             job => job.RunAsync(CancellationToken.None),
             ExpireInvoiceImagesJob.Cron,
-            new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
+            utc);
+        manager.AddOrUpdate<ReconcilePaymentsJob>(
+            ReconcilePaymentsJob.RecurringJobId,
+            HangfireOptions.MaintenanceQueue,
+            job => job.RunAsync(CancellationToken.None),
+            ReconcilePaymentsJob.Cron,
+            utc);
+        manager.AddOrUpdate<DowngradeLapsedSubscriptionsJob>(
+            DowngradeLapsedSubscriptionsJob.RecurringJobId,
+            HangfireOptions.MaintenanceQueue,
+            job => job.RunAsync(CancellationToken.None),
+            DowngradeLapsedSubscriptionsJob.Cron,
+            utc);
+    }
 
     private async Task<JobStorage?> WaitForStorageAsync(CancellationToken stoppingToken)
     {
