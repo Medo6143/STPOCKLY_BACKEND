@@ -377,6 +377,142 @@ namespace Stockly.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Stockly.Domain.Payments.Payment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<string>("CheckoutUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
+                        .HasColumnName("checkout_url");
+
+                    b.Property<Guid>("ClientRequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("client_request_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character(3)")
+                        .HasColumnName("currency")
+                        .IsFixedLength();
+
+                    b.Property<DateTimeOffset?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("failure_reason");
+
+                    b.Property<short>("Method")
+                        .HasColumnType("smallint")
+                        .HasColumnName("method");
+
+                    b.Property<DateTimeOffset?>("PaidAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("paid_at");
+
+                    b.Property<Guid>("PlanId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("plan_id");
+
+                    b.Property<short>("Provider")
+                        .HasColumnType("smallint")
+                        .HasColumnName("provider");
+
+                    b.Property<string>("ProviderOrderId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("provider_order_id");
+
+                    b.Property<string>("ProviderTransactionId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("provider_transaction_id");
+
+                    b.Property<string>("ReferenceNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("reference_number");
+
+                    b.Property<Guid>("ShopId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("shop_id");
+
+                    b.Property<short>("Status")
+                        .HasColumnType("smallint")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_payments");
+
+                    b.HasIndex("PlanId")
+                        .HasDatabaseName("ix_payments_plan_id");
+
+                    b.HasIndex(new[] { "CreatedAt" }, "ix_payments_created_at")
+                        .IsDescending()
+                        .HasDatabaseName("ix_payments_created_at");
+
+                    b.HasIndex(new[] { "ExpiresAt" }, "ix_payments_expires_at_pending")
+                        .HasDatabaseName("ix_payments_expires_at_pending")
+                        .HasFilter("status = 1");
+
+                    b.HasIndex(new[] { "PaidAt" }, "ix_payments_paid_at_paid")
+                        .HasDatabaseName("ix_payments_paid_at_paid")
+                        .HasFilter("status = 2");
+
+                    b.HasIndex(new[] { "ShopId", "CreatedAt" }, "ix_payments_shop_id_created_at")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("ix_payments_shop_id_created_at");
+
+                    b.HasIndex(new[] { "ShopId", "CreatedAt" }, "ix_payments_shop_id_created_at_pending")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("ix_payments_shop_id_created_at_pending")
+                        .HasFilter("status = 1");
+
+                    b.HasIndex(new[] { "Status", "CreatedAt" }, "ix_payments_status_created_at")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("ix_payments_status_created_at");
+
+                    b.HasIndex(new[] { "Provider", "ProviderOrderId" }, "ux_payments_provider_provider_order_id")
+                        .IsUnique()
+                        .HasDatabaseName("ux_payments_provider_provider_order_id");
+
+                    b.HasIndex(new[] { "ProviderTransactionId" }, "ux_payments_provider_transaction_id")
+                        .IsUnique()
+                        .HasDatabaseName("ux_payments_provider_transaction_id")
+                        .HasFilter("provider_transaction_id IS NOT NULL");
+
+                    b.HasIndex(new[] { "ShopId", "ClientRequestId" }, "ux_payments_shop_id_client_request_id")
+                        .IsUnique()
+                        .HasDatabaseName("ux_payments_shop_id_client_request_id");
+
+                    b.ToTable("payments", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_payments_amount", "amount > 0");
+
+                            t.HasCheckConstraint("ck_payments_paid_at", "(status = 2) = (paid_at IS NOT NULL)");
+                        });
+                });
+
             modelBuilder.Entity("Stockly.Domain.Platform.AdminAuditLog", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1497,6 +1633,23 @@ namespace Stockly.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_invoice_items_shops_shop_id");
+                });
+
+            modelBuilder.Entity("Stockly.Domain.Payments.Payment", b =>
+                {
+                    b.HasOne("Stockly.Domain.Shops.Plan", null)
+                        .WithMany()
+                        .HasForeignKey("PlanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_payments_plans_plan_id");
+
+                    b.HasOne("Stockly.Domain.Shops.Shop", null)
+                        .WithMany()
+                        .HasForeignKey("ShopId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_payments_shops_shop_id");
                 });
 
             modelBuilder.Entity("Stockly.Domain.Platform.AdminAuditLog", b =>
