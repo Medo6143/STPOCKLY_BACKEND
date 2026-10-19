@@ -48,6 +48,7 @@ builder.Services.AddInvoiceScanning(builder.Configuration, postgres, useFakeAi);
 builder.Services.AddStocklyIdentity(jwt);
 builder.Services.AddApplication();
 builder.Services.AddPlatformAdmin(builder.Configuration);
+builder.Services.AddPayments(builder.Configuration);
 builder.Services.AddDataProtection();
 builder.Services.AddStocklyAuthentication(jwt);
 builder.Services.AddStocklyLocalization();

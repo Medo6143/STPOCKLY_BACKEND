@@ -16,6 +16,7 @@ using Stockly.Application.Abstractions.Caching;
 using Stockly.Application.Abstractions.Identity;
 using Stockly.Application.Abstractions.Jobs;
 using Stockly.Application.Abstractions.Limits;
+using Stockly.Application.Abstractions.Payments;
 using Stockly.Application.Abstractions.Persistence;
 using Stockly.Application.Abstractions.Stock;
 using Stockly.Application.Abstractions.Storage;
@@ -29,6 +30,7 @@ using Stockly.Infrastructure.Caching;
 using Stockly.Infrastructure.Configuration;
 using Stockly.Infrastructure.Identity;
 using Stockly.Infrastructure.Jobs;
+using Stockly.Infrastructure.Payments.Paymob;
 using Stockly.Infrastructure.Persistence;
 using Stockly.Infrastructure.Persistence.Admin;
 using Stockly.Infrastructure.Persistence.Interceptors;
@@ -51,6 +53,9 @@ public static class DependencyInjection
 
     /// <summary>Longest wait before a retry, also when a 429 asks for more with <c>Retry-After</c>.</summary>
     private static readonly TimeSpan OpenRouterMaxRetryDelay = TimeSpan.FromSeconds(10);
+
+    /// <summary>The standard resilience handler's default circuit-breaker sampling window.</summary>
+    private static readonly TimeSpan PaymobMinSamplingDuration = TimeSpan.FromSeconds(30);
 
     /// <summary>
     /// Registers <see cref="StocklyDbContext"/> with its interceptors, <see cref="IClock"/> and a <see cref="TimeProvider"/>
@@ -92,6 +97,8 @@ public static class DependencyInjection
         services.AddScoped<IDashboardQueries, DashboardQueries>();
         services.AddScoped<IProductUnitUsageQueries, ProductUnitUsageQueries>();
         services.AddScoped<IProductSimilarityQueries, ProductSimilarityQueries>();
+        services.AddScoped<IPaymentRepository, PaymentRepository>();
+        services.AddScoped<IBillingQueries, BillingQueries>();
 
         // Platform admin (ADR-0005, update 2026-10-18): the only cross-tenant access, used only by Features/Admin.
         services.AddScoped<IAdminShopQueries, AdminShopQueries>();
@@ -101,6 +108,8 @@ public static class DependencyInjection
         services.AddScoped<IAdminInvoiceQueries, AdminInvoiceQueries>();
         services.AddScoped<IAdminAuditLog, AdminAuditLogRepository>();
         services.AddScoped<IAdminInvoiceImageRetention, AdminInvoiceImageRetention>();
+        services.AddScoped<IAdminPaymentQueries, AdminPaymentQueries>();
+        services.AddScoped<IAdminPaymentRepository, AdminPaymentRepository>();
 
         return services;
     }
@@ -281,6 +290,36 @@ public static class DependencyInjection
     }
 
     /// <summary>
+    /// Plan payments through Paymob (ADR-0015): <see cref="PaymobOptions"/> (validated at startup; the other secrets are
+    /// required only when <c>Paymob__SecretKey</c> is set) and <see cref="IPaymentGateway"/> as a typed client with the
+    /// standard resilience pipeline: per-attempt and total timeout of <c>Paymob__TimeoutSeconds</c>, a circuit breaker, and
+    /// retries on transient errors for safe methods only (every Paymob call is a POST, so none is repeated: a repeated
+    /// checkout could create a second kiosk reference). Without a secret key every method is unavailable.
+    /// </summary>
+    public static IServiceCollection AddPayments(this IServiceCollection services, IConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        services.AddValidatedOptions<PaymobOptions>(configuration, PaymobOptions.SectionName);
+        services.TryAddSingleton<IClock, SystemClock>();
+        services.AddHttpClient<IPaymentGateway, PaymobPaymentGateway>((provider, client) =>
+            {
+                client.BaseAddress = provider.GetRequiredService<PaymobOptions>().BaseUrl;
+                client.Timeout = Timeout.InfiniteTimeSpan;
+            })
+            .AddStandardResilienceHandler()
+            .Configure((resilience, provider) =>
+            {
+                var timeout = TimeSpan.FromSeconds(provider.GetRequiredService<PaymobOptions>().TimeoutSeconds);
+                resilience.AttemptTimeout.Timeout = timeout;
+                resilience.TotalRequestTimeout.Timeout = timeout;
+                resilience.CircuitBreaker.SamplingDuration = timeout * 2 > PaymobMinSamplingDuration ? timeout * 2 : PaymobMinSamplingDuration;
+                resilience.Retry.DisableForUnsafeHttpMethods();
+            });
+        return services;
+    }
+
+    /// <summary>
     /// Hangfire on PostgreSQL (schema <c>hangfire</c>) without Hangfire's static configuration: the storage, the job
     /// scheduler, the DI job activator (one scope per job run), the job tenant and the in-process server.
     /// </summary>
@@ -301,6 +340,8 @@ public static class DependencyInjection
         services.AddTransient<ProcessInvoiceJob>();
         services.AddTransient<FailInvoiceProcessingJob>();
         services.AddTransient<ExpireInvoiceImagesJob>();
+        services.AddTransient<ReconcilePaymentsJob>();
+        services.AddTransient<DowngradeLapsedSubscriptionsJob>();
         services.AddHostedService<HangfireServerHost>();
         return services;
     }

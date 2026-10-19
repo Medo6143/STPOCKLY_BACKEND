@@ -69,7 +69,8 @@ public sealed class ApiFixture : IAsyncLifetime
         StocklyApiFactory.JobMode jobs = StocklyApiFactory.JobMode.Off,
         string environment = StocklyApiFactory.TestEnvironment,
         IReadOnlyDictionary<string, string?>? settings = null,
-        bool replaceExtractor = true) =>
+        bool replaceExtractor = true,
+        HttpMessageHandler? paymob = null) =>
         new(
             postgres ?? PostgresConnectionString,
             redis ?? RedisConnectionString,
@@ -82,7 +83,8 @@ public sealed class ApiFixture : IAsyncLifetime
             seedAdmin: postgres is null,
             environment,
             settings,
-            replaceExtractor);
+            replaceExtractor,
+            paymob);
 
     /// <summary>Raw SQL for arranging states the API cannot create yet (suspended shop, staff membership...).</summary>
     public async Task<int> ExecuteAsync(string sql, params object[] parameters)

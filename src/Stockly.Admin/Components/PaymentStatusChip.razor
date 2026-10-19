@@ -1,0 +1,26 @@
+@* A payment's status (contract §12.1): Paid green, Pending amber, Failed red, Expired grey. *@
+<MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="@ColorOf(Status)" Icon="@IconOf(Status)"
+         data-testid="payment-status">
+    @Status
+</MudChip>
+
+@code {
+    [Parameter, EditorRequired]
+    public PaymentStatus Status { get; set; }
+
+    private static Color ColorOf(PaymentStatus status) => status switch
+    {
+        PaymentStatus.Paid => Color.Success,
+        PaymentStatus.Pending => Color.Warning,
+        PaymentStatus.Failed => Color.Error,
+        _ => Color.Default,
+    };
+
+    private static string IconOf(PaymentStatus status) => status switch
+    {
+        PaymentStatus.Paid => Icons.Material.Rounded.CheckCircle,
+        PaymentStatus.Pending => Icons.Material.Rounded.HourglassTop,
+        PaymentStatus.Failed => Icons.Material.Rounded.Cancel,
+        _ => Icons.Material.Rounded.TimerOff,
+    };
+}

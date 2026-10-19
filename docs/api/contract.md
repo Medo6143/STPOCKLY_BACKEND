@@ -140,14 +140,14 @@ Every error response is `application/problem+json`:
 | AD18 | GET | /api/admin/invoices/{id} | admin | 200, 401, 403, 404 | 5 | implemented |
 | AD19 | POST | /api/admin/invoices/{id}/rerun | admin | 202, 400, 401, 403, 404, 409 | 5 | implemented |
 | AD20 | GET | /api/admin/audit-logs | admin | 200, 400, 401, 403 | 5 | implemented |
-| B1 | GET | /api/billing/plans | user | 200, 401, 403 | billing | planned |
-| B2 | GET | /api/billing/subscription | user | 200, 401, 403 | billing | planned |
-| B3 | POST | /api/billing/checkout | owner | 200, 201, 400, 401, 403, 404, 409, 502 | billing | planned |
-| B4 | GET | /api/billing/payments/{id} | user | 200, 401, 403, 404 | billing | planned |
-| B5 | GET | /api/billing/payments | user | 200, 400, 401, 403 | billing | planned |
-| B6 | POST | /api/billing/payments/{id}/cancel | owner | 200, 401, 403, 404, 409 | billing | planned |
-| AD21 | GET | /api/admin/payments | admin | 200, 400, 401, 403 | billing | planned |
-| AD22 | GET | /api/admin/payments/summary | admin | 200, 400, 401, 403 | billing | planned |
+| B1 | GET | /api/billing/plans | user | 200, 401, 403 | billing | implemented |
+| B2 | GET | /api/billing/subscription | user | 200, 401, 403 | billing | implemented |
+| B3 | POST | /api/billing/checkout | owner | 200, 201, 400, 401, 403, 404, 409, 502 | billing | implemented |
+| B4 | GET | /api/billing/payments/{id} | user | 200, 401, 403, 404 | billing | implemented |
+| B5 | GET | /api/billing/payments | user | 200, 400, 401, 403 | billing | implemented |
+| B6 | POST | /api/billing/payments/{id}/cancel | owner | 200, 401, 403, 404, 409 | billing | implemented |
+| AD21 | GET | /api/admin/payments | admin | 200, 400, 401, 403 | billing | implemented |
+| AD22 | GET | /api/admin/payments/summary | admin | 200, 400, 401, 403 | billing | implemented |
 
 Not in the API (by design): `/health/live`, `/health/ready` (operations, not part of the mobile contract) and `/openapi/v1.json`.
 

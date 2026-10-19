@@ -26,6 +26,14 @@ internal sealed class ShopMembershipRepository(StocklyDbContext db) : IShopMembe
         return row?.ToMembership();
     }
 
+    // The caller's own active membership (PK shop_id, user_id) gates the count; the shop's members by the PK prefix.
+    public Task<int> CountActiveMembersAsync(Guid userId, Guid shopId, CancellationToken cancellationToken)
+    {
+        var caller = ActiveMembersOf(userId).Where(member => member.ShopId == shopId);
+        return db.Set<ShopMember>().AsNoTracking()
+            .CountAsync(member => member.ShopId == shopId && member.IsActive && caller.Any(), cancellationToken);
+    }
+
     public void Add(ShopMember member) => db.Set<ShopMember>().Add(member);
 
     private IQueryable<ShopMember> ActiveMembersOf(Guid userId) =>

@@ -496,6 +496,7 @@ Growth note: when this table passes ~10M rows, partition by month on `created_at
 | `PlatformAdmin` (Sprint 5, step 5a) | `admin_audit_logs` | `shops.normalized_name` (backfilled), `shops.suspended_at`, `shops.suspended_reason`, `shop_subscriptions.daily_scan_quota_override` with its CHECK; indexes `ix_shops_created_at`, `ix_shops_normalized_name_trgm`, `ix_users_normalized_email_pattern` and the three `admin_audit_logs` indexes (§3.1, §3.6). Docs: `docs/features/admin.md` |
 | `MatchingAndImageLifecycle` (Sprint 6) | — | `products.latin_key` and `product_aliases.latin_key` (`text NOT NULL`, backfilled with `stockly_latin_key(normalized_*)`, default dropped afterwards), function `stockly_latin_key(text)` (kept for re-backfills), `invoices.image_deleted_at`; indexes `ix_products_latin_key_trgm`, `ix_product_aliases_latin_key_trgm`, `ix_invoices_created_at_image_kept` (§3.2, §3.3). Docs: `docs/features/invoice-scan.md` (matching), `docs/operations/image-lifecycle.md` |
 | `InvoiceScan` (Sprint 2, step 2a) | `suppliers`, `product_aliases`, `invoices`, `invoice_items`, `ai_usage_records`; schema `hangfire` | every index and check listed above for these tables; FKs `stock_movements.invoice_id` → `invoices`, `stock_movements.invoice_item_id` → `invoice_items` (restrict); Hangfire tables are created in schema `hangfire` by `Hangfire.PostgreSql` at startup (backend.md §17.1 item 8, documented exception to rule 31). Design: `docs/design/backend.md` §12 |
+| `PlanPayments` (billing, ADR-0015) | `payments` | every index and check listed in §3.8; FKs `payments.shop_id` → `shops`, `payments.plan_id` → `plans` (restrict). Docs: `docs/features/billing.md` |
 
 Step 2b (matching, I2–I4) adds no migration: every filter and sort it uses is served by an index of `InitialCatalog` or `InvoiceScan` (the queries are listed next to those indexes above).
 
@@ -519,6 +520,28 @@ Implementation notes for the `InitialCatalog` tables:
 **FK-support indexes of `InvoiceScan`.** EF creates a plain index for every foreign key that no listed index starts with; none serves a named query: `ix_invoices_supplier_id`, `ix_invoices_created_by_user_id`, `ix_invoices_confirmed_by_user_id`, `ix_invoice_items_product_id`, `ix_invoice_items_product_unit_id` (also serves `ProductUnit.InUse`, P8, once invoice lines reference units), `ix_product_aliases_product_id`, `ix_product_aliases_supplier_id`, `ix_product_aliases_product_unit_id`, `ix_stock_movements_invoice_id`.
 
 **Deferred columns and index:** `products.barcode`, `products.category` and `UNIQUE (shop_id, barcode) WHERE barcode IS NOT NULL AND NOT is_archived` were added in step 1.6 (**done**, migration `ProductsCatalog`).
+
+
+### 3.8 Payments (migration `PlanPayments`, ADR-0015)
+
+**payments** — one checkout of one month of a plan (contract §12). Tenant entity (global query filter). Created only after Paymob accepted the checkout, so a provider failure leaves no row. Columns: `amount numeric(18,2)` (the plan's price at checkout, EGP), `currency char(3)` (`EGP`), `method smallint` (Card 1, Wallet 2, Kiosk 3), `provider smallint` (Paymob 1), `status smallint` (Pending 1, Paid 2, Failed 3, Expired 4), `provider_order_id varchar(100)` (Paymob `intention_order_id`: the signed `order.id` of callbacks), `provider_transaction_id varchar(100) NULL` (the transaction that last changed the status), `checkout_url varchar(2048) NULL`, `reference_number varchar(100) NULL` (kiosk), `expires_at timestamptz NULL`, `failure_reason varchar(500) NULL`, `created_at`, `paid_at NULL`, `updated_at` (shadow, `AuditTimestampsInterceptor`).
+
+| Index / constraint | Serves |
+|---|---|
+| `UNIQUE (shop_id, client_request_id)` (`ux_payments_shop_id_client_request_id`) | B3 idempotency (rule 20): the repeat lookup `WHERE client_request_id = @id` and the insert a concurrent repeat loses (`Payment.DuplicateClientRequest`, answered with the winner) |
+| `UNIQUE (provider_transaction_id) WHERE provider_transaction_id IS NOT NULL` (`ux_payments_provider_transaction_id`) | callback idempotency (contract §12.3): one payment per provider transaction |
+| `UNIQUE (provider, provider_order_id)` (`ux_payments_provider_provider_order_id`) | callback and reconcile: `SELECT … WHERE provider = @p AND provider_order_id = @o FOR UPDATE` |
+| `(shop_id, created_at DESC)` (`ix_payments_shop_id_created_at`) | B5 `ORDER BY created_at DESC, id DESC LIMIT … OFFSET …` plus the count; AD21 with `shopId`; FK support |
+| `(shop_id, created_at DESC) WHERE status = 1` (`ix_payments_shop_id_created_at_pending`) | B2 newest pending payment; B3 open-payment check `WHERE status = Pending AND (expires_at IS NULL OR expires_at > now)` |
+| `(created_at DESC)` (`ix_payments_created_at`) | AD21 without filters, newest first |
+| `(status, created_at DESC)` (`ix_payments_status_created_at`) | AD21 with `status` |
+| `(expires_at) WHERE status = 1` (`ix_payments_expires_at_pending`) | reconcile job: `WHERE status = Pending AND expires_at <= now ORDER BY expires_at, id LIMIT 100` |
+| `(paid_at) WHERE status = 2` (`ix_payments_paid_at_paid`) | AD22: `WHERE status = Paid AND paid_at >= @from AND paid_at < @to GROUP BY method` |
+| `(plan_id)` (`ix_payments_plan_id`) | FK support only (created by EF) |
+| `CHECK (amount > 0)` (`ck_payments_amount`) | a free plan is never charged (ADR-0015 §7) |
+| `CHECK ((status = 2) = (paid_at IS NOT NULL))` (`ck_payments_paid_at`) | a paid payment always has its paid time |
+
+Locks: the callback, the reconcile job and B6 lock the payment row first (`FOR UPDATE`), then the shop's active subscription (`ux_shop_subscriptions_shop_id_active`, `FOR UPDATE`); B3 serializes a shop's checkouts by locking its active subscription row. The daily downgrade reads `ix_shop_subscriptions_ends_on_active` (`WHERE status = Active AND ends_on < today AND plan_id <> default`).
 
 ## 4. Confirm-invoice transaction (how the schema enforces rules 3 and 4)
 

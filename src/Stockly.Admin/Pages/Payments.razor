@@ -1,0 +1,85 @@
+@page "/payments"
+@attribute [Authorize]
+@inherits ApiPageBase
+@inject AdminApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>Payments · Stockly Admin</PageTitle>
+
+<PageHeader Title="Payments" Subtitle="Plan payments of every shop through Paymob, newest first.">
+    <TitleContent>
+        @if (ShopId is { } shopId)
+        {
+            <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined" OnClose="ClearShopFilter" data-testid="shop-filter">
+                Shop @shopId.ToString()[..8]
+            </MudChip>
+        }
+    </TitleContent>
+</PageHeader>
+
+<MudPaper Elevation="0" Class="section-card">
+    <div class="d-flex flex-wrap align-center gap-3 pa-4">
+        <MudSelect T="PaymentStatus?" Value="_status" ValueChanged="StatusChangedAsync" Label="Status" Variant="Variant.Outlined"
+                   Margin="Margin.Dense" Style="max-width: 220px" data-testid="payment-status-filter">
+            <MudSelectItem T="PaymentStatus?" Value="null">All statuses</MudSelectItem>
+            <MudSelectItem T="PaymentStatus?" Value="PaymentStatus.Paid">Paid</MudSelectItem>
+            <MudSelectItem T="PaymentStatus?" Value="PaymentStatus.Pending">Pending</MudSelectItem>
+            <MudSelectItem T="PaymentStatus?" Value="PaymentStatus.Failed">Failed</MudSelectItem>
+            <MudSelectItem T="PaymentStatus?" Value="PaymentStatus.Expired">Expired</MudSelectItem>
+        </MudSelect>
+    </div>
+    <MudDivider />
+
+    <div class="pa-2">
+        <StateView Loading="_loading" Problem="_problem" IsEmpty="_page is { TotalCount: 0 }" OnRetry="LoadAsync"
+                   EmptyIcon="@Icons.Material.Rounded.Payments" EmptyTitle="No payments"
+                   EmptyText="@(HasFilter ? "No payment matches the filters." : "No shop has started a payment yet.")">
+            <PaymentsTable Payments="_page!.Items" ShowShop="true" />
+            <Pager Page="_pageNumber" PageSize="InputLimits.DefaultPageSize" TotalCount="_page!.TotalCount" PageChanged="PageChangedAsync" />
+        </StateView>
+    </div>
+</MudPaper>
+
+@code {
+    private PaymentStatus? _status;
+    private int _pageNumber = 1;
+    private bool _loading = true;
+    private ApiProblem? _problem;
+    private PagedResponse<AdminPayment>? _page;
+
+    [SupplyParameterFromQuery(Name = QueryNames.ShopId)]
+    public Guid? ShopId { get; set; }
+
+    private bool HasFilter => ShopId is not null || _status is not null;
+
+    protected override Task OnParametersSetAsync()
+    {
+        _pageNumber = 1;
+        return LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _problem = null;
+        var result = await Api.GetPaymentsAsync(ShopId, _status, _pageNumber, InputLimits.DefaultPageSize, PageToken);
+        _page = result.Value;
+        _problem = result.Problem;
+        _loading = false;
+    }
+
+    private Task StatusChangedAsync(PaymentStatus? status)
+    {
+        _status = status;
+        _pageNumber = 1;
+        return LoadAsync();
+    }
+
+    private Task PageChangedAsync(int page)
+    {
+        _pageNumber = page;
+        return LoadAsync();
+    }
+
+    private void ClearShopFilter() => Navigation.NavigateTo(AppRoutes.Payments);
+}

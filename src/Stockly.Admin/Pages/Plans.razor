@@ -7,7 +7,7 @@
 
 <PageTitle>Plans · Stockly Admin</PageTitle>
 
-<PageHeader Title="Plans" Subtitle="Subscription plans: daily scan quota, members and monthly price.">
+<PageHeader Title="Plans" Subtitle="Subscription plans: monthly price, daily scan quota and members. Shops pay for one month at a time.">
     <Actions>
         <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.Add" OnClick="CreateAsync"
                    data-testid="new-plan">New plan</MudButton>
@@ -29,12 +29,26 @@
             </HeaderContent>
             <RowTemplate>
                 <MudTd DataLabel="Plan">
-                    <MudText Typo="Typo.body2" Style="font-weight: 600">@context.Name</MudText>
+                    <div class="d-flex align-center gap-2">
+                        <MudText Typo="Typo.body2" Style="font-weight: 600">@context.Name</MudText>
+                        @if (IsFree(context))
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined" data-testid="plan-free">Free</MudChip>
+                        }
+                    </div>
                     <MudText Typo="Typo.caption" Class="mud-text-secondary mono">@context.Code</MudText>
                 </MudTd>
                 <MudTd DataLabel="Scans per day" Style="text-align: right">@Display.Count(context.DailyScanQuota)</MudTd>
                 <MudTd DataLabel="Max members" Style="text-align: right">@Display.Count(context.MaxMembers)</MudTd>
-                <MudTd DataLabel="Monthly price" Style="text-align: right">@Display.Egp(context.MonthlyPrice)</MudTd>
+                <MudTd DataLabel="Monthly price" Style="text-align: right">
+                    <MudText Typo="Typo.h6" Class="mono" Color="@(IsFree(context) ? Color.Default : Color.Primary)" data-testid="plan-price">
+                        @(IsFree(context) ? "Free" : Display.Egp(context.MonthlyPrice))
+                    </MudText>
+                    @if (!IsFree(context))
+                    {
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">per month</MudText>
+                    }
+                </MudTd>
                 <MudTd DataLabel="Status">
                     <MudChip T="string" Size="Size.Small" Variant="Variant.Text"
                              Color="@(context.IsActive ? Color.Success : Color.Default)">@(context.IsActive ? "Active" : "Inactive")</MudChip>
@@ -53,6 +67,9 @@
     private ApiProblem? _problem;
 
     protected override Task OnInitializedAsync() => LoadAsync();
+
+    // A plan with price 0 cannot be checked out by a shop (contract §12, Billing.FreePlan).
+    private static bool IsFree(PlanDto plan) => Display.ParseDecimal(plan.MonthlyPrice) == 0m;
 
     private async Task LoadAsync()
     {

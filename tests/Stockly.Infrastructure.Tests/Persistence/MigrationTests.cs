@@ -74,6 +74,18 @@ public sealed class MigrationTests(PostgresFixture fixture)
         "ix_products_latin_key_trgm",
         "ix_product_aliases_latin_key_trgm",
         "ix_invoices_created_at_image_kept",
+
+        // PlanPayments (erd.md §3.8, ADR-0015)
+        "ux_payments_shop_id_client_request_id",
+        "ux_payments_provider_transaction_id",
+        "ux_payments_provider_provider_order_id",
+        "ix_payments_shop_id_created_at",
+        "ix_payments_shop_id_created_at_pending",
+        "ix_payments_created_at",
+        "ix_payments_status_created_at",
+        "ix_payments_expires_at_pending",
+        "ix_payments_paid_at_paid",
+        "ix_payments_plan_id",
     ];
 
     private static readonly string[] ExpectedChecks =
@@ -98,6 +110,8 @@ public sealed class MigrationTests(PostgresFixture fixture)
         "ck_sale_items_amounts",
         "ck_sale_items_line_no",
         "ck_shop_subscriptions_daily_scan_quota_override",
+        "ck_payments_amount",
+        "ck_payments_paid_at",
     ];
 
     [Fact]
@@ -154,7 +168,8 @@ public sealed class MigrationTests(PostgresFixture fixture)
             "ai_usage_records",
             "sales",
             "sale_items",
-            "admin_audit_logs");
+            "admin_audit_logs",
+            "payments");
     }
 
     [Fact]
@@ -179,6 +194,10 @@ public sealed class MigrationTests(PostgresFixture fixture)
     [InlineData("ix_invoices_created_at_image_kept", "WHERE (image_deleted_at IS NULL)")]
     [InlineData("ix_invoice_items_created_product_id", "WHERE (created_product_id IS NOT NULL)")]
     [InlineData("ix_invoice_items_shop_id_expiry_date", "WHERE (expiry_date IS NOT NULL)")]
+    [InlineData("ux_payments_provider_transaction_id", "WHERE (provider_transaction_id IS NOT NULL)")]
+    [InlineData("ix_payments_shop_id_created_at_pending", "WHERE (status = 1)")]
+    [InlineData("ix_payments_expires_at_pending", "WHERE (status = 1)")]
+    [InlineData("ix_payments_paid_at_paid", "WHERE (status = 2)")]
     public async Task Migrate_PartialIndexes_HaveTheErdPredicate(string index, string predicate)
     {
         var definition = await fixture.ScalarAsync<string>("SELECT indexdef FROM pg_indexes WHERE indexname = @p0", index);

@@ -99,6 +99,53 @@ public sealed class ShopSubscription : Entity, ITenantEntity
         return changed;
     }
 
+    /// <summary>
+    /// A paid month of another plan (ADR-0015 §5): an active subscription from <paramref name="today"/> ending one month
+    /// later, carrying the previous subscription's quota override.
+    /// </summary>
+    public static Result<ShopSubscription> StartPaidMonth(
+        Guid shopId, Guid planId, DateOnly today, int? dailyScanQuotaOverride, DateTimeOffset now) =>
+        Start(shopId, planId, today, today.AddMonths(1), dailyScanQuotaOverride, now);
+
+    /// <summary>
+    /// A paid month of the same plan (ADR-0015 §5): <see cref="EndsOn"/> moves one month past the later of
+    /// <paramref name="today"/> and the current end. An open-ended subscription stays open-ended (it is never shortened).
+    /// </summary>
+    public Result ExtendOneMonth(DateOnly today)
+    {
+        if (Status != SubscriptionStatus.Active)
+        {
+            return ShopSubscriptionErrors.NotActive;
+        }
+
+        if (EndsOn is { } endsOn)
+        {
+            EndsOn = (endsOn > today ? endsOn : today).AddMonths(1);
+        }
+
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// The paid period has passed (the daily downgrade job): the subscription ends and keeps its last day. Only an active
+    /// subscription whose <see cref="EndsOn"/> is before <paramref name="today"/> lapses.
+    /// </summary>
+    public Result Lapse(DateOnly today)
+    {
+        if (Status != SubscriptionStatus.Active)
+        {
+            return ShopSubscriptionErrors.NotActive;
+        }
+
+        if (EndsOn is not { } endsOn || endsOn >= today)
+        {
+            return ShopSubscriptionErrors.NotLapsed;
+        }
+
+        Status = SubscriptionStatus.Ended;
+        return Result.Success();
+    }
+
     /// <summary>Ends an active subscription on <paramref name="today"/> (contract AD8: replaced by a new one from today).</summary>
     public Result End(DateOnly today)
     {

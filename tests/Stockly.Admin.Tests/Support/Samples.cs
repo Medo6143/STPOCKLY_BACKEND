@@ -1,4 +1,5 @@
 using Stockly.Contracts.Admin;
+using Stockly.Contracts.Billing;
 using Stockly.Contracts.Common;
 using Stockly.Contracts.Invoices;
 using Stockly.Contracts.Shops;
@@ -66,4 +67,14 @@ public static class Samples
             System.Text.Json.JsonDocument.Parse("{\"status\":\"Active\"}").RootElement,
             System.Text.Json.JsonDocument.Parse("{\"status\":\"Suspended\"}").RootElement,
             At);
+
+    public static AdminPayment Payment(PaymentStatus status = PaymentStatus.Paid, PaymentMethod method = PaymentMethod.Card) =>
+        new(Guid.NewGuid(), Guid.NewGuid(), PlanId, "Pro", "199.50", "EGP", method, status, null, null, null,
+            status == PaymentStatus.Failed ? "Do not honour" : null, At, status == PaymentStatus.Paid ? At : null,
+            ShopId, "صيدلية النور", PaymentProvider.Paymob, status == PaymentStatus.Paid ? "192036465" : null);
+
+    public static PaymentSummary Revenue(bool withPayments = true) =>
+        withPayments
+            ? new(3, "1250.50", [new PaymentMethodSummary(PaymentMethod.Card, 2, "1000.00"), new PaymentMethodSummary(PaymentMethod.Kiosk, 1, "250.50")])
+            : new(0, "0.00", []);
 }

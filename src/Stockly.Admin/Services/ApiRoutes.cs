@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using Stockly.Contracts.Billing;
 using Stockly.Contracts.Shops;
 
 namespace Stockly.Admin.Services;
@@ -19,6 +20,8 @@ public static class ApiRoutes
     public const string Invoices = "api/admin/invoices";
     public const string AuditLogs = "api/admin/audit-logs";
     public const string HangfireSession = "api/admin/hangfire/session";
+    public const string Payments = "api/admin/payments";
+    public const string PaymentSummary = "api/admin/payments/summary";
 
     public static string Shop(Guid id) => $"{Shops}/{id}";
 
@@ -69,6 +72,8 @@ public sealed class QueryString(string path)
     public QueryString Add(string name, DateOnly value) => Add(name, value.ToString(DateFormat, CultureInfo.InvariantCulture));
 
     public QueryString Add(string name, ShopStatus? value) => Add(name, value?.ToString());
+
+    public QueryString Add(string name, PaymentStatus? value) => Add(name, value?.ToString());
 
     public override string ToString() => _builder.ToString();
 }

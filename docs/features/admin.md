@@ -154,12 +154,13 @@ Blazor WebAssembly + MudBlazor, served as static files, referencing **only** `St
 | Page | Route | Endpoints | Notes |
 |---|---|---|---|
 | Login | `/login` | AD1 | Return URL limited to paths inside the app (no open redirect) |
-| Overview | `/` | AD4 (counts), AD14, AD16, AD17 | KPI cards, 30-day cost chart, cost by model, latest failed scans |
+| Overview | `/` | AD4 (counts), AD14, AD16, AD17, AD22 | KPI cards, 30-day cost chart, cost by model, revenue card (paid amount and count of the last 30 days, by method; own four states), latest failed scans |
 | Shops | `/shops` | AD4 | Search (debounced), status filter, server paging |
-| Shop | `/shops/{id}` | AD5–AD10, AD11 | Suspend/activate, reset quota and quota override ask a required reason; change plan offers active plans only, end date and reason optional (AD8) |
-| Plans | `/plans` | AD11–AD13 | Create and edit in a dialog; `409 Plan.CodeTaken` and other errors stay in the dialog |
+| Shop | `/shops/{id}` | AD5–AD10, AD11, AD21 | Payments section (AD21 with `shopId`, paged, own four states); suspend/activate, reset quota and quota override ask a required reason; change plan offers active plans only, end date and reason optional (AD8) |
+| Plans | `/plans` | AD11–AD13 | Monthly price shown prominently, free plans (price 0) marked `Free`; create and edit in a dialog; `409 Plan.CodeTaken` and other errors stay in the dialog |
 | AI usage | `/ai-usage` | AD14–AD16 | Date range picker (default last 30 days; at most 92 days between the dates, checked before calling), totals, daily chart, by shop (paged) and by model |
 | Failed scans | `/failed-scans`, `/failed-scans/{id}` | AD17–AD19 | Optional `?shopId=` filter; detail shows the photo (`imageUrl`), raw AI JSON in a read-only code view, AI calls; re-run asks a reason |
+| Payments | `/payments` | AD21 | Plan payments of every shop (billing, ADR-0015): status filter, optional `?shopId=`, paged table (shop linked to its page, plan, method, amount, status chip with the failure reason, created, paid, Paymob transaction id). Read only: refunds are manual in the Paymob dashboard |
 | Audit log | `/audit-log` | AD20 | Filters target type, target id, admin id (also from `?targetType=&targetId=`); expandable before/after JSON |
 | Hangfire | app bar button | `POST /api/admin/hangfire/session` | Opens `{api}/hangfire?code=…` in a new tab (`noopener`) |
 
@@ -172,3 +173,10 @@ Decisions:
 - **Theme.** Light and dark palettes; the app bar toggle switches them (starts from the system preference, kept in memory).
 
 Known limitations: a page reload needs a new sign-in; the pre-signed image URL must be reachable from the browser (see §12); the dashboard is English only.
+
+## 14. Payments (billing, contract §12.4, ADR-0015)
+
+- **AD21** `GET /api/admin/payments?shopId=&status=&page=&pageSize=` and **AD22** `GET /api/admin/payments/summary?from=&to=` are read-only admin endpoints (no audit entry). They go through `IAdminPaymentQueries` in `Infrastructure/Persistence/Admin` (rule 9). Indexes: `docs/erd.md` §3.8.
+- The platform side of payments that has no shop token (the Paymob callback, the reconcile job, the daily downgrade) reaches across tenants too, so it lives in `Application/Features/Admin` behind `IAdminPaymentRepository` (same rule 9 boundary). These are system actions: no admin user, no `AdminAuditLog`.
+- Dashboard: the Payments page, the overview revenue card and the shop's payments (§13). bUnit: `PaymentsPageTests` (each of the three in loading, empty, error, data), `PlansPageTests.Render_FreeAndPaidPlans_*`.
+- Full feature doc: `docs/features/billing.md`.
