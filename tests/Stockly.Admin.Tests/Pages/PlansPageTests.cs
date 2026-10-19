@@ -51,6 +51,18 @@ public sealed class PlansPageTests : AdminTestContext
     }
 
     [Fact]
+    public void Render_FreeAndPaidPlans_MarksFreeAndShowsThePriceProminently()
+    {
+        Api.OnGet(ApiRoutes.Plans, new[] { Samples.Plan() with { MonthlyPrice = "0.00" }, Samples.Plan(code: "pro") });
+
+        var page = Render<Plans>();
+
+        page.WaitForAssertion(() => page.FindAll("[data-testid=plan-free]").Should().ContainSingle());
+        var prices = page.FindAll("[data-testid=plan-price]").Select(price => price.TextContent.Trim()).ToList();
+        prices.Should().Equal("Free", "199.50 EGP");
+    }
+
+    [Fact]
     public void Create_CodeTaken_KeepsDialogOpenWithTheProblem()
     {
         Api.OnGet(ApiRoutes.Plans, Array.Empty<PlanDto>());

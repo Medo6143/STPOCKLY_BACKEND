@@ -6,6 +6,7 @@ using Stockly.Application.Features.Invoices;
 using Stockly.Application.Features.Products;
 using Stockly.Domain.Common;
 using Stockly.Domain.Invoices;
+using Stockly.Domain.Payments;
 using Stockly.Domain.Products;
 using Stockly.Domain.Sales;
 using Stockly.Domain.Shops;
@@ -13,7 +14,7 @@ using Stockly.Domain.Stock;
 
 namespace Stockly.Api.IntegrationTests.Errors;
 
-/// <summary>Every code the API can return (steps 1.5, 1.6, 2a, 2b and Sprint 4) has a title and detail in Arabic and English (contract §1.5, §9).</summary>
+/// <summary>Every code the API can return (steps 1.5, 1.6, 2a, 2b, Sprint 4 and billing) has a title and detail in Arabic and English (contract §1.5, §9).</summary>
 public sealed class ErrorTextTests
 {
     public static TheoryData<string> Codes()
@@ -61,6 +62,14 @@ public sealed class ErrorTextTests
             SaleErrors.UnitNotOfProduct.Code,
             ScanErrors.RateLimitedCode,
             ScanErrors.DailyQuotaExceededCode,
+            PlanErrors.NotFound.Code,
+            PlanErrors.Inactive.Code,
+            PaymentErrors.NotFound.Code,
+            PaymentErrors.FreePlan.Code,
+            PaymentErrors.MethodUnavailable.Code,
+            PaymentErrors.PaymentPending.Code,
+            PaymentErrors.NotCancelable.Code,
+            PaymentErrors.ProviderUnavailable.Code,
         ];
         return new TheoryData<string>(authCodes.Concat(others));
     }
@@ -107,6 +116,7 @@ public sealed class ErrorTextTests
     [InlineData(ErrorType.Locked, 423)]
     [InlineData(ErrorType.TooManyRequests, 429)]
     [InlineData(ErrorType.PayloadTooLarge, 413)]
+    [InlineData(ErrorType.BadGateway, 502)]
     public void StatusFor_ErrorType_FollowsContract(ErrorType type, int status)
     {
         StocklyProblems.StatusFor(type).Should().Be(status);

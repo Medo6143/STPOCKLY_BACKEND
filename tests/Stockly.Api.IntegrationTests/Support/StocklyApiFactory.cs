@@ -4,7 +4,9 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Http;
 using Stockly.Application.Abstractions.Ai;
+using Stockly.Application.Abstractions.Payments;
 using Stockly.Application.Abstractions.Time;
 using Stockly.Infrastructure.Jobs;
 
@@ -20,7 +22,8 @@ namespace Stockly.Api.IntegrationTests.Support;
 /// The in-process Hangfire server runs only with <see cref="JobMode.Run"/>. With <c>seedAdmin</c> the start-up seed creates
 /// the test platform admin (<see cref="AdminApi"/>) once per database. <c>environment</c> and <c>settings</c> (extra
 /// configuration, e.g. <c>Cors:AdminOrigins</c>) serve the hardening tests; <c>replaceExtractor: false</c> keeps the real
-/// OpenRouter extractor (only with <c>Ai:UseFake</c>, so still no network call).
+/// OpenRouter extractor (only with <c>Ai:UseFake</c>, so still no network call). <c>paymob</c> answers every Paymob call
+/// of the payment gateway (with <see cref="FakePaymobApi.Settings"/>); Paymob itself is never called.
 /// </summary>
 public sealed class StocklyApiFactory(
     string postgres,
@@ -34,7 +37,8 @@ public sealed class StocklyApiFactory(
     bool seedAdmin = false,
     string environment = StocklyApiFactory.TestEnvironment,
     IReadOnlyDictionary<string, string?>? settings = null,
-    bool replaceExtractor = true)
+    bool replaceExtractor = true,
+    HttpMessageHandler? paymob = null)
     : WebApplicationFactory<Program>
 {
     public const string TestEnvironment = "Testing";
@@ -100,6 +104,12 @@ public sealed class StocklyApiFactory(
             if (clock is not null)
             {
                 services.AddSingleton(clock);
+            }
+
+            if (paymob is not null)
+            {
+                services.Configure<HttpClientFactoryOptions>(
+                    nameof(IPaymentGateway), options => options.HttpMessageHandlerBuilderActions.Add(handler => handler.PrimaryHandler = paymob));
             }
 
             if (includeTestEndpoints)
