@@ -121,16 +121,21 @@ public sealed class ConfirmInvoiceCommandHandler(
         var existingIds = lines.Where(line => line.ProductId is not null).Select(line => line.ProductId!.Value).Distinct().ToList();
         var locked = await stock.LockProductsAsync(existingIds, cancellationToken);
 
-        // Step 6.
-        var created = CreateNewProducts(lines, shopId, now);
+        // Step 6 (§10.5).
+        var created = NewProductsFromInvoice.Create(lines, shopId, now);
         if (created.IsFailure)
         {
             return created.Error;
         }
 
+        foreach (var product in created.Value.Values)
+        {
+            products.Add(product);
+        }
+
         // Step 7: one receipt per line, in line order, in base units (ADR-0003).
         var createdProductIdByLineId = new Dictionary<Guid, Guid>();
-        var targets = new List<(InvoiceItem Line, Product Product, Guid UnitId)>(lines.Count);
+        var received = new List<(InvoiceItem Line, Guid ProductId, Guid UnitId)>(lines.Count);
         foreach (var line in lines)
         {
             var (product, unit, baseQuantity) = Target(line, locked, created.Value);
@@ -145,7 +150,7 @@ public sealed class ConfirmInvoiceCommandHandler(
                 return movement.Error;
             }
 
-            targets.Add((line, product, unit.Id));
+            received.Add((line, product.Id, unit.Id));
         }
 
         // Step 9.
@@ -163,7 +168,7 @@ public sealed class ConfirmInvoiceCommandHandler(
         }
 
         // Step 8.
-        var learned = LearnAliases(targets, shopId, supplier.Value.SupplierId, now);
+        var learned = InvoiceAliasLearning.Learn(received, shopId, supplier.Value.SupplierId, now);
         if (learned.IsFailure)
         {
             return learned.Error;
@@ -198,43 +203,10 @@ public sealed class ConfirmInvoiceCommandHandler(
         return new SupplierChoice(resolved.SupplierId, resolved.Created);
     }
 
-    // §10.5: lines with the same normalized name and base unit share one product; the lowest line number sets its prices.
-    private Result<Dictionary<(string Name, string BaseUnit), Product>> CreateNewProducts(
-        List<InvoiceItem> lines, Guid shopId, DateTimeOffset now)
-    {
-        var created = new Dictionary<(string Name, string BaseUnit), Product>();
-        foreach (var line in lines.Where(line => line.NewProductName is not null))
-        {
-            var key = NewProductKey(line);
-            if (created.ContainsKey(key))
-            {
-                continue;
-            }
-
-            var product = Product.Create(
-                shopId,
-                line.NewProductName!,
-                line.NewProductBaseUnitName!,
-                costPrice: line.UnitPrice,
-                baseUnitSellPrice: line.NewProductSellPrice!.Value,
-                lowStockThreshold: 0m,
-                now);
-            if (product.IsFailure)
-            {
-                return product.Error;
-            }
-
-            products.Add(product.Value);
-            created[key] = product.Value;
-        }
-
-        return created;
-    }
-
     // An existing line's product is always locked (FK) and its unit always one of the product's (I4 checked it; units in
     // use cannot be deleted, P8), so a miss is a broken invariant, not a client error.
     private static (Product Product, ProductUnit Unit, decimal BaseQuantity) Target(
-        InvoiceItem line, IReadOnlyDictionary<Guid, Product> locked, Dictionary<(string Name, string BaseUnit), Product> created)
+        InvoiceItem line, IReadOnlyDictionary<Guid, Product> locked, IReadOnlyDictionary<(string Name, string BaseUnit), Product> created)
     {
         if (line.ProductId is { } productId)
         {
@@ -248,32 +220,9 @@ public sealed class ConfirmInvoiceCommandHandler(
         }
 
         // A new product's line quantity is already in its base unit (contract I4).
-        var newProduct = created[NewProductKey(line)];
+        var newProduct = created[NewProductsFromInvoice.KeyOf(line)];
         return (newProduct, newProduct.BaseUnit, line.Quantity);
     }
-
-    // One alias per normalized raw name: the highest line number decides the product and unit; every line counts.
-    private static Result<List<ProductAlias>> LearnAliases(
-        List<(InvoiceItem Line, Product Product, Guid UnitId)> targets, Guid shopId, Guid? supplierId, DateTimeOffset now)
-    {
-        var learned = new List<ProductAlias>();
-        foreach (var group in targets.GroupBy(target => ArabicTextNormalizer.Normalize(target.Line.RawName), StringComparer.Ordinal))
-        {
-            var last = group.MaxBy(target => target.Line.LineNo);
-            var alias = ProductAlias.Learn(shopId, last.Product.Id, supplierId, last.UnitId, last.Line.RawName, now, group.Count());
-            if (alias.IsFailure)
-            {
-                return alias.Error;
-            }
-
-            learned.Add(alias.Value);
-        }
-
-        return learned;
-    }
-
-    private static (string Name, string BaseUnit) NewProductKey(InvoiceItem line) =>
-        (ArabicTextNormalizer.Normalize(line.NewProductName!), ArabicTextNormalizer.Normalize(line.NewProductBaseUnitName!));
 
     private async Task<InvoiceDetail> DetailAsync(Guid invoiceId, CancellationToken cancellationToken) =>
         await queries.FindDetailAsync(invoiceId, cancellationToken)

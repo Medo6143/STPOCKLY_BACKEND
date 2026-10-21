@@ -15,7 +15,7 @@ After the owner has reviewed a scanned invoice (I4), confirming it receives the 
 |---|---|---|---|---|---|---|
 | I5 | POST | `/api/invoices/{id}/confirm` | user | none | `200 InvoiceDetail` (status `Confirmed`) | 200, 400, 401, 403, 404, 409 |
 
-Code: `InvoicesController.ConfirmAsync` → `Application/Features/Invoices/ConfirmInvoice/{ConfirmInvoiceCommand,ConfirmInvoiceCommandHandler}`. The command is **not** wrapped in `TransactionBehavior`: the handler runs `IUnitOfWork.ExecuteInTransactionAsync` itself so the cache work happens strictly after the commit and the last-safety-net conflict can be answered after the rollback. A confirmed new-product line returns the created product's `productId`/`productName` (backend.md §9.2); `newProduct` is kept.
+Code: `InvoicesController.ConfirmAsync` → `Application/Features/Invoices/ConfirmInvoice/{ConfirmInvoiceCommand,ConfirmInvoiceCommandHandler}`. The command is **not** wrapped in `TransactionBehavior`: the handler runs `IUnitOfWork.ExecuteInTransactionAsync` itself so the cache work happens strictly after the commit and the last-safety-net conflict can be answered after the rollback. A confirmed new-product line returns the created product's `productId`/`productName` (backend.md §9.2); `newProduct` is kept. The two pure rules live in the Domain, so the handler only orchestrates (locks, receipts, save): `Domain/Invoices/NewProductsFromInvoice` (which products a confirm creates, §10.5) and `Domain/Invoices/InvoiceAliasLearning` (which aliases it learns, §11 step 8), tested in `Domain.Tests` `Invoices/InvoiceConfirmationRulesTests`.
 
 ## 4. Data model changes
 No new table or index for confirm (migration `InvoiceScan` already has every column and index). The transaction, docs/design/backend.md §11:
