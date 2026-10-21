@@ -4,15 +4,21 @@ namespace Stockly.Application.Abstractions.Caching;
 
 /// <summary>
 /// The invoice status for polling (<c>stockly:{shopId}:invoice:{id}:status</c>, 10 minutes, docs/design/redis.md).
-/// Written by the scan, the job and confirm after their commit, and read-through by I3 for a processing invoice;
-/// overwritten on every change. Redis failures are misses
-/// and skipped writes, never errors (rule 25).
+/// Written by the scan, the job and confirm after their commit (overwriting), and read-through by I3 for a processing
+/// invoice (only if absent). Redis failures are misses and skipped writes, never errors (rule 25).
 /// </summary>
 public interface IInvoiceStatusCache
 {
     Task<InvoiceStatusSnapshot?> GetAsync(Guid shopId, Guid invoiceId, CancellationToken cancellationToken);
 
+    /// <summary>A change committed by the caller: overwrites what is cached.</summary>
     Task SetAsync(Guid shopId, InvoiceStatusSnapshot snapshot, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// A read-through snapshot: written only when the key is absent, so a status read before a change that was cached
+    /// meanwhile never overwrites it.
+    /// </summary>
+    Task SetIfAbsentAsync(Guid shopId, InvoiceStatusSnapshot snapshot, CancellationToken cancellationToken);
 }
 
 /// <summary>

@@ -308,5 +308,7 @@ public sealed class ProcessInvoiceJobTests(PostgresFixture fixture) : IAsyncDisp
             Task.FromResult<InvoiceStatusSnapshot?>(null);
 
         public Task SetAsync(Guid shopId, InvoiceStatusSnapshot snapshot, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task SetIfAbsentAsync(Guid shopId, InvoiceStatusSnapshot snapshot, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }

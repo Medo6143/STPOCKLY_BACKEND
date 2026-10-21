@@ -45,8 +45,13 @@ public sealed class AdminInvoiceAndMiscHandlerTests
         invoice.Status.Should().Be(DomainInvoiceStatus.Processing);
         commitsWhenQueued.Should().Be(1, "the job is queued only after the transaction committed");
         _context.Jobs.DidNotReceiveWithAnyArgs().EnqueueProcessInvoice(default, default);
-        await _context.StatusCache.Received(1).SetAsync(
-            ShopId, Arg.Is<InvoiceStatusSnapshot>(snapshot => snapshot.Status == DomainInvoiceStatus.Processing), Arg.Any<CancellationToken>());
+        // Cached before the job is queued: a fast job's status must not be overwritten by this Processing.
+        Received.InOrder(() =>
+        {
+            _context.StatusCache.SetAsync(
+                ShopId, Arg.Is<InvoiceStatusSnapshot>(snapshot => snapshot.Status == DomainInvoiceStatus.Processing), Arg.Any<CancellationToken>());
+            _context.Jobs.EnqueueRerunInvoice(ShopId, invoice.Id);
+        });
         var entry = _context.Audited.Should().ContainSingle().Subject;
         entry.Should().BeEquivalentTo(new { Action = AdminActions.InvoiceRerun, TargetType = AdminTargets.Invoice, TargetId = invoice.Id, Reason = "AI outage over" });
         entry.Before.Should().Be("""{"status":"Failed","failureReason":"AiUnavailable"}""");

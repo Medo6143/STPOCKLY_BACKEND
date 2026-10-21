@@ -87,6 +87,36 @@ public sealed class RedisInvoiceCachesTests(RedisFixture fixture)
     }
 
     [Fact]
+    public async Task StatusCache_SetIfAbsent_NeverOverwritesANewerSnapshot()
+    {
+        // A poll read Processing from PostgreSQL; the job then wrote NeedsReview. The poll's late write must lose.
+        var cache = Services().GetRequiredService<IInvoiceStatusCache>();
+        var shopId = Guid.CreateVersion7();
+        var invoiceId = Guid.CreateVersion7();
+        var processing = new InvoiceStatusSnapshot(invoiceId, InvoiceStatus.Processing, TestTime.T0, Guid.CreateVersion7(), TestTime.T0);
+        var reviewed = processing with { Status = InvoiceStatus.NeedsReview, UpdatedAt = TestTime.T1 };
+
+        await cache.SetAsync(shopId, reviewed, CancellationToken.None);
+        await cache.SetIfAbsentAsync(shopId, processing, CancellationToken.None);
+
+        (await cache.GetAsync(shopId, invoiceId, CancellationToken.None)).Should().Be(reviewed);
+    }
+
+    [Fact]
+    public async Task StatusCache_SetIfAbsentOnAnEmptyKey_WritesWithTenMinuteTtl()
+    {
+        var cache = Services().GetRequiredService<IInvoiceStatusCache>();
+        var shopId = Guid.CreateVersion7();
+        var snapshot = new InvoiceStatusSnapshot(Guid.CreateVersion7(), InvoiceStatus.Processing, TestTime.T0, Guid.CreateVersion7(), TestTime.T0);
+
+        await cache.SetIfAbsentAsync(shopId, snapshot, CancellationToken.None);
+
+        (await cache.GetAsync(shopId, snapshot.InvoiceId, CancellationToken.None)).Should().Be(snapshot);
+        (await fixture.TimeToLiveAsync(CacheKeys.InvoiceStatus(shopId, snapshot.InvoiceId)))!.Value
+            .Should().BeCloseTo(CacheKeys.InvoiceStatusTimeToLive, TimeSpan.FromSeconds(30));
+    }
+
+    [Fact]
     public async Task StatusCache_OtherShopsKey_Miss()
     {
         var cache = Services().GetRequiredService<IInvoiceStatusCache>();
@@ -110,6 +140,7 @@ public sealed class RedisInvoiceCachesTests(RedisFixture fixture)
         await aiCache.SetAsync(shopId, Sha(), Model, Extraction, CancellationToken.None);
         (await statusCache.GetAsync(shopId, snapshot.InvoiceId, CancellationToken.None)).Should().BeNull();
         await statusCache.SetAsync(shopId, snapshot, CancellationToken.None);
+        await statusCache.SetIfAbsentAsync(shopId, snapshot, CancellationToken.None);
 
         logs.Entries.Where(entry => entry.Level == LogLevel.Warning).Should().ContainSingle();
     }

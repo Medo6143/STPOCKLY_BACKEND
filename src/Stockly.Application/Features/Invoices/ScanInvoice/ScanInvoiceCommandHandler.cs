@@ -135,8 +135,9 @@ public sealed class ScanInvoiceCommandHandler(
             return await LoseRaceAsync(shopId, clientRequestId, created, countedInRedis, saved.Error, cancellationToken);
         }
 
-        jobs.EnqueueProcessInvoice(shopId, created.Id);
+        // Cached before the job is queued: a fast job's status must not be overwritten by this Processing.
         await statusCache.SetAsync(shopId, created.ToStatusSnapshot(), cancellationToken);
+        jobs.EnqueueProcessInvoice(shopId, created.Id);
         return new ScanInvoiceResult(created.ToListItem(), Created: true);
     }
 

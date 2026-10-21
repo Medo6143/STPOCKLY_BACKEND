@@ -68,8 +68,9 @@ public sealed class RerunInvoiceCommandHandler(
             return outcome.Result.Error;
         }
 
-        jobs.EnqueueRerunInvoice(queued.ShopId, queued.Id);
+        // Cached before the job is queued: a fast job's status must not be overwritten by this Processing.
         await statusCache.SetAsync(queued.ShopId, queued.ToStatusSnapshot(), cancellationToken);
+        jobs.EnqueueRerunInvoice(queued.ShopId, queued.Id);
 
         var detail = await invoices.FindAsync(queued.Id, cancellationToken)
             ?? throw new InvalidOperationException("The invoice queued again was not found.");

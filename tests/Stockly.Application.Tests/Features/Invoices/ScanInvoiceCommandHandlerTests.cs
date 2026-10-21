@@ -45,11 +45,15 @@ public sealed class ScanInvoiceCommandHandlerTests
             InvoiceImageFormat.Jpeg,
             Arg.Any<CancellationToken>());
         _context.UnitOfWork.SaveCount.Should().Be(1);
-        _context.Jobs.Received(1).EnqueueProcessInvoice(ShopId, added.Id);
-        await _context.StatusCache.Received(1).SetAsync(
-            ShopId,
-            Arg.Is<InvoiceStatusSnapshot>(snapshot => snapshot.InvoiceId == added.Id && snapshot.Status == Domain.Invoices.InvoiceStatus.Processing),
-            Arg.Any<CancellationToken>());
+        // Cached before the job is queued: a fast job's NeedsReview must not be overwritten by this Processing.
+        Received.InOrder(() =>
+        {
+            _context.StatusCache.SetAsync(
+                ShopId,
+                Arg.Is<InvoiceStatusSnapshot>(snapshot => snapshot.InvoiceId == added.Id && snapshot.Status == Domain.Invoices.InvoiceStatus.Processing),
+                Arg.Any<CancellationToken>());
+            _context.Jobs.EnqueueProcessInvoice(ShopId, added.Id);
+        });
     }
 
     [Fact]

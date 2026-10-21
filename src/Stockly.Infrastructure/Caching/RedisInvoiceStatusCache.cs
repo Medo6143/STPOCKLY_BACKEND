@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using StackExchange.Redis;
 using Stockly.Application.Abstractions.Caching;
 
 namespace Stockly.Infrastructure.Caching;
@@ -31,7 +32,14 @@ internal sealed class RedisInvoiceStatusCache(RedisConnection redis, RedisDegrad
         }
     }
 
-    public async Task SetAsync(Guid shopId, InvoiceStatusSnapshot snapshot, CancellationToken cancellationToken)
+    public Task SetAsync(Guid shopId, InvoiceStatusSnapshot snapshot, CancellationToken cancellationToken) =>
+        WriteAsync(shopId, snapshot, When.Always, nameof(SetAsync), cancellationToken);
+
+    public Task SetIfAbsentAsync(Guid shopId, InvoiceStatusSnapshot snapshot, CancellationToken cancellationToken) =>
+        WriteAsync(shopId, snapshot, When.NotExists, nameof(SetIfAbsentAsync), cancellationToken);
+
+    private async Task WriteAsync(
+        Guid shopId, InvoiceStatusSnapshot snapshot, When when, string operation, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
 
@@ -39,12 +47,13 @@ internal sealed class RedisInvoiceStatusCache(RedisConnection redis, RedisDegrad
         {
             var value = JsonSerializer.Serialize(snapshot, Json);
             var database = await redis.GetDatabaseAsync(cancellationToken);
-            await database.StringSetAsync(CacheKeys.InvoiceStatus(shopId, snapshot.InvoiceId), value, CacheKeys.InvoiceStatusTimeToLive)
+            await database.StringSetAsync(
+                    CacheKeys.InvoiceStatus(shopId, snapshot.InvoiceId), value, CacheKeys.InvoiceStatusTimeToLive, when)
                 .WaitAsync(cancellationToken);
         }
         catch (Exception exception) when (RedisDegradationLog.IsRedisFailure(exception))
         {
-            degradation.Warn(nameof(SetAsync), exception);
+            degradation.Warn(operation, exception);
         }
     }
 }
