@@ -109,6 +109,22 @@ public sealed class IdentityUserAccountsTests(PostgresFixture fixture)
     }
 
     [Fact]
+    public async Task CheckCredentials_WrongPasswordsAtTheSameTime_EachCountsAndTheAccountLocks()
+    {
+        // Counted on a copy read before the others committed, parallel attempts used to count once.
+        var clock = new FakeClock(TestTime.T0);
+        var email = NewEmail();
+        var created = await CreateAsync(email, PreferredLanguage.Ar);
+
+        await Task.WhenAll(Enumerable.Range(0, AuthProtection.MaxFailedLoginAttempts * 2)
+            .Select(_ => CheckInTransactionAsync(clock, email, "Wr0ngPass")));
+
+        (await CheckAsync(clock, email, Password)).Status.Should().Be(CredentialStatus.LockedOut);
+        (await fixture.ScalarAsync<DateTime>("SELECT lockout_end FROM users WHERE id = @p0", created.Value))
+            .Should().Be((TestTime.T0 + AuthProtection.LockoutDuration).UtcDateTime);
+    }
+
+    [Fact]
     public async Task CheckCredentials_RightPassword_ResetsTheFailedCount()
     {
         var clock = new FakeClock(TestTime.T0);
@@ -173,6 +189,17 @@ public sealed class IdentityUserAccountsTests(PostgresFixture fixture)
         return await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().ExecuteInTransactionAsync(
             token => accounts.CreateAsync(new NewUserAccount(email, "Mona", null, PreferredLanguage.Ar, TestTime.T0), Password, token),
             result => result.IsSuccess,
+            CancellationToken.None);
+    }
+
+    /// <summary>Like a login request: its own scope and transaction, committed whatever the outcome.</summary>
+    private async Task<CredentialCheck> CheckInTransactionAsync(FakeClock clock, string email, string password)
+    {
+        await using var scope = fixture.CreateScope(shopId: null, withIdentity: true, clock: clock);
+        var accounts = scope.ServiceProvider.GetRequiredService<IUserAccounts>();
+        return await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().ExecuteInTransactionAsync(
+            token => accounts.CheckCredentialsAsync(email, password, token),
+            _ => true,
             CancellationToken.None);
     }
 
