@@ -22,7 +22,8 @@ Key docs:
 | `docs/features/` | One doc per feature, from `_TEMPLATE.md` |
 | `docs/api/contract.md` | API contract v1 for Sprints 1–4 (binding; changed only by the orchestrator) |
 | `docs/api/openapi.json` | Generated spec, checked against the contract by tests |
-| `docs/agents/` | Orchestration guide and agent briefs |
+| `docs/agents/` | Agent briefs (the record of each task) |
+| `.claude/` | Coordinator skill, worker and reviewer agents, git guard hook (see `.claude/skills/coordinator/SKILL.md`) |
 
 **Repositories (ADR-0011).** This repository, `stockly-backend`, holds the API and the Blazor admin. The Flutter app lives in `stockly-mobile` and consumes the API through the OpenAPI spec at `docs/api/openapi.json`; mobile-only rules live in that repository.
 
