@@ -68,7 +68,7 @@ internal sealed partial class PaymobPaymentGateway(
 
             case PaymentMethod.Wallet:
                 var wallet = await PayAsync(created.PaymentKey, request.WalletPhone ?? string.Empty, WalletSubtype, cancellationToken);
-                var walletUrl = AsUrl(wallet?["redirect_url"]) ?? AsUrl(wallet?["iframe_redirection_url"]);
+                var walletUrl = AsUrl(PaymobHmac.Field(wallet, "redirect_url")) ?? AsUrl(PaymobHmac.Field(wallet, "iframe_redirection_url"));
                 if (walletUrl is null)
                 {
                     LogCheckoutFailed(logger, request.PaymentId, request.Method, "wallet pay");
@@ -80,7 +80,8 @@ internal sealed partial class PaymobPaymentGateway(
 
             default:
                 var kiosk = await PayAsync(created.PaymentKey, Aggregator, Aggregator, cancellationToken);
-                var reference = PaymobHmac.AsText(kiosk?["data"]?["bill_reference"]) ?? PaymobHmac.AsText(kiosk?["bill_reference"]);
+                var reference = PaymobHmac.AsText(PaymobHmac.Field(PaymobHmac.Field(kiosk, "data"), "bill_reference"))
+                    ?? PaymobHmac.AsText(PaymobHmac.Field(kiosk, "bill_reference"));
                 if (string.IsNullOrWhiteSpace(reference))
                 {
                     LogCheckoutFailed(logger, request.PaymentId, request.Method, "kiosk pay");
@@ -136,7 +137,8 @@ internal sealed partial class PaymobPaymentGateway(
             return PaymentErrors.ProviderUnavailable;
         }
 
-        var token = PaymobHmac.AsText((await SendAsync(Json(PaymobPaths.AuthToken, new { api_key = options.ApiKey }), cancellationToken))?["token"]);
+        var auth = await SendAsync(Json(PaymobPaths.AuthToken, new { api_key = options.ApiKey }), cancellationToken);
+        var token = PaymobHmac.AsText(PaymobHmac.Field(auth, "token"));
         if (string.IsNullOrWhiteSpace(token))
         {
             LogInquiryFailed(logger, providerOrderId, "auth");
@@ -251,10 +253,10 @@ internal sealed partial class PaymobPaymentGateway(
 
     private static Intention? ReadIntention(JsonNode node)
     {
-        var key = node["payment_keys"] is JsonArray { Count: > 0 } keys ? keys[0] : null;
-        var orderId = PaymobHmac.AsText(node["intention_order_id"]) ?? PaymobHmac.AsText(key?["order_id"]);
-        var clientSecret = PaymobHmac.AsText(node["client_secret"]);
-        var paymentKey = PaymobHmac.AsText(key?["key"]);
+        var key = PaymobHmac.Field(node, "payment_keys") is JsonArray { Count: > 0 } keys ? keys[0] : null;
+        var orderId = PaymobHmac.AsText(PaymobHmac.Field(node, "intention_order_id")) ?? PaymobHmac.AsText(PaymobHmac.Field(key, "order_id"));
+        var clientSecret = PaymobHmac.AsText(PaymobHmac.Field(node, "client_secret"));
+        var paymentKey = PaymobHmac.AsText(PaymobHmac.Field(key, "key"));
         return string.IsNullOrWhiteSpace(orderId) || string.IsNullOrWhiteSpace(clientSecret)
             ? null
             : new Intention(orderId, clientSecret, paymentKey ?? string.Empty);
@@ -263,7 +265,7 @@ internal sealed partial class PaymobPaymentGateway(
     private static ProviderTransaction? ReadTransaction(JsonObject transaction)
     {
         var id = PaymobHmac.AsText(transaction["id"]);
-        var orderId = PaymobHmac.AsText(transaction["order"]?["id"]) ?? PaymobHmac.AsText(transaction["order"]);
+        var orderId = PaymobHmac.AsText(PaymobHmac.Field(transaction["order"], "id")) ?? PaymobHmac.AsText(transaction["order"]);
         var cents = PaymobHmac.AsLong(transaction["amount_cents"]);
         var currency = PaymobHmac.AsText(transaction["currency"]);
         if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(orderId) || cents is null || string.IsNullOrWhiteSpace(currency))
@@ -277,7 +279,7 @@ internal sealed partial class PaymobPaymentGateway(
         var outcome = success && !pending && !reversed ? ProviderTransactionOutcome.Succeeded
             : pending && !reversed ? ProviderTransactionOutcome.Pending
             : ProviderTransactionOutcome.Failed;
-        var reason = outcome == ProviderTransactionOutcome.Failed ? PaymobHmac.AsText(transaction["data"]?["message"]) : null;
+        var reason = outcome == ProviderTransactionOutcome.Failed ? PaymobHmac.AsText(PaymobHmac.Field(transaction["data"], "message")) : null;
         return new ProviderTransaction(id, orderId, Piastres.ToPounds(cents.Value), currency, outcome, reason);
     }
 

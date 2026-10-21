@@ -221,6 +221,28 @@ public sealed class AdminPaymentHandlerTests
     }
 
     [Fact]
+    public async Task Reconcile_OnePaymentThrows_TheRestOfTheBatchStillRuns()
+    {
+        // The batch is ordered oldest first: a payment that always throws must not stop every later run.
+        var broken = Pending("order-broken");
+        var paid = Pending("order-paid");
+        _payments.ListExpiredPendingAsync(Now, AdminLimits.ReconcileBatchSize, Arg.Any<CancellationToken>())
+            .Returns([Expired(broken), Expired(paid)]);
+        _payments.FindForUpdateAsync(paid.Id, Arg.Any<CancellationToken>()).Returns(paid);
+        _payments.FindActiveSubscriptionForUpdateAsync(ShopId, Arg.Any<CancellationToken>()).Returns(Subscription(ProPlan, Today));
+        _gateway.FindLatestTransactionAsync("order-broken", Arg.Any<CancellationToken>())
+            .Returns<Task<Result<ProviderTransaction?>>>(_ => throw new InvalidOperationException("unexpected answer"));
+        _gateway.FindLatestTransactionAsync("order-paid", Arg.Any<CancellationToken>())
+            .Returns(Result.Success<ProviderTransaction?>(Transaction("order-paid", 199.50m)));
+
+        var result = await Reconcile();
+
+        result.Value.Should().Be(new ReconcileSummary(2, 1, 0, 0, 1));
+        broken.Status.Should().Be(PaymentStatus.Pending);
+        paid.Status.Should().Be(PaymentStatus.Paid);
+    }
+
+    [Fact]
     public async Task Reconcile_SettledMeanwhile_ChangesNothing()
     {
         var payment = Pending();
