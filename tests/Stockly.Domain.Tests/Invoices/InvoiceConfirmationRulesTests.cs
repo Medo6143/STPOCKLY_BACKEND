@@ -11,7 +11,7 @@ public sealed class InvoiceConfirmationRulesTests
     private static readonly Guid SupplierId = Guid.CreateVersion7();
 
     [Fact]
-    public void NewProducts_SameNameAndBaseUnitOnTwoLines_OneProductPricedByTheLowestLine()
+    public void Create_SameNameAndBaseUnitOnTwoLines_OneProductPricedByTheLowestLine()
     {
         // Lines given out of order: the lowest line number sets the prices whatever the caller's order.
         var items = Items(
@@ -29,7 +29,7 @@ public sealed class InvoiceConfirmationRulesTests
     }
 
     [Fact]
-    public void NewProducts_SameNameOtherBaseUnit_TwoProducts_ExistingLinesIgnored()
+    public void Create_SameNameOtherBaseUnit_TwoProductsAndExistingLinesIgnored()
     {
         var items = Items(
             New(1, "بنادول", "علبة", unitPrice: 30m, sellPrice: 40m),
@@ -43,14 +43,15 @@ public sealed class InvoiceConfirmationRulesTests
     }
 
     [Fact]
-    public void Aliases_SameRawNameOnTwoLines_OneAliasForTheHighestLineCountedTwice()
+    public void Learn_SameRawNameOnTwoLines_OneAliasForTheHighestLineCountedTwice()
     {
         var items = Items(Existing(1, "بنادول علبة"), Existing(2, "كونجستال"), Existing(4, "بنادول  علبه"));
         var first = (Line: items[0], ProductId: Guid.CreateVersion7(), UnitId: Guid.CreateVersion7());
         var last = (Line: items[2], ProductId: Guid.CreateVersion7(), UnitId: Guid.CreateVersion7());
         var other = (Line: items[1], ProductId: Guid.CreateVersion7(), UnitId: Guid.CreateVersion7());
 
-        var learned = InvoiceAliasLearning.Learn([last, other, first], TestData.ShopId, SupplierId, TestData.Now);
+        // Highest line last: taking the group's first entry instead of the highest line would pick the wrong product.
+        var learned = InvoiceAliasLearning.Learn([first, other, last], TestData.ShopId, SupplierId, TestData.Now);
 
         learned.Value.Should().HaveCount(2);
         var panadol = learned.Value.Single(alias => alias.ProductId == last.ProductId);

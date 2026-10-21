@@ -43,7 +43,10 @@ public static class NewProductsFromInvoice
         return created;
     }
 
-    /// <summary>The product a new-product line belongs to: its normalized name and base unit.</summary>
+    /// <summary>
+    /// The product a new-product line belongs to: its normalized name and base unit. Only for lines with a new product
+    /// (<see cref="InvoiceItem.NewProductName"/> set); a line of an existing product has no key.
+    /// </summary>
     public static (string Name, string BaseUnit) KeyOf(InvoiceItem line)
     {
         ArgumentNullException.ThrowIfNull(line);
