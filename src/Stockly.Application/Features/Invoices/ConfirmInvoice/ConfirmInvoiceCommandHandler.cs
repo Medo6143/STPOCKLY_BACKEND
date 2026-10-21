@@ -71,11 +71,11 @@ public sealed class ConfirmInvoiceCommandHandler(
         var confirmation = outcome.Value;
         if (confirmation.Snapshot is { } snapshot)
         {
-            await cache.IncrementVersionAsync(CacheKeys.CatalogVersion(shopId), cancellationToken);
-            await statusCache.SetAsync(shopId, snapshot, cancellationToken);
+            await cache.IncrementVersionAsync(CacheKeys.CatalogVersion(shopId), AfterCommit.Token);
+            await statusCache.SetAsync(shopId, snapshot, AfterCommit.Token);
             if (confirmation.SupplierCreated)
             {
-                await cache.RemoveAsync(CacheKeys.SuppliersList(shopId), cancellationToken);
+                await cache.RemoveAsync(CacheKeys.SuppliersList(shopId), AfterCommit.Token);
             }
         }
 

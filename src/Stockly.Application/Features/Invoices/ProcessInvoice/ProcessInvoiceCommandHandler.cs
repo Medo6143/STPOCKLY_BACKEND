@@ -224,7 +224,7 @@ public sealed class ProcessInvoiceCommandHandler(
 
         if (save.Changed is not null)
         {
-            await statusCache.SetAsync(shopId, save.Changed.ToStatusSnapshot(), cancellationToken);
+            await statusCache.SetAsync(shopId, save.Changed.ToStatusSnapshot(), AfterCommit.Token);
         }
 
         return save.Result;

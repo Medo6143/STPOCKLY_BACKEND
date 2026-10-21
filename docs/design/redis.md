@@ -38,7 +38,7 @@ The Hangfire dashboard's one-time codes (contract §11.3) are not in Redis: they
 
 ## 2. Why version keys instead of deleting by pattern
 
-Deleting `stockly:{shopId}:products:*` needs `SCAN`, which is slow and not atomic. Instead every catalog key embeds the current version. A write does one `INCR stockly:{shopId}:ver:catalog`, after commit, and every old key becomes unreachable and expires by TTL. One round-trip, no race with readers.
+Deleting `stockly:{shopId}:products:*` needs `SCAN`, which is slow and not atomic. Instead every catalog key embeds the current version. A write does one `INCR stockly:{shopId}:ver:catalog`, after commit, and every old key becomes unreachable and expires by TTL. One round-trip, no race with readers. Writes made after a commit (this `INCR`, the invoice status, the suppliers list removal) use `AfterCommit.Token`, never the request's token: a client that disconnects right after the commit must not skip them, or its retry gets the existing resource back and the old lists stay cached until their TTL (review 2026-10-21).
 
 ## 3. Rules (from the master prompt, made concrete)
 

@@ -136,7 +136,7 @@ public sealed class ScanInvoiceCommandHandler(
         }
 
         // Cached before the job is queued: a fast job's status must not be overwritten by this Processing.
-        await statusCache.SetAsync(shopId, created.ToStatusSnapshot(), cancellationToken);
+        await statusCache.SetAsync(shopId, created.ToStatusSnapshot(), AfterCommit.Token);
         jobs.EnqueueProcessInvoice(shopId, created.Id);
         return new ScanInvoiceResult(created.ToListItem(), Created: true);
     }

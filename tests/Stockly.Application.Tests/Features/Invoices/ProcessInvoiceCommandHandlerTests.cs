@@ -39,7 +39,8 @@ public sealed class ProcessInvoiceCommandHandlerTests
             AiJson.Serialize(extraction),
             [Attempt(Primary, AiCallOutcome.RateLimited, 429), Attempt(Primary, AiCallOutcome.Succeeded, 200, tokens: 900, cost: 0.0012m)]));
 
-        var result = await Handle(invoice.Id);
+        using var request = new CancellationTokenSource();
+        var result = await Handle(invoice.Id, cancellationToken: request.Token);
 
         result.Value.Should().BeEquivalentTo(new ProcessInvoiceOutcome(
             InvoiceStatus.NeedsReview, null, [InvoiceWarning.TotalMismatch], 2, 2));
@@ -54,7 +55,7 @@ public sealed class ProcessInvoiceCommandHandlerTests
         _context.AddedUsage[1].CostUsd.Should().Be(0.0012m);
         await _context.AiCache.Received(1).SetAsync(ShopId, Sha256, Primary, extraction, Arg.Any<CancellationToken>());
         await _context.StatusCache.Received(1).SetAsync(
-            ShopId, Arg.Is<InvoiceStatusSnapshot>(snapshot => snapshot.Status == InvoiceStatus.NeedsReview), Arg.Any<CancellationToken>());
+            ShopId, Arg.Is<InvoiceStatusSnapshot>(snapshot => snapshot.Status == InvoiceStatus.NeedsReview), Arg.Is<CancellationToken>(token => !token.CanBeCanceled));
         _context.UnitOfWork.CommitCount.Should().Be(1);
     }
 
@@ -311,7 +312,8 @@ public sealed class ProcessInvoiceCommandHandlerTests
     private static AiAttempt Attempt(string model, AiCallOutcome outcome, int? status, int tokens = 0, decimal cost = 0m) =>
         new(model, outcome, status, tokens, tokens / 3, cost, 1500);
 
-    private Task<Result<ProcessInvoiceOutcome>> Handle(Guid invoiceId, bool bypassAiCache = false) =>
+    private Task<Result<ProcessInvoiceOutcome>> Handle(
+        Guid invoiceId, bool bypassAiCache = false, CancellationToken cancellationToken = default) =>
         new ProcessInvoiceCommandHandler(
                 _context.CurrentTenant,
                 _context.Invoices,
@@ -326,5 +328,5 @@ public sealed class ProcessInvoiceCommandHandlerTests
                 _context.StatusCache,
                 _context.UnitOfWork,
                 _context.Clock)
-            .Handle(new ProcessInvoiceCommand(invoiceId, bypassAiCache), CancellationToken.None);
+            .Handle(new ProcessInvoiceCommand(invoiceId, bypassAiCache), cancellationToken);
 }
