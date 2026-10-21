@@ -72,7 +72,7 @@ public sealed class CreateSaleCommandHandler(
             return new CreateSaleResult(winner, Created: false);
         }
 
-        await cache.IncrementVersionAsync(CacheKeys.CatalogVersion(shopId), cancellationToken);
+        await cache.IncrementVersionAsync(CacheKeys.CatalogVersion(shopId), AfterCommit.Token);
         return new CreateSaleResult(recorded.Value, Created: true);
     }
 

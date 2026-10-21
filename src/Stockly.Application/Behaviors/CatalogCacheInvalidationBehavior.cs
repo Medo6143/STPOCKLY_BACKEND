@@ -23,7 +23,7 @@ public sealed class CatalogCacheInvalidationBehavior<TRequest, TResponse>(ICache
         var response = await next(cancellationToken);
         if (response.IsSuccess && currentTenant.ShopId is { } shopId)
         {
-            await cache.IncrementVersionAsync(CacheKeys.CatalogVersion(shopId), cancellationToken);
+            await cache.IncrementVersionAsync(CacheKeys.CatalogVersion(shopId), AfterCommit.Token);
         }
 
         return response;

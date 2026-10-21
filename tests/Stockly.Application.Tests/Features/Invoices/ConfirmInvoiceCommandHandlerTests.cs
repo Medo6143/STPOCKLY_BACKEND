@@ -54,7 +54,8 @@ public sealed class ConfirmInvoiceCommandHandlerTests
     {
         var invoice = Reviewed(" شركة الأدوية ");
 
-        var result = await Handle(invoice.Id);
+        using var request = new CancellationTokenSource();
+        var result = await Handle(invoice.Id, request.Token);
 
         result.Value.Should().BeSameAs(_detail);
         _stock.Received(1).ReceiveFromInvoice(_panadol, 6m, invoice.Id, Arg.Any<Guid>(), UserId);
@@ -71,10 +72,10 @@ public sealed class ConfirmInvoiceCommandHandlerTests
         _context.UnitOfWork.CommitCount.Should().Be(1);
         _aliases.Select(alias => (alias.NormalizedAlias, alias.TimesConfirmed, alias.ProductId))
             .Should().BeEquivalentTo([("بنادول علبه", 1, _panadol.Id), ("فيتامين", 2, created.Id)]);
-        await _cache.Received(1).IncrementVersionAsync(CacheKeys.CatalogVersion(ShopId), Arg.Any<CancellationToken>());
-        await _cache.Received(1).RemoveAsync(CacheKeys.SuppliersList(ShopId), Arg.Any<CancellationToken>());
+        await _cache.Received(1).IncrementVersionAsync(CacheKeys.CatalogVersion(ShopId), Arg.Is<CancellationToken>(token => !token.CanBeCanceled));
+        await _cache.Received(1).RemoveAsync(CacheKeys.SuppliersList(ShopId), Arg.Is<CancellationToken>(token => !token.CanBeCanceled));
         await _context.StatusCache.Received(1).SetAsync(
-            ShopId, Arg.Is<InvoiceStatusSnapshot>(snapshot => snapshot.Status == DomainInvoiceStatus.Confirmed), Arg.Any<CancellationToken>());
+            ShopId, Arg.Is<InvoiceStatusSnapshot>(snapshot => snapshot.Status == DomainInvoiceStatus.Confirmed), Arg.Is<CancellationToken>(token => !token.CanBeCanceled));
     }
 
     [Fact]
@@ -186,7 +187,7 @@ public sealed class ConfirmInvoiceCommandHandlerTests
         return invoice;
     }
 
-    private Task<Result<InvoiceDetail>> Handle(Guid invoiceId) =>
+    private Task<Result<InvoiceDetail>> Handle(Guid invoiceId, CancellationToken cancellationToken = default) =>
         new ConfirmInvoiceCommandHandler(
                 _context.CurrentUser,
                 _context.CurrentTenant,
@@ -200,5 +201,5 @@ public sealed class ConfirmInvoiceCommandHandlerTests
                 _cache,
                 _context.StatusCache,
                 _context.Clock)
-            .Handle(new ConfirmInvoiceCommand(invoiceId), CancellationToken.None);
+            .Handle(new ConfirmInvoiceCommand(invoiceId), cancellationToken);
 }

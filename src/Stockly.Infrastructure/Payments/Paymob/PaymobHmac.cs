@@ -109,4 +109,10 @@ public static class PaymobHmac
     /// <summary>A JSON integer (or a string of digits); <c>null</c> otherwise.</summary>
     internal static long? AsLong(JsonNode? node) =>
         long.TryParse(AsText(node), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) ? parsed : null;
+
+    /// <summary>
+    /// The property <paramref name="name"/> of an object, or <c>null</c> when <paramref name="node"/> is not an object.
+    /// Paymob's answers are untrusted: <c>node["name"]</c> throws when the node is a number, a string or an array.
+    /// </summary>
+    internal static JsonNode? Field(JsonNode? node, string name) => node is JsonObject value ? value[name] : null;
 }

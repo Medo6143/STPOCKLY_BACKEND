@@ -75,6 +75,7 @@ None. The suspended-shop check reads `shops.status` from PostgreSQL on every aut
 - While locked, login returns `423 Auth.LockedOut` with `Retry-After` = whole seconds until `lockout_end`, rounded up, at least 1. The lock starts at the 5th failure and the failure count is reset then; after it ends, 5 new failures are needed.
 - A successful password check resets the failure count (also when the login then fails with `Auth.NoActiveShop` or `Shop.Suspended`).
 - The failed attempt is written although the command fails: `LoginCommand` is `ICommitOnFailure`.
+- The count is atomic: one `UPDATE users` adds the failure, and sets `lockout_end` and resets the count when it reaches 5, under the row lock. Counted on the loaded copy, failures made at the same moment all read the same count and all but one were lost to the concurrency stamp (review 2026-10-21).
 - Unknown emails keep returning `401 Auth.InvalidCredentials` (still one password hash) and are never locked.
 - Accepted trade-off (contract decision 18): a caller who fails 5 times on one email learns from the `423` that the account exists. The per-IP rate limit bounds how fast emails can be probed.
 - Time: lockout start and end follow `IClock`. `ClockTimeProvider` (`Infrastructure/Time`) is the `TimeProvider` backed by `IClock`; `StocklyUserManager` (`Infrastructure/Identity`) overrides `IsLockedOutAsync` and `AccessFailedAsync` to read it, because the stock Identity 10.0 `UserManager` reads `DateTimeOffset.UtcNow` directly there.

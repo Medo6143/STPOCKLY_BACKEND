@@ -17,14 +17,15 @@ public sealed class FailInvoiceProcessingCommandHandlerTests
     {
         var invoice = _context.ProcessingInvoice();
 
-        var result = await Handle(invoice.Id);
+        using var request = new CancellationTokenSource();
+        var result = await Handle(invoice.Id, request.Token);
 
         result.IsSuccess.Should().BeTrue();
         invoice.Status.Should().Be(InvoiceStatus.Failed);
         invoice.FailureReason.Should().Be(InvoiceFailureReason.Unexpected);
         _context.UnitOfWork.CommitCount.Should().Be(1);
         await _context.StatusCache.Received(1).SetAsync(
-            ShopId, Arg.Is<InvoiceStatusSnapshot>(snapshot => snapshot.Status == InvoiceStatus.Failed), Arg.Any<CancellationToken>());
+            ShopId, Arg.Is<InvoiceStatusSnapshot>(snapshot => snapshot.Status == InvoiceStatus.Failed), Arg.Is<CancellationToken>(token => !token.CanBeCanceled));
     }
 
     [Fact]
@@ -49,7 +50,7 @@ public sealed class FailInvoiceProcessingCommandHandlerTests
         await _context.StatusCache.DidNotReceive().SetAsync(Arg.Any<Guid>(), Arg.Any<InvoiceStatusSnapshot>(), Arg.Any<CancellationToken>());
     }
 
-    private Task<Result> Handle(Guid invoiceId) =>
+    private Task<Result> Handle(Guid invoiceId, CancellationToken cancellationToken = default) =>
         new FailInvoiceProcessingCommandHandler(_context.CurrentTenant, _context.Invoices, _context.StatusCache, _context.UnitOfWork, _context.Clock)
-            .Handle(new FailInvoiceProcessingCommand(invoiceId), CancellationToken.None);
+            .Handle(new FailInvoiceProcessingCommand(invoiceId), cancellationToken);
 }

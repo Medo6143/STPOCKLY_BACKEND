@@ -29,25 +29,23 @@ public sealed class ReconcilePaymentsCommandHandler(
         int paid = 0, expired = 0, failed = 0, skipped = 0;
         foreach (var candidate in due)
         {
-            if (candidate.Provider != gateway.Provider)
+            SettlementOutcome? outcome;
+            try
             {
-                skipped++;
-                continue;
+                outcome = await ReconcileAsync(candidate, cancellationToken);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                // The batch is oldest first, so a payment that keeps throwing would stop every later run for every
+                // shop. It is skipped instead, and the job logs the skipped count.
+                outcome = null;
             }
 
-            var latest = await gateway.FindLatestTransactionAsync(candidate.ProviderOrderId, cancellationToken);
-            if (latest.IsFailure)
-            {
-                skipped++;
-                continue;
-            }
-
-            var outcome = await unitOfWork.ExecuteInTransactionAsync(
-                token => SettleAsync(candidate.PaymentId, latest.Value, token),
-                _ => true,
-                cancellationToken);
             switch (outcome)
             {
+                case null:
+                    skipped++;
+                    break;
                 case SettlementOutcome.Paid:
                     paid++;
                     break;
@@ -63,6 +61,26 @@ public sealed class ReconcilePaymentsCommandHandler(
         }
 
         return new ReconcileSummary(due.Count, paid, expired, failed, skipped);
+    }
+
+    /// <summary>The outcome for one payment, or <c>null</c> when it is skipped until the next run.</summary>
+    private async Task<SettlementOutcome?> ReconcileAsync(ExpiredPayment candidate, CancellationToken cancellationToken)
+    {
+        if (candidate.Provider != gateway.Provider)
+        {
+            return null;
+        }
+
+        var latest = await gateway.FindLatestTransactionAsync(candidate.ProviderOrderId, cancellationToken);
+        if (latest.IsFailure)
+        {
+            return null;
+        }
+
+        return await unitOfWork.ExecuteInTransactionAsync(
+            token => SettleAsync(candidate.PaymentId, latest.Value, token),
+            _ => true,
+            cancellationToken);
     }
 
     private async Task<SettlementOutcome> SettleAsync(Guid paymentId, ProviderTransaction? latest, CancellationToken cancellationToken)

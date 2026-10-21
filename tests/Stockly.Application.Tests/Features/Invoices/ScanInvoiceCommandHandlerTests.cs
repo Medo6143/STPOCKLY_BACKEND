@@ -28,7 +28,8 @@ public sealed class ScanInvoiceCommandHandlerTests
         Invoice? added = null;
         _context.Invoices.When(repository => repository.Add(Arg.Any<Invoice>())).Do(call => added = call.Arg<Invoice>());
 
-        var result = await Handle(Command());
+        using var request = new CancellationTokenSource();
+        var result = await Handle(Command(), request.Token);
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Created.Should().BeTrue();
@@ -45,11 +46,15 @@ public sealed class ScanInvoiceCommandHandlerTests
             InvoiceImageFormat.Jpeg,
             Arg.Any<CancellationToken>());
         _context.UnitOfWork.SaveCount.Should().Be(1);
-        _context.Jobs.Received(1).EnqueueProcessInvoice(ShopId, added.Id);
-        await _context.StatusCache.Received(1).SetAsync(
-            ShopId,
-            Arg.Is<InvoiceStatusSnapshot>(snapshot => snapshot.InvoiceId == added.Id && snapshot.Status == Domain.Invoices.InvoiceStatus.Processing),
-            Arg.Any<CancellationToken>());
+        // Cached before the job is queued: a fast job's NeedsReview must not be overwritten by this Processing.
+        Received.InOrder(() =>
+        {
+            _context.StatusCache.SetAsync(
+                ShopId,
+                Arg.Is<InvoiceStatusSnapshot>(snapshot => snapshot.InvoiceId == added.Id && snapshot.Status == Domain.Invoices.InvoiceStatus.Processing),
+                Arg.Is<CancellationToken>(token => !token.CanBeCanceled));
+            _context.Jobs.EnqueueProcessInvoice(ShopId, added.Id);
+        });
     }
 
     [Fact]
@@ -270,7 +275,7 @@ public sealed class ScanInvoiceCommandHandlerTests
     private static InvoiceListItem ListItem(ContractInvoiceStatus status, DateTimeOffset createdAt) =>
         new(Guid.CreateVersion7(), status, null, null, null, null, 0, [], createdAt.UtcDateTime);
 
-    private Task<Result<ScanInvoiceResult>> Handle(ScanInvoiceCommand command) =>
+    private Task<Result<ScanInvoiceResult>> Handle(ScanInvoiceCommand command, CancellationToken cancellationToken = default) =>
         new ScanInvoiceCommandHandler(
                 _context.CurrentUser,
                 _context.CurrentTenant,
@@ -285,7 +290,7 @@ public sealed class ScanInvoiceCommandHandlerTests
                 _context.UnitOfWork,
                 _context.Clock,
                 _context.ScanOptions)
-            .Handle(command, CancellationToken.None);
+            .Handle(command, cancellationToken);
 
     private async Task NothingStoredAsync()
     {

@@ -39,14 +39,20 @@ public sealed class AdminInvoiceAndMiscHandlerTests
         var commitsWhenQueued = -1;
         _context.Jobs.When(jobs => jobs.EnqueueRerunInvoice(ShopId, invoice.Id)).Do(_ => commitsWhenQueued = _context.UnitOfWork.CommitCount);
 
-        var result = await Rerun(invoice.Id, "AI outage over");
+        using var request = new CancellationTokenSource();
+        var result = await Rerun(invoice.Id, "AI outage over", request.Token);
 
         result.Value.Should().Be(record.Invoice);
         invoice.Status.Should().Be(DomainInvoiceStatus.Processing);
         commitsWhenQueued.Should().Be(1, "the job is queued only after the transaction committed");
         _context.Jobs.DidNotReceiveWithAnyArgs().EnqueueProcessInvoice(default, default);
-        await _context.StatusCache.Received(1).SetAsync(
-            ShopId, Arg.Is<InvoiceStatusSnapshot>(snapshot => snapshot.Status == DomainInvoiceStatus.Processing), Arg.Any<CancellationToken>());
+        // Cached before the job is queued: a fast job's status must not be overwritten by this Processing.
+        Received.InOrder(() =>
+        {
+            _context.StatusCache.SetAsync(
+                ShopId, Arg.Is<InvoiceStatusSnapshot>(snapshot => snapshot.Status == DomainInvoiceStatus.Processing), Arg.Is<CancellationToken>(token => !token.CanBeCanceled));
+            _context.Jobs.EnqueueRerunInvoice(ShopId, invoice.Id);
+        });
         var entry = _context.Audited.Should().ContainSingle().Subject;
         entry.Should().BeEquivalentTo(new { Action = AdminActions.InvoiceRerun, TargetType = AdminTargets.Invoice, TargetId = invoice.Id, Reason = "AI outage over" });
         entry.Before.Should().Be("""{"status":"Failed","failureReason":"AiUnavailable"}""");
@@ -233,9 +239,9 @@ public sealed class AdminInvoiceAndMiscHandlerTests
         new SeedPlatformAdminCommandHandler(_context.Admins, _context.Clock)
             .Handle(new SeedPlatformAdminCommand(" admin@example.com ", "Str0ngPass", " Platform Admin "), CancellationToken.None);
 
-    private Task<Domain.Common.Result<InvoiceDetail>> Rerun(Guid id, string? reason) =>
+    private Task<Domain.Common.Result<InvoiceDetail>> Rerun(Guid id, string? reason, CancellationToken cancellationToken = default) =>
         new RerunInvoiceCommandHandler(_context.CurrentUser, _context.Invoices, _context.Audit, _context.Jobs, _context.StatusCache, _context.UnitOfWork)
-            .Handle(new RerunInvoiceCommand(id, reason), CancellationToken.None);
+            .Handle(new RerunInvoiceCommand(id, reason), cancellationToken);
 
     private static Invoice FailedInvoice()
     {

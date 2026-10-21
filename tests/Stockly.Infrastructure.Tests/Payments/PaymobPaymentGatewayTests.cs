@@ -23,6 +23,10 @@ public sealed class PaymobPaymentGatewayTests : IDisposable
     private static readonly DateTimeOffset Now = new(2026, 10, 18, 10, 0, 0, TimeSpan.Zero);
     private static readonly Guid PaymentId = Guid.Parse("0192f0a0-0000-7000-8000-0000000000c1");
 
+    private static readonly string[] TokenInAnArray = ["auth-token-1"];
+    private static readonly int[] KeyAsANumber = [1];
+    private static readonly string[] NotAnObject = ["not", "an", "object"];
+
     private readonly FakePaymob _paymob = new();
     private readonly ListLoggerProvider _logs = new();
     private ServiceProvider? _provider;
@@ -320,6 +324,60 @@ public sealed class PaymobPaymentGatewayTests : IDisposable
         _paymob.Answer(PaymobPaths.AuthToken, Status(HttpStatusCode.InternalServerError));
 
         (await Gateway().FindLatestTransactionAsync("1", CancellationToken.None)).Error.Should().Be(PaymentErrors.ProviderUnavailable);
+    }
+
+    [Fact]
+    public async Task FindLatestTransaction_OrderAsANumber_ReadsItsId()
+    {
+        var transaction = Transaction("265715202", 477136036, 19950);
+        transaction["order"] = 265715202;
+        _paymob.Answer(PaymobPaths.AuthToken, Json(HttpStatusCode.Created, new { token = "auth-token-1" }));
+        _paymob.Answer(PaymobPaths.Inquiry, Json(HttpStatusCode.OK, transaction));
+
+        var result = await Gateway().FindLatestTransactionAsync("265715202", CancellationToken.None);
+
+        result.Value!.ProviderOrderId.Should().Be("265715202");
+    }
+
+    [Fact]
+    public async Task FindLatestTransaction_DataNotAnObject_FailedWithoutAReason()
+    {
+        var transaction = Transaction("265715202", 477136036, 19950, success: false);
+        transaction["data"] = "declined";
+        _paymob.Answer(PaymobPaths.AuthToken, Json(HttpStatusCode.Created, new { token = "auth-token-1" }));
+        _paymob.Answer(PaymobPaths.Inquiry, Json(HttpStatusCode.OK, transaction));
+
+        var result = await Gateway().FindLatestTransactionAsync("265715202", CancellationToken.None);
+
+        result.Value!.Outcome.Should().Be(ProviderTransactionOutcome.Failed);
+        result.Value.FailureReason.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task FindLatestTransaction_AuthAnswerNotAnObject_ReturnsProviderUnavailable()
+    {
+        _paymob.Answer(PaymobPaths.AuthToken, Json(HttpStatusCode.Created, TokenInAnArray));
+
+        (await Gateway().FindLatestTransactionAsync("1", CancellationToken.None)).Error.Should().Be(PaymentErrors.ProviderUnavailable);
+    }
+
+    [Fact]
+    public async Task Checkout_AnswersOfAnotherShape_ReturnProviderUnavailableInsteadOfThrowing()
+    {
+        // Each step answers JSON of an unexpected shape (a string, a number, an array where an object is read).
+        _paymob.Answer(PaymobPaths.Intention, Json(HttpStatusCode.Created, new { client_secret = "egy_csk_test_123", payment_keys = KeyAsANumber }));
+        (await Gateway().CreateCheckoutAsync(Request(PaymentMethod.Card), CancellationToken.None)).Error
+            .Should().Be(PaymentErrors.ProviderUnavailable);
+
+        _paymob.Answer(PaymobPaths.Intention, Intention(orderId: 42));
+        _paymob.Answer(PaymobPaths.Pay, Json(HttpStatusCode.OK, NotAnObject));
+        (await Gateway().CreateCheckoutAsync(Request(PaymentMethod.Wallet, walletPhone: "01012345678"), CancellationToken.None)).Error
+            .Should().Be(PaymentErrors.ProviderUnavailable);
+
+        _paymob.Answer(PaymobPaths.Intention, Intention(orderId: 43));
+        _paymob.Answer(PaymobPaths.Pay, Json(HttpStatusCode.OK, new { pending = true, data = "no reference" }));
+        (await Gateway().CreateCheckoutAsync(Request(PaymentMethod.Kiosk), CancellationToken.None)).Error
+            .Should().Be(PaymentErrors.ProviderUnavailable);
     }
 
     private static Dictionary<string, string> Query(string hmac) => new() { ["hmac"] = hmac };

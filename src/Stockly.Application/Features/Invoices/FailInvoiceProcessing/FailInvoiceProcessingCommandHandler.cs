@@ -51,7 +51,7 @@ public sealed class FailInvoiceProcessingCommandHandler(
             return failed.Error;
         }
 
-        await statusCache.SetAsync(shopId, failed.Value.ToStatusSnapshot(), cancellationToken);
+        await statusCache.SetAsync(shopId, failed.Value.ToStatusSnapshot(), AfterCommit.Token);
         return Result.Success();
     }
 }

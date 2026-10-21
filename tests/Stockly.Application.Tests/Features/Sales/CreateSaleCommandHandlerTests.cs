@@ -47,7 +47,8 @@ public sealed class CreateSaleCommandHandlerTests
     [Fact]
     public async Task Handle_NewSale_HeaderFirstThenLinesAndStockInBaseUnitsAndBumpAfterCommit()
     {
-        var result = await Handle(Command(Line(_box.Id, "2"), Line(_product.BaseUnit.Id, "1.5", "14.25")));
+        using var request = new CancellationTokenSource();
+        var result = await Handle(Command(Line(_box.Id, "2"), Line(_product.BaseUnit.Id, "1.5", "14.25")), request.Token);
 
         result.Value.Created.Should().BeTrue();
         result.Value.Sale.Should().BeSameAs(_dto);
@@ -59,7 +60,7 @@ public sealed class CreateSaleCommandHandlerTests
         _stock.Received(1).RecordSale(_product, 1.5m, sale.Id, Arg.Any<Guid>(), UserId);
         _product.Quantity.Should().Be(-7.5m, "negative stock never blocks");
         _context.UnitOfWork.SaveCount.Should().Be(2, "the header is saved before the products are locked");
-        await _cache.Received(1).IncrementVersionAsync(CacheKeys.CatalogVersion(ShopId), Arg.Any<CancellationToken>());
+        await _cache.Received(1).IncrementVersionAsync(CacheKeys.CatalogVersion(ShopId), Arg.Is<CancellationToken>(token => !token.CanBeCanceled));
     }
 
     [Fact]
@@ -189,8 +190,8 @@ public sealed class CreateSaleCommandHandlerTests
 
     private SaleItemRequest Line(Guid unitId, string quantity, string? unitPrice = null) => new(_product.Id, unitId, quantity, unitPrice);
 
-    private Task<Result<CreateSaleResult>> Handle(CreateSaleCommand command) =>
+    private Task<Result<CreateSaleResult>> Handle(CreateSaleCommand command, CancellationToken cancellationToken = default) =>
         new CreateSaleCommandHandler(
                 _context.CurrentUser, _context.CurrentTenant, _sales, _queries, _context.Products, _stock, _context.UnitOfWork, _cache, _context.Clock)
-            .Handle(command, CancellationToken.None);
+            .Handle(command, cancellationToken);
 }

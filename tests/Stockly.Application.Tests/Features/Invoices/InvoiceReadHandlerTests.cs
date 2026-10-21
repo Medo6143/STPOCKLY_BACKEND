@@ -59,10 +59,12 @@ public sealed class InvoiceReadHandlerTests
         var result = await GetInvoice(InvoiceId);
 
         result.Value.Status.Should().Be(ContractInvoiceStatus.Processing);
-        await _context.StatusCache.Received(1).SetAsync(
+        // Only if absent: the job may have written NeedsReview after this read, and that must win.
+        await _context.StatusCache.Received(1).SetIfAbsentAsync(
             ShopId,
             new InvoiceStatusSnapshot(InvoiceId, DomainInvoiceStatus.Processing, CreatedAt, ClientRequestId, CreatedAt),
             Arg.Any<CancellationToken>());
+        await _context.StatusCache.DidNotReceiveWithAnyArgs().SetAsync(default, default!, default);
     }
 
     [Fact]

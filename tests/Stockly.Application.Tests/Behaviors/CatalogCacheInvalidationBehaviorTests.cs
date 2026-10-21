@@ -46,6 +46,27 @@ public sealed class CatalogCacheInvalidationBehaviorTests
     }
 
     [Fact]
+    public async Task Handle_RequestCancelledRightAfterTheCommit_StillBumps()
+    {
+        // The client disconnects just after the sale committed: the bump must still reach Redis, or the retry returns
+        // the existing sale and the old quantities stay cached.
+        using var request = new CancellationTokenSource();
+
+        var result = await Behavior().Handle(
+            new CatalogWrite(),
+            async _ =>
+            {
+                await request.CancelAsync();
+                return Result.Success();
+            },
+            request.Token);
+
+        result.IsSuccess.Should().BeTrue();
+        await _cache.Received(1).IncrementVersionAsync(
+            $"stockly:{ShopId}:ver:catalog", Arg.Is<CancellationToken>(token => !token.CanBeCanceled));
+    }
+
+    [Fact]
     public async Task Handle_Failure_DoesNotBump()
     {
         var result = await Behavior().Handle(

@@ -43,7 +43,8 @@ public sealed class GetInvoiceQueryHandler(
 
         if (detail.Status == Contracts.Invoices.InvoiceStatus.Processing)
         {
-            await statusCache.SetAsync(shopId, InvoiceMapping.ToStatusSnapshot(detail), cancellationToken);
+            // Only if absent: the job may have finished and cached its status after this read.
+            await statusCache.SetIfAbsentAsync(shopId, InvoiceMapping.ToStatusSnapshot(detail), cancellationToken);
         }
 
         return detail;
